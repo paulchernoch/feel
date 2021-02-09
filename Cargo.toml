@@ -1,0 +1,13 @@
+[package]
+name = "feel"
+version = "0.1.0"
+authors = ["Paul Chernoch <paul.chernoch@yahoo.com>"]
+edition = "2018"
+description = "Domain Model and Notation Feel Language interpreter"
+keywords = ["Domain Model and Notation", "DMN", "Feel", "Friendly Enough Expression Language"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+pest = "2.1"
+pest_derive = "2.1"

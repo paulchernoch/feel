@@ -1,0 +1,671 @@
+// Pest Grammar for the DMN Feel Language
+
+// Ported to Rust's Pest parser from a Peg.js-based Javascript Feel Parser in this project:
+// https://github.com/EdgeVerve/feel
+
+// The PEG.js grammar often explicitly included whitespace tokens in its rules, indicated by __ (a double underscore).
+// Pest supports implicit whitespace rules. Where feasible, the grammar rules have been rewritten 
+// with the double underscore tokens removed. Only rules where whitespace is not permitted in at least one position
+// will retain the original practice of using explicit whitespace rules.
+//
+// The resulting parse tree would have many superfluous levels, so much use has been made of
+// the rule modifier @ to merge tokens below it and $, @, or ! at a lower level to turn
+// token retainment back on. This leaves many fewer superfluous tokens in the Pairs stream.
+
+// Feel
+
+// /////////////////////////////////////
+
+// The start rule is the primary rule that matches all input.
+
+start = @{ SOI ~ start_expression? ~ EOI }
+
+start_expression = {
+      expression
+    | simple_unary_tests
+}
+
+expression = {
+      boxed_expression ~ !(__ ~ ("[" | "."))
+    | textual_expression
+}
+
+textual_expression = @{
+      txt_expa // function definition | for expression | if expression | quantified expression |
+    | txt_expb // disjunction |
+    | txt_expc // conjunction |
+    | txt_expd // comparison |
+    | txt_expe // arithmetic expression |
+    | txt_expf // instance of |
+    | txt_expg // path expression |
+    | txt_exph // filter expression | function invocation |
+    | txt_expi // literal | simple positive unary test | name | "(" , textual expression , ")"
+}
+
+simple_expression = @{
+      arithmetic_expression
+    | simple_value
+}
+
+simple_expressions = !{
+    simple_expression ~ (","~ simple_expression)*
+}
+
+txt_expi = {
+      parenthesized_expression
+    | name
+    | literal
+    | simple_positive_unary_test
+}
+
+// Added so we can suppress txt_expi in Pair stream
+parenthesized_expression = !{
+    "(" ~ textual_expression ~ ")"
+}
+
+// Expressions End
+
+// /////////////////////////////////////
+
+// Name Start
+
+// TODO: Investigate if a small set of Pest binary unicode attribute rules can replace this mess.
+name_start_unicode_char = _{ 
+      '\u{0300}'..'\u{036F}' | '\u{0483}'..'\u{0487}' | '\u{0591}'..'\u{05BD}' | "\u{05BF}" 
+    | '\u{05C1}'..'\u{05C2}' | '\u{05C4}'..'\u{05C5}' | "\u{05C7}" | '\u{0610}'..'\u{061A}' 
+    | '\u{064B}'..'\u{065F}' | "\u{0670}" | '\u{06D6}'..'\u{06DC}' | '\u{06DF}'..'\u{06E4}' 
+    | '\u{06E7}'..'\u{06E8}' | '\u{06EA}'..'\u{06ED}' | "\u{0711}" | '\u{0730}'..'\u{074A}' 
+    | '\u{07A6}'..'\u{07B0}' | '\u{07EB}'..'\u{07F3}' | '\u{0816}'..'\u{0819}' | '\u{081B}'..'\u{0823}' 
+    | '\u{0825}'..'\u{0827}' | '\u{0829}'..'\u{082D}' | '\u{0859}'..'\u{085B}' | '\u{08E3}'..'\u{0902}' 
+    | "\u{093A}" | "\u{093C}" | '\u{0941}'..'\u{0948}' | "\u{094D}" | '\u{0951}'..'\u{0957}' 
+    | '\u{0962}'..'\u{0963}' | "\u{0981}" | "\u{09BC}" | '\u{09C1}'..'\u{09C4}' | "\u{09CD}" 
+    | '\u{09E2}'..'\u{09E3}' | '\u{0A01}'..'\u{0A02}' | "\u{0A3C}" | '\u{0A41}'..'\u{0A42}' 
+    | '\u{0A47}'..'\u{0A48}' | '\u{0A4B}'..'\u{0A4D}' | "\u{0A51}" | '\u{0A70}'..'\u{0A71}' 
+    | "\u{0A75}" | '\u{0A81}'..'\u{0A82}' | "\u{0ABC}" | '\u{0AC1}'..'\u{0AC5}' | '\u{0AC7}'..'\u{0AC8}' 
+    | "\u{0ACD}" | '\u{0AE2}'..'\u{0AE3}' | "\u{0B01}" | "\u{0B3C}" | "\u{0B3F}" | '\u{0B41}'..'\u{0B44}'
+    | "\u{0B4D}" | "\u{0B56}" | '\u{0B62}'..'\u{0B63}' | "\u{0B82}" | "\u{0BC0}" | "\u{0BCD}" 
+    | "\u{0C00}" | '\u{0C3E}'..'\u{0C40}' | '\u{0C46}'..'\u{0C48}' | '\u{0C4A}'..'\u{0C4D}' 
+    | '\u{0C55}'..'\u{0C56}' | '\u{0C62}'..'\u{0C63}' | "\u{0C81}" | "\u{0CBC}" | "\u{0CBF}" 
+    | "\u{0CC6}" | '\u{0CCC}'..'\u{0CCD}' | '\u{0CE2}'..'\u{0CE3}' | "\u{0D01}" | '\u{0D41}'..'\u{0D44}' 
+    | "\u{0D4D}" | '\u{0D62}'..'\u{0D63}' | "\u{0DCA}" | '\u{0DD2}'..'\u{0DD4}' | "\u{0DD6}" 
+    | "\u{0E31}" | '\u{0E34}'..'\u{0E3A}' | '\u{0E47}'..'\u{0E4E}' | "\u{0EB1}" | '\u{0EB4}'..'\u{0EB9}'
+    | '\u{0EBB}'..'\u{0EBC}' | '\u{0EC8}'..'\u{0ECD}' | '\u{0F18}'..'\u{0F19}' | "\u{0F35}" 
+    | "\u{0F37}" | "\u{0F39}" | '\u{0F71}'..'\u{0F7E}' | '\u{0F80}'..'\u{0F84}' | '\u{0F86}'..'\u{0F87}' 
+    | '\u{0F8D}'..'\u{0F97}' | '\u{0F99}'..'\u{0FBC}' | "\u{0FC6}" | '\u{102D}'..'\u{1030}' 
+    | '\u{1032}'..'\u{1037}' | '\u{1039}'..'\u{103A}' | '\u{103D}'..'\u{103E}' | '\u{1058}'..'\u{1059}' 
+    | '\u{105E}'..'\u{1060}' | '\u{1071}'..'\u{1074}' | "\u{1082}" | '\u{1085}'..'\u{1086}' | "\u{108D}"
+    | "\u{109D}" | '\u{135D}'..'\u{135F}' | '\u{1712}'..'\u{1714}' | '\u{1732}'..'\u{1734}' 
+    | '\u{1752}'..'\u{1753}' | '\u{1772}'..'\u{1773}' | '\u{17B4}'..'\u{17B5}' | '\u{17B7}'..'\u{17BD}'
+    | "\u{17C6}" | '\u{17C9}'..'\u{17D3}' | "\u{17DD}" | '\u{180B}'..'\u{180D}' | "\u{18A9}"
+    | '\u{1920}'..'\u{1922}' | '\u{1927}'..'\u{1928}' | "\u{1932}" | '\u{1939}'..'\u{193B}' 
+    | '\u{1A17}'..'\u{1A18}' | "\u{1A1B}" | "\u{1A56}" | '\u{1A58}'..'\u{1A5E}' | "\u{1A60}" 
+    | "\u{1A62}" | '\u{1A65}'..'\u{1A6C}' | '\u{1A73}'..'\u{1A7C}' | "\u{1A7F}" | '\u{1AB0}'..'\u{1ABD}' 
+    | '\u{1B00}'..'\u{1B03}' | "\u{1B34}" | '\u{1B36}'..'\u{1B3A}' | "\u{1B3C}" | "\u{1B42}" 
+    | '\u{1B6B}'..'\u{1B73}' | '\u{1B80}'..'\u{1B81}' | '\u{1BA2}'..'\u{1BA5}' | '\u{1BA8}'..'\u{1BA9}'
+    | '\u{1BAB}'..'\u{1BAD}' | "\u{1BE6}" | '\u{1BE8}'..'\u{1BE9}' | "\u{1BED}" | '\u{1BEF}'..'\u{1BF1}' 
+    | '\u{1C2C}'..'\u{1C33}' | '\u{1C36}'..'\u{1C37}' | '\u{1CD0}'..'\u{1CD2}' | '\u{1CD4}'..'\u{1CE0}' 
+    | '\u{1CE2}'..'\u{1CE8}' | "\u{1CED}" | "\u{1CF4}" | '\u{1CF8}'..'\u{1CF9}' | '\u{1DC0}'..'\u{1DF5}' 
+    | '\u{1DFC}'..'\u{1DFF}' | '\u{20D0}'..'\u{20DC}' | "\u{20E1}" | '\u{20E5}'..'\u{20F0}' 
+    | '\u{2CEF}'..'\u{2CF1}' | "\u{2D7F}" | '\u{2DE0}'..'\u{2DFF}' | '\u{302A}'..'\u{302D}' 
+    | '\u{3099}'..'\u{309A}' | "\u{A66F}" | '\u{A674}'..'\u{A67D}' | '\u{A69E}'..'\u{A69F}' 
+    | '\u{A6F0}'..'\u{A6F1}' | "\u{A802}" | "\u{A806}" | "\u{A80B}" | '\u{A825}'..'\u{A826}' 
+    | "\u{A8C4}" | '\u{A8E0}'..'\u{A8F1}' | '\u{A926}'..'\u{A92D}' | '\u{A947}'..'\u{A951}' 
+    | '\u{A980}'..'\u{A982}' | "\u{A9B3}" | '\u{A9B6}'..'\u{A9B9}' | "\u{A9BC}" | "\u{A9E5}" 
+    | '\u{AA29}'..'\u{AA2E}' | '\u{AA31}'..'\u{AA32}' | '\u{AA35}'..'\u{AA36}' | "\u{AA43}" 
+    | "\u{AA4C}" | "\u{AA7C}" | "\u{AAB0}" | '\u{AAB2}'..'\u{AAB4}' | '\u{AAB7}'..'\u{AAB8}' 
+    | '\u{AABE}'..'\u{AABF}' | "\u{AAC1}" | '\u{AAEC}'..'\u{AAED}' | "\u{AAF6}" | "\u{ABE5}" 
+    | "\u{ABE8}" | "\u{ABED}" | "\u{FB1E}" | '\u{FE00}'..'\u{FE0F}' | '\u{FE20}'..'\u{FE2F}'
+}
+
+name_part_unicode_char = _{
+    "\u{0B70}" | '\u{0300}'..'\u{036F}' | '\u{203F}'..'\u{2040}'
+}
+
+name_start_char = _{
+      "?"
+    | ASCII_ALPHA
+    | "_"
+    | name_start_unicode_char
+}
+
+name_part_char = _{
+      name_start_char
+    | ASCII_DIGIT
+    | name_part_unicode_char
+    | "'"
+}
+
+name_start = @{ name_start_char ~ (name_part_char)* }
+
+name_part = @{ name_part_char ~ (name_part_char)* }
+
+name = ${ 
+    "time zone"
+    | (!reserved_word) ~ name_start ~ (__ ~ (!reserved_word) ~ __ ~ name_part)*
+}
+
+// Name End
+
+// /////////////////////////////////////
+
+// Literal Start
+
+literal = @{
+      simple_literal
+    | null_literal
+}
+
+simple_literal = @{
+      numeric_literal
+    | string_literal
+    | boolean_literal
+    | date_time_literal
+}
+
+null_literal = !{ null_token }
+
+boolean_literal = @{
+      true_token
+    | false_token
+}
+
+digit = @{ ASCII_DIGIT }
+
+digits = @{ ASCII_DIGIT+ }
+
+numeric_literal = @{ ("-")? ~ __ ~ decimal_number }
+
+decimal_number = @{
+      (digits ~ "." ~ digits)
+    | ("." ~ digits)
+    | digits
+}
+
+string_literal = @{
+    ("\"" ~ double_string_character* ~ "\"")
+  | ("'" ~ single_string_character* ~ "'")
+}
+
+double_string_character = @{
+    (!("\"" | "\\" | line_terminator) ~ source_character) 
+  | ("\\" ~ escape_sequence)
+  | line_continuation
+}
+
+single_string_character = @{
+    (!("'" | "\\" | line_terminator) ~ source_character)
+  | ("\\" ~ escape_sequence)
+  | line_continuation
+}
+
+line_continuation = !{
+  "\\" ~ line_terminator_sequence 
+}
+
+escape_sequence = @{ character_escape_sequence }
+
+character_escape_sequence = @{ single_escape_character }
+
+single_escape_character = @{
+    "'"
+  | "\""
+  | "\\"
+  | "b"
+  | "f"
+  | "n"
+  | "r"
+  | "t"
+  | "v"
+}
+
+line_terminator = !{ 
+    "\n"
+  | "\r"
+  | "\u{2028}"
+  | "\u{2029}"
+}
+
+line_terminator_sequence = @{
+    "\n"
+  | "\r\n"
+  | "\r"
+  | "\u{2028}"
+  | "\u{2029}"
+}
+
+date_time_literal = ${
+     date_time_keyword ~ "(" ~ __ ~ expression ~ (__ ~ "," ~ __ ~ expression)* ~ __ ~ ")"
+}
+
+// Literal End
+
+// /////////////////////////////////////
+
+// simple_positive_unary_test Start
+
+simple_positive_unary_test = !{
+      unary_operator? ~ endpoint ~ !(arithmetic_operator | reserved_word | "..")
+    | interval
+}
+
+unary_operator = !{
+      "<="
+    | ">="
+    | "<"
+    | ">"
+}
+
+arithmetic_operator = !{
+      "+"
+    | "-"
+    | "*" ~ !"*"
+    | "/"
+    | "**"
+}
+
+interval = ${
+    interval_start ~ !(interval_start | interval_end) ~ __ ~ endpoint ~ __ ~ ".." ~ __ ~ endpoint ~ __ ~ interval_end
+}
+
+interval_start = !{
+      open_interval_start
+    | closed_interval_start
+}
+
+
+interval_end = !{
+      open_interval_end
+    | closed_interval_end
+}
+
+open_interval_start = !{ "(" | "]" }
+
+closed_interval_start = !{ "[" }
+
+open_interval_end = !{ ")" | "[" }
+
+closed_interval_end = !{ "]" }
+
+endpoint = @{ simple_value }
+
+simple_value = {
+      qualified_name
+    | simple_literal
+}
+
+qualified_name = !{
+    name ~ ("->" ~ name)*
+}
+
+// simple_positive_unary_test End
+
+// /////////////////////////////////////
+
+// simple_unary_tests Start
+
+simple_unary_tests = !{
+      simple_positive_unary_tests
+    | not_token ~ "(" ~ simple_positive_unary_tests ~ ")"
+    | "-"
+}
+
+simple_positive_unary_tests = !{
+    positive_unary_test ~ ("," ~ positive_unary_test)*
+}
+
+// simple_unary_tests End
+
+// /////////////////////////////////////
+
+// positive_unary_test Start
+
+positive_unary_test = !{
+      simple_positive_unary_test
+    | null_literal
+}
+
+positive_unary_tests = !{
+    positive_unary_test ~ ( "," ~ positive_unary_test)*
+}
+
+// positive_unary_test End
+
+// /////////////////////////////////////
+
+// unary_tests Start
+
+unary_tests = !{
+      positive_unary_tests
+    | not_token ~ "(" ~ positive_unary_tests ~ ")"
+    | "-"
+}
+
+// unary_tests End
+
+// /////////////////////////////////////
+
+// Miscellaneous expression Start
+
+txt_exph = {
+      filter_expression
+    | function_invocation
+}
+
+left_exph = { txt_expi }
+
+filter_expression = !{
+      (left_exph ~ "[" ~ expression ~ "]")
+    | (boxed_expression ~ "[" ~ expression ~ "]")
+}
+
+function_invocation = !{
+    left_exph ~ "(" ~ (named_parameters | positional_parameters)? ~ ")"
+}
+
+named_parameters = !{
+    named_parameter ~ ("," ~ named_parameter)*
+}
+
+named_parameter = !{
+    name ~ ":" ~ expression
+}
+
+positional_parameters = !{
+    expression ~ ("," ~ expression)*
+}
+
+txt_expg = { path_expression }
+
+left_expg = {
+      txt_exph
+    | left_exph
+}
+
+path_expression = !{
+      (left_expg ~ ("." ~ expression)+)
+    | (boxed_expression ~ ("." ~ expression)+)
+}
+
+txt_expf = { instance_of }
+
+left_expf = {
+      txt_expg
+    | left_expg
+}
+
+instance_of = !{
+	left_expf ~ instance_of_token ~ qualified_name
+}
+
+txt_expe = { arithmetic_expression }
+
+left_expe = {
+      txt_expf
+    | left_expf
+}
+
+arithmetic_expression = {
+      additive
+    | multiplicative
+    | exponentiation
+    | arithmetic_negation
+}
+
+arithmetic_negation = !{
+    "-" ~ expression
+}
+
+unary_expression = @{
+      left_expe
+    | arithmetic_negation
+}
+
+exponentiation = !{
+    unary_expression ~ ("**" ~ unary_expression)*
+}
+
+multiplicative_operator = @{
+    ("*" ~ !"*")
+  | "/"
+}
+
+multiplicative = !{
+    exponentiation ~ (multiplicative_operator ~ exponentiation)*
+}
+
+additive = !{
+    multiplicative ~ ( ("+" | "-") ~ multiplicative)*
+}
+
+txt_expd = { comparision }
+
+left_expd	= { 
+      txt_expe
+    | left_expe 
+}
+
+comparision_operator = @{ 
+      "="
+    | "!="
+    | ("<" ~ !"=")
+    | "<="
+    | (">" ~ !"=")
+    | ">="
+}
+
+comparision = !{
+      left_expd ~ (comparision_operator ~ left_expd)+
+    | left_expd ~ between_token ~ left_expd ~ and_token ~ left_expd
+    | left_expd ~ in_token ~ positive_unary_test
+    | left_expd ~ in_token ~ "(" ~ positive_unary_tests ~ ")"
+}
+
+txt_expc = { conjunction }
+
+left_expc = {
+      txt_expd
+    | left_expd
+}
+
+conjunction = !{
+    left_expc ~ (and_token ~ left_expc)+
+}
+
+txt_expb = { disjunction }
+
+left_expb = {
+      txt_expc
+    | left_expc
+}
+
+disjunction = !{
+  left_expb ~ (or_token ~ left_expb)+
+}
+
+txt_expa = {
+      function_definition
+    | for_expression
+    | if_expression
+    | quantified_expression
+}
+
+left_expa = {
+      txt_expb
+    | left_expb
+}
+
+// Note: Space not permitted between the function name and the opening parenthesis.
+//       This necessitates use of explicit whitespace tokens.
+function_definition = ${
+    function_token ~ "(" ~ (__ ~ formal_parameters)? ~ __ ~ ")" ~ __ ~ function_body
+}
+
+function_body = !{
+    external_token? ~ expression
+}
+
+formal_parameters = !{
+    name ~ ("," ~ name)*
+}
+
+for_expression = !{
+    for_token ~ in_expressions ~ return_token ~ expression
+}
+
+in_expressions = !{
+    in_expression ~ ("," ~ in_expression)*
+}
+
+in_expression = !{
+    name ~ in_token ~ expression
+}
+
+if_expression = !{
+    if_token ~ expression ~ then_token ~ expression ~ else_token ~ expression
+}
+
+quantified_expression = ${
+    (some_token | every_token) ~ white_space+ ~ in_expressions ~ __ ~ satisfies_token ~ __ ~ expression
+}
+
+boxed_expression = !{
+      list
+    | function_definition
+    | context
+}
+
+list = !{
+    "[" ~ list_entries? ~ "]"
+}
+
+list_entries = {
+    expression ~ ("," ~ expression)*
+}
+
+// Miscellaneous expression End
+
+// /////////////////////////////////////
+
+// context start
+
+context = ${ 
+  "{" ~ (__ ~ context_entries)? ~ __ ~ "}" 
+}
+
+key = !{
+    name
+  | string_literal
+}
+
+context_entry = ${
+  key ~ __ ~ ":" ~ __ ~ expression
+}
+
+context_entries = ${
+    context_entry? ~ (__ ~ "," ~ __ ~ context_entry)*
+}
+
+// context end
+
+// /////////////////////////////////////
+
+// Tokens and Whitespace Start
+
+reserved_word = {
+    keyword
+  | date_time_keyword
+  | null_literal
+  | boolean_literal
+}
+
+date_time_keyword = ${
+    ("date and time"             ~ !name_part_char)
+  | ("time"                      ~ !name_part_char)
+  | ("date"                      ~ !name_part_char)
+  | ("duration"                  ~ !name_part_char)
+  | ("years and months duration" ~ !name_part_char)
+  | ("days and time duration"    ~ !name_part_char)
+}
+
+keyword = {
+      true_token
+    | false_token
+    | null_token
+    | and_token
+    | or_token
+    | not_token
+    | for_token
+    | return_token
+    | instance_of_token
+    | in_token
+    | if_token
+    | then_token
+    | else_token
+    | some_token
+    | every_token
+    | satisfies_token
+    | between_token
+    | function_token
+    | external_token
+}
+
+source_character = _{ 
+  ANY 
+}
+
+// white_space
+
+// white_space comes from the peg.js grammar for Feel. It is not the special Pest WHITESPACE rule.
+white_space = _{
+      "\t"
+    | "\u{000B}" // Vertical tab or "\v"
+    | "\u{000C}" // Formfeed or "\f"
+    | " "
+    | "\u{00A0}"
+    | "\u{FEFF}"
+    | zs
+}
+
+// Separator, Space
+zs = _{
+      "\u{0020}"
+    | "\u{00A0}"
+    | "\u{1680}"
+    | '\u{2000}'..'\u{200A}'
+    | "\u{202F}"
+    | "\u{205F}"
+    | "\u{3000}"
+}
+
+__ = _{
+    (white_space)*
+}
+
+// Override Pest grammar's special WHITESPACE rule for implicit whitespace.
+WHITESPACE  = _{ white_space }
+
+// Tokens
+
+true_token        = ${ ("true" | "TRUE" | "True")       ~  !name_part_char }
+false_token       = ${ ("false" | "FALSE" | "False")    ~  !name_part_char }
+null_token        = ${ "null"                           ~  !name_part_char }
+and_token         = ${ "and"                            ~  !name_part_char }
+or_token          = ${ "or"                             ~  !name_part_char }
+not_token         = ${ "not"                            ~  !name_part_char }
+for_token         = ${ "for"                            ~  !name_part_char }
+return_token      = ${ "return"                         ~  !name_part_char }
+in_token          = ${ "in"                             ~  !name_part_char }
+if_token          = ${ "if"                             ~  !name_part_char }
+then_token        = ${ "then"                           ~  !name_part_char }
+else_token        = ${ "else"                           ~  !name_part_char }
+some_token        = ${ "some"                           ~  !name_part_char }
+every_token       = ${ "every"                          ~  !name_part_char }
+satisfies_token   = ${ "satisfies"                      ~  !name_part_char }
+between_token     = ${ "between"                        ~  !name_part_char }
+instance_of_token = ${ "instanceof"                     ~  !name_part_char }
+function_token    = ${ "function"                       ~  !name_part_char }
+external_token    = ${ "external"                       ~  !name_part_char }
+
+//Tokens and Whitespace End
+
+

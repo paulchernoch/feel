@@ -1,0 +1,46 @@
+// Pest Grammar for parsing XPATH Duration strings like this: P2Y3M1DT5H2M5.5S
+//   - A "T" divides the year, month, day fields from the hour, minute, second fields.
+//   - Some parts may be omitted, but at least one must be specified.
+//     For example, PT10M is ten minutes.
+//   - If hour, minute and second are all omitted, you must omit the "T".
+//   - Never omit the "P".
+//   - Only the Seconds field may have a fraction, the others are integers.
+//   - A leading minus sign indicates a negative duration. It must come before the "P".
+//     For example: -P2Y is negative two years.
+//   - Months can be more than twelve, hours more than 24, etc.
+date_time = @{
+    SOI ~ sign? ~ "P" ~ (
+      date ~ "T" ~ time
+    | date
+    | "T" ~ time
+    ) ~ EOI
+}
+date = {
+    year ~ month ~ day
+  | year ~ month
+  | year ~ day
+  | year
+  | month ~ day
+  | month
+  | day
+}
+time = { 
+    hour ~ minute ~ second
+  | hour ~ minute
+  | hour ~ second
+  | hour
+  | minute ~ second
+  | minute
+  | second
+}
+sign = !{ "-" }
+year = !{ number ~ "Y" }
+month = !{ number ~ "M" }
+day = !{ number ~ "D" }
+hour = !{ number ~ "H" }
+minute = !{ number ~ "M" }
+second = ${ number ~ "S" }
+digits = @{ ASCII_DIGIT+ }
+number = @{ digits ~ fraction? }
+fraction = @{ "." ~ digits ~ !integral }
+integral = { "Y" | "M" | "D" | "H" }
