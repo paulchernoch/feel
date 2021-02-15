@@ -11,3 +11,4 @@ keywords = ["Domain Model and Notation", "DMN", "Feel", "Friendly Enough Express
 [dependencies]
 pest = "2.1"
 pest_derive = "2.1"
+chrono = "0.4"
