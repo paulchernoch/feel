@@ -3,6 +3,7 @@ use std::cmp;
 use std::ops;
 use std::str::FromStr;
 use chrono::Duration as ChronoDuration;
+use chrono::{Date, DateTime, Datelike, offset::TimeZone};
 use super::duration_parser::parse_duration;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -36,6 +37,8 @@ pub struct Duration {
   minutes: u32,
   seconds: f32
 }
+
+const DAYS_PER_YEAR: f64 = 365.25;
 
 impl Duration {
 
@@ -102,7 +105,7 @@ impl Duration {
   /// Construct a Duration from signed values, where some parts may be positive and others negative.
   /// The resulting Duration will have a single sign, possibly reformulating the values in canonical form.
   /// In canonical form, there are never more than 60 seconds, or more than 60 minutes, or more than 24 hours, etc.
-  /// If the canonical transform is required, months will equal 1/12th of a 365 day year in seconds. 
+  /// If the canonical transform is required, months will equal 1/12th of a 365.25 day year in seconds. 
   pub fn new_from_signed(variety: DurationVariety, years: i32, months: i32, days: i32, hours: i32, minutes: i32, seconds: f32) -> Self {
     let mut nonnegative_count = 0_u32;
     let mut nonpositive_count = 0_u32;
@@ -136,7 +139,7 @@ impl Duration {
     };
     // Some parts are positive and some negative, so we need to create a canonical Duration.
     let as_seconds: f64 = ((
-      ((years as f64 + months as f64 / 12.0) * 365.0 + days as f64) * 24.0 
+      ((years as f64 + months as f64 / 12.0) * DAYS_PER_YEAR + days as f64) * 24.0 
       + hours as f64) * 60.0
       + minutes as f64) * 60.0 
       + seconds as f64;
@@ -146,11 +149,11 @@ impl Duration {
   /// Construct a canonical Duration given a number of seconds,
   /// such that if the number overflows 60 the extra is converted to minutes.
   /// If minutes overflows 60, the extra is converted to hours.
-  /// etc. Months are taken as 365/12 days.
+  /// etc. Months are taken as 365.25/12 days.
   pub fn new_from_seconds(seconds: f64) -> Self {
     let positive = seconds >= 0.0;
     let mut as_seconds = seconds.abs();
-    const YEAR_SECONDS: f64 = 60.0 * 60.0 * 24.0 * 365.0;
+    const YEAR_SECONDS: f64 = 60.0 * 60.0 * 24.0 * DAYS_PER_YEAR;
     const MONTH_SECONDS: f64 = YEAR_SECONDS / 12.0;
     const DAY_SECONDS: f64 = 60.0 * 60.0 * 24.0;
     const HOUR_SECONDS: f64 = 60.0 * 60.0;
@@ -192,11 +195,17 @@ impl Duration {
     let sign:f32 = if self.positive { 1.0 } else { -1.0 };
     sign
     * (((
-       (self.years as f32 + self.months as f32 / 12.0) * 365.0 
+       (self.years as f32 + self.months as f32 / 12.0) * (DAYS_PER_YEAR as f32)
       + self.days as f32) * 24.0 
       + self.hours as f32) * 60.0
       + self.minutes as f32) * 60.0 
       + self.seconds
+  }
+
+  pub fn total_days(&self) -> i32 {
+    let seconds = self.total_seconds() as i32;
+    const SECONDS_PER_DAY: i32 = 86400;
+    seconds / SECONDS_PER_DAY
   }
 
   pub fn as_year_month(&self, days_in_month: f32) -> Duration {
@@ -206,7 +215,7 @@ impl Duration {
   }
 
   /// Convert to a DayTime variety Duration by piling all the years, and months into the days field.
-  /// For example, if the Duration was for one year, it would become a 365 day Duration.
+  /// For example, if the Duration was for one year, it would become a 365.25 day Duration.
   pub fn as_day_time(&self, days_in_month: f32) -> Duration {
     let days_float: f32 = ((self.years as f32) * 12.0 + (self.months as f32)) * days_in_month + self.days as f32;
     let days = days_float as u32;
@@ -302,12 +311,155 @@ impl ops::Add<Duration> for Duration {
   }
 }
 
+/// Create a new Date in the same month as the given date
+/// but with the day changed to the given day (one-based), 
+/// unless that month has fewer days, in which case
+/// use the last day of that month.
+fn set_day_in_current_month<D>(date: &D, try_day: u32) -> D where D: Datelike {
+  let mut day = try_day;
+  while day >= 1_u32 {
+    match date.with_day(day) {
+      Some(d) => { return d },
+      None => { day -= 1_u32; }
+    };
+  } 
+  panic!("set_day_or_earlier cannot find valid date");
+}
+
+/// Create a new Date in the month following the given date (rolling the year if necessary)
+/// but with the day changed to the given day (one-based), 
+/// unless that month has fewer days, in which case
+/// use the last day of that month.
+fn set_day_in_next_month<D>(date: &D, try_day: u32) -> D where D: Datelike {
+  let month = date.month();
+  let mut first_of_month = date.with_day(1).unwrap();
+  first_of_month = if month == 12_u32 {
+    first_of_month.with_year(date.year() + 1).unwrap().with_month(1).unwrap()
+  }
+  else {
+    first_of_month.with_month(month + 1_u32).unwrap()
+  };
+  set_day_in_current_month(&first_of_month, try_day)
+}
+
+/// Create a new Date in the month preceding the given date (rolling the year if necessary)
+/// but with the day changed to the given day (one-based), 
+/// unless that month has fewer days, in which case
+/// use the last day of that month.
+fn set_day_in_previous_month<D>(date: &D, try_day: u32) -> D where D: Datelike {
+  let month = date.month();
+  let mut first_of_month = date.with_day(1).unwrap();
+  first_of_month = if month == 1_u32 {
+    first_of_month.with_year(date.year() - 1).unwrap().with_month(12_u32).unwrap()
+  }
+  else {
+    first_of_month.with_month(month - 1_u32).unwrap()
+  };
+  set_day_in_current_month(&first_of_month, try_day)
+}
+
+fn add_datelike_and_duration<Dt>(date: &Dt, rhs: Duration) -> Dt 
+where Dt: Datelike + Clone
+      + ops::Add<ChronoDuration, Output = Dt>
+{
+  let days = rhs.total_days();
+  let chrono_duration = ChronoDuration::days(days as i64);
+  let approx_date = date.clone() + chrono_duration;
+  let day = date.day();
+  let days_0 = approx_date.num_days_from_ce();
+
+  match (days.cmp(&0), rhs.variety) {
+    (cmp::Ordering::Equal, _) => date.clone(),
+    (_, DurationVariety::YearMonth) => {
+      let d1 = set_day_in_current_month(&approx_date, day);
+      let d2 = set_day_in_next_month(&approx_date, day);
+      let d3 = set_day_in_previous_month(&approx_date, day);
+      let delta_1 = (d1.num_days_from_ce() - days_0).abs();
+      let delta_2 = (d2.num_days_from_ce() - days_0).abs();
+      let delta_3 = (d3.num_days_from_ce() - days_0).abs();
+      if delta_1 <= delta_2 && delta_1 <= delta_3 { d1 }
+      else if delta_2 <= delta_3 { d2 }
+      else { d3 }
+    },
+    _ => approx_date
+  }
+}
+
+//            Date and Duration arithmetic
+
+impl<Tz: TimeZone> ops::Add<Duration> for &Date<Tz> {
+  type Output = Date<Tz>;
+  fn add(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(self, rhs)
+  }
+}
+
+/// Date<Tz> + Duration
+impl<Tz: TimeZone> ops::Add<Duration> for Date<Tz> {
+  type Output = Date<Tz>;
+  fn add(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(&self, rhs)
+  }
+}
+
+/// &Date<Tz> + Duration
+impl<Tz: TimeZone> ops::Sub<Duration> for &Date<Tz> {
+  type Output = Date<Tz>;
+  fn sub(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(self, -rhs)
+  }
+}
+
+/// Date<Tz> - Duration
+impl<Tz: TimeZone> ops::Sub<Duration> for Date<Tz> {
+  type Output = Date<Tz>;
+  fn sub(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(&self, -rhs)
+  }
+}
+
+//            End of Date and Duration arithmetic
+
+//            DateTime and Duration arithmetic
+
+/// &DateTime<Tz> + Duration
+impl<Tz: TimeZone> ops::Add<Duration> for &DateTime<Tz> {
+  type Output = DateTime<Tz>;
+  fn add(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(self, rhs)
+  }
+}
+
+/// DateTime<Tz> + Duration
+impl<Tz: TimeZone> ops::Add<Duration> for DateTime<Tz> {
+  type Output = DateTime<Tz>;
+  fn add(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(&self, rhs)
+  }
+}
+
+/// &DateTime<Tz> - Duration
+impl<Tz: TimeZone> ops::Sub<Duration> for &DateTime<Tz> {
+  type Output = DateTime<Tz>;
+  fn sub(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(self, -rhs)
+  }
+}
+
+/// DateTime<Tz> - Duration
+impl<Tz: TimeZone> ops::Sub<Duration> for DateTime<Tz> {
+  type Output = DateTime<Tz>;
+  fn sub(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(&self, -rhs)
+  }
+}
+
+//      End of DateTime and Duration arithmetic  
+
+
+/// Subtract two Durations to get a Duration
 impl ops::Sub<Duration> for Duration {
   type Output = Duration;
-
-  /// Add two Durations and return a new Duration, 
-  /// using the same variety for the sum as the addends if they match,
-  /// but changing the variety to Full if the addends have differing varieties.
   fn sub(self, rhs: Duration) -> Duration {
     self + rhs.negate()
   }
@@ -340,12 +492,12 @@ impl ops::Div<f32> for Duration {
       
       match self.variety {
         DurationVariety::YearMonth => {
-          let total_months: u32 = ((self.years as f32 * 12.0 + self.months as f32 + self.days as f32 * 12.0 / 365.0) / rhs.abs()).floor() as u32;
+          let total_months: u32 = ((self.years as f32 * 12.0 + self.months as f32 + self.days as f32 * 12.0 / DAYS_PER_YEAR as f32) / rhs.abs()).floor() as u32;
           let years = total_months / 12;
           let months = total_months % 12;
           Duration::new_year_month(positive, years, months)
         },
-        DurationVariety::DayTime => Duration::new_from_seconds(seconds).as_day_time(365.0/12.0),
+        DurationVariety::DayTime => Duration::new_from_seconds(seconds).as_day_time(DAYS_PER_YEAR as f32/12.0),
         DurationVariety::Full => Duration::new_from_seconds(seconds)
       }
   }
@@ -374,7 +526,36 @@ impl ops::Mul<f32> for Duration {
           let months = total_months % 12;
           Duration::new_year_month(positive, years, months)
         },
-        DurationVariety::DayTime => Duration::new_from_seconds(seconds).as_day_time(365.0/12.0),
+        DurationVariety::DayTime => Duration::new_from_seconds(seconds).as_day_time(DAYS_PER_YEAR as f32/12.0),
+        DurationVariety::Full => Duration::new_from_seconds(seconds)
+      }
+  }
+}
+
+impl ops::Mul<Duration> for f32 {
+  type Output = Duration;
+
+  /// Multiply a scalar by a Duration and derive a new Duration.
+  /// A YearMonth type Duration will remain so, and round down to a whole month. 
+  /// Months will be treated as one twelfth of a year.
+  fn mul(self, rhs: Duration) -> Self::Output {
+      if self == 0.0 {
+        return Duration::new_zero(rhs.variety);
+      };
+      if self == 1.0 {
+        return rhs;
+      }
+      let positive = rhs.positive == (self >= 0.0);
+      let seconds: f64 = rhs.total_seconds() as f64 * self as f64;
+      
+      match rhs.variety {
+        DurationVariety::YearMonth => {
+          let total_months: u32 = ((rhs.years as f32 * 12.0 + rhs.months as f32 + rhs.days as f32 * 12.0 / 365.0) * self.abs()).floor() as u32;
+          let years = total_months / 12;
+          let months = total_months % 12;
+          Duration::new_year_month(positive, years, months)
+        },
+        DurationVariety::DayTime => Duration::new_from_seconds(seconds).as_day_time(DAYS_PER_YEAR as f32/12.0),
         DurationVariety::Full => Duration::new_from_seconds(seconds)
       }
   }
@@ -407,8 +588,10 @@ impl From<Duration> for ChronoDuration {
 #[cfg(test)]
 mod tests {
   use super::Duration;
+  use super::DAYS_PER_YEAR;
   use std::str::FromStr;
   use chrono::Duration as ChronoDuration;
+  use chrono::{Utc, TimeZone, DateTime};
 
   #[test]
   fn test_year_month_to_string() {
@@ -473,7 +656,7 @@ mod tests {
   #[test]
   fn test_duration_by_duration_div() {
     assert_eq!(
-      365.0, 
+      DAYS_PER_YEAR as f32, 
       Duration::new_year_month(true, 1_u32, 0_u32) / Duration::new_day_time(true, 1_u32, 0_u32, 0_u32, 0.0), 
     );
   }
@@ -487,7 +670,7 @@ mod tests {
     // Divide a year down to an hour
     assert_eq!(
       Duration::from_str("PT1H").unwrap(), 
-      Duration::from_str("P1Y").unwrap() / (365.0 * 24.0), 
+      Duration::from_str("P1Y").unwrap() / (DAYS_PER_YEAR as f32 * 24.0), 
     );
 
     // Divide by one twelfth, the same as multiplying by 12.
@@ -506,13 +689,32 @@ mod tests {
     // Reduce a year down to an hour
     assert_eq!(
       Duration::from_str("PT1H").unwrap(), 
-      Duration::from_str("P1Y").unwrap() * (1.0 / (365.0 * 24.0)), 
+      Duration::from_str("P1Y").unwrap() * (1.0 / (DAYS_PER_YEAR as f32 * 24.0)), 
     );
 
     // Multiply by 12.
     assert_eq!(
       Duration::from_str("P1Y").unwrap(), 
       Duration::from_str("P1M").unwrap() * 12.0, 
+    );
+  }
+
+  #[test]
+  fn test_scalar_by_duration_mul() {
+    assert_eq!(
+      Duration::new_year_month(true, 3_u32, 0_u32), 
+      2.0 * Duration::new_year_month(true, 1_u32, 6_u32), 
+    );
+    // Reduce a year down to an hour
+    assert_eq!(
+      Duration::from_str("PT1H").unwrap(), 
+      (1.0 / (DAYS_PER_YEAR as f32 * 24.0)) * Duration::from_str("P1Y").unwrap(), 
+    );
+
+    // Multiply by 12.
+    assert_eq!(
+      Duration::from_str("P1Y").unwrap(), 
+      12.0 * Duration::from_str("P1M").unwrap(), 
     );
   }
 
@@ -551,4 +753,50 @@ mod tests {
       ten_seconds_c, 
     );
   }
+
+  #[test]
+  fn test_add_date_and_duration() {
+    let duration = Duration::from_str("P2Y8M").unwrap().as_year_month(DAYS_PER_YEAR as f32/ 12.0);
+
+    // Rollover into January
+    assert_eq!(
+      Utc.ymd(2018, 1, 15), 
+      &Utc.ymd(2015, 5, 15) + duration, 
+    );
+    // Advance to month with fewer days
+    assert_eq!(
+      Utc.ymd(2017, 9, 30), 
+      Utc.ymd(2015, 1, 31) + duration, 
+    );
+  }
+
+  #[test]
+  fn test_sub_date_and_duration() {
+    let duration = Duration::from_str("P1Y3M").unwrap().as_year_month(DAYS_PER_YEAR as f32/ 12.0);
+    assert_eq!(
+      Utc.ymd(2018, 11, 12), 
+      Utc.ymd(2020, 2, 12) - duration, 
+    );
+  }
+// pub fn parse_from_rfc3339(s: &str) -> ParseResult<DateTime<FixedOffset>>
+// Parses an RFC 3339 and ISO 8601 date and time string such as 1996-12-19T16:39:57-08:00, then returns a new DateTime with a parsed FixedOffset.
+#[test]
+fn test_add_datetime_and_duration() {
+  let duration = Duration::from_str("P2Y8M").unwrap().as_year_month(DAYS_PER_YEAR as f32/ 12.0);
+
+  // Rollover into January
+  let dt_a = DateTime::parse_from_rfc3339("2015-05-15T16:39:57-05:00").unwrap();
+  let dt_rollover = DateTime::parse_from_rfc3339("2018-01-15T16:39:57-05:00").unwrap();
+  assert_eq!(
+    dt_rollover, 
+    dt_a + duration, 
+  );
+  // Advance to month with fewer days
+  let dt_b = DateTime::parse_from_rfc3339("2015-01-31T16:39:57-05:00").unwrap();
+  let dt_truncate = DateTime::parse_from_rfc3339("2017-09-30T16:39:57-05:00").unwrap();
+  assert_eq!(
+    dt_truncate, 
+    dt_b + duration, 
+  );
+}
 }
