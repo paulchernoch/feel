@@ -1,16 +1,20 @@
 use std::fmt;
 use std::ops;
 use std::str::FromStr;
+use std::convert::From;
 
 /// A qualified name, consisting of a list of strings.
-#[derive(Clone, Debug, Hash)]
+#[derive(Eq, Clone, Debug, Hash)]
 pub struct QName {
   parts: Vec<String>
 }
 
 impl QName {
   fn new<S>(name: S) -> Self where S: Into<String> {
-    QName { parts: vec![name.into()] }
+    QName { 
+      // parts: vec![name.into()] 
+      parts: name.into().split_whitespace().map(|s| s.to_string()).collect()
+    }
   }
 }
 
@@ -24,16 +28,24 @@ impl fmt::Display for QName {
 pub struct ParseQNameError;
 
 impl fmt::Display for ParseQNameError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "unable to parse QName from string")
-    }
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "unable to parse QName from string")
+  }
 }
 
 impl FromStr for QName {
   type Err = ParseQNameError;
 
+  /// Split a single string into multiple parts on whitespace and create a QName from them.
+  /// If multiple consecutive whitespace characters are encountered, blank words will be skipped.
   fn from_str(s: &str) -> Result<Self, Self::Err> {
-    Result::Ok(QName { parts : s.split(" ").map(|s| s.to_string()).collect() })
+    Result::Ok(QName { parts : s.to_string().split_whitespace().map(|s| s.to_string()).collect() })
+  }
+}
+
+impl<S: Into<String>> From<S> for QName {
+  fn from(item: S) -> Self {
+    QName { parts : item.into().split_whitespace().map(|s| s.to_string()).collect() }
   }
 }
 
@@ -44,7 +56,6 @@ impl PartialEq for QName {
   }
 }
 
-impl Eq for &QName {}
 
 impl<S> ops::Add<S> for &QName where S: Into<String> {
   type Output = QName;
@@ -95,6 +106,15 @@ mod tests {
   #[test]
   fn test_qname_fromstr() {
     let q1: QName = "John Smith".parse().unwrap();
+    assert_eq!(
+      QName { parts: vec_of_strings!["John", "Smith"] },
+      q1,
+    )
+  }
+
+  #[test]
+  fn test_qname_fromstr_extra_spaces() {
+    let q1: QName = "John   Smith".parse().unwrap();
     assert_eq!(
       QName { parts: vec_of_strings!["John", "Smith"] },
       q1,

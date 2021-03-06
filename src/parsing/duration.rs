@@ -3,7 +3,7 @@ use std::cmp;
 use std::ops;
 use std::str::FromStr;
 use chrono::Duration as ChronoDuration;
-use chrono::{Date, DateTime, Datelike, offset::TimeZone};
+use chrono::{NaiveDate, Date, NaiveDateTime, DateTime, Datelike, offset::TimeZone};
 use super::duration_parser::parse_duration;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -385,8 +385,25 @@ where Dt: Datelike + Clone
   }
 }
 
-//            Date and Duration arithmetic
+//            NaiveDate or Date and Duration arithmetic
 
+/// &NaiveDate + Duration
+impl ops::Add<Duration> for &NaiveDate {
+  type Output = NaiveDate;
+  fn add(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(self, rhs)
+  }
+}
+
+/// NaiveDate + Duration
+impl ops::Add<Duration> for NaiveDate {
+  type Output = NaiveDate;
+  fn add(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(&self, rhs)
+  }
+}
+
+/// &Date<Tz> + Duration
 impl<Tz: TimeZone> ops::Add<Duration> for &Date<Tz> {
   type Output = Date<Tz>;
   fn add(self, rhs: Duration) -> Self::Output {
@@ -402,7 +419,7 @@ impl<Tz: TimeZone> ops::Add<Duration> for Date<Tz> {
   }
 }
 
-/// &Date<Tz> + Duration
+/// &Date<Tz> - Duration
 impl<Tz: TimeZone> ops::Sub<Duration> for &Date<Tz> {
   type Output = Date<Tz>;
   fn sub(self, rhs: Duration) -> Self::Output {
@@ -418,9 +435,41 @@ impl<Tz: TimeZone> ops::Sub<Duration> for Date<Tz> {
   }
 }
 
+/// &NaiveDate - Duration
+impl ops::Sub<Duration> for &NaiveDate {
+  type Output = NaiveDate;
+  fn sub(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(self, -rhs)
+  }
+}
+
+/// NaiveDate - Duration
+impl ops::Sub<Duration> for NaiveDate {
+  type Output = NaiveDate;
+  fn sub(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(&self, -rhs)
+  }
+}
+
 //            End of Date and Duration arithmetic
 
-//            DateTime and Duration arithmetic
+//            NaiveDateTime or DateTime and Duration arithmetic
+
+/// &NaiveDateTime + Duration
+impl ops::Add<Duration> for &NaiveDateTime {
+  type Output = NaiveDateTime;
+  fn add(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(self, rhs)
+  }
+}
+
+/// NaiveDateTime + Duration
+impl ops::Add<Duration> for NaiveDateTime {
+  type Output = NaiveDateTime;
+  fn add(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(&self, rhs)
+  }
+}
 
 /// &DateTime<Tz> + Duration
 impl<Tz: TimeZone> ops::Add<Duration> for &DateTime<Tz> {
@@ -435,6 +484,22 @@ impl<Tz: TimeZone> ops::Add<Duration> for DateTime<Tz> {
   type Output = DateTime<Tz>;
   fn add(self, rhs: Duration) -> Self::Output {
     add_datelike_and_duration(&self, rhs)
+  }
+}
+
+/// &NaiveDateTime - Duration
+impl ops::Sub<Duration> for &NaiveDateTime {
+  type Output = NaiveDateTime;
+  fn sub(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(self, -rhs)
+  }
+}
+
+/// NaiveDateTime - Duration
+impl ops::Sub<Duration> for NaiveDateTime {
+  type Output = NaiveDateTime;
+  fn sub(self, rhs: Duration) -> Self::Output {
+    add_datelike_and_duration(&self, -rhs)
   }
 }
 

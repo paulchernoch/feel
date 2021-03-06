@@ -11,6 +11,12 @@ use parsing::qname::QName;
 #[allow(unused_imports)]
 use parsing::duration::Duration;
 
+#[allow(unused_imports)]
+use parsing::context::Context;
+
+#[allow(unused_imports)]
+use parsing::feel_value::FeelValue;
+
 #[cfg(test)]
 mod tests {
     #[test]
