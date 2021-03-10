@@ -38,7 +38,8 @@ pub struct Duration {
   seconds: f32
 }
 
-const DAYS_PER_YEAR: f64 = 365.25;
+pub const DAYS_PER_YEAR: f64 = 365.25;
+pub const DAYS_PER_MONTH: f64 = 365.25 / 12.0;
 const SECONDS_PER_DAY: f64 = 24.0 * 60.0 * 60.0;
 const NANOSECONDS_PER_SECOND: f64 = 1000000000.0;
 

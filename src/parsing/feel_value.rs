@@ -3,7 +3,6 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::convert::From;
 use std::string::ToString;
-use chrono::Duration as ChronoDuration;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime };
 
 use super::qname::{QName, Stringlike};
@@ -98,6 +97,26 @@ impl FeelValue {
       FeelValue::Error(_) => FeelType::Error
     }
   }
+
+  pub fn negate(&self) -> Self {
+    match self {
+      FeelValue::Number(n) => FeelValue::Number(-n),
+      FeelValue::Boolean(b) => FeelValue::Boolean(!b),
+      FeelValue::YearMonthDuration(ymd) => FeelValue::YearMonthDuration(- *ymd),
+      FeelValue::DayTimeDuration(dtd) => FeelValue::DayTimeDuration(- *dtd),
+      FeelValue::Null => FeelValue::Null,
+      FeelValue::Error(_) => self.clone(),
+      _ => FeelValue::Error(format!("Cannot negate {}", self.get_type().to_string()))
+    }
+  } 
+
+  pub fn is_error(&self) -> bool {
+    match self {
+      FeelValue::Error(_) => true,
+      _ => false
+    }
+  }
+
 }
 
 fn are_vecs_equal<T: PartialEq>(a: &Vec<T>, b: &Vec<T>) -> bool {
@@ -251,10 +270,11 @@ impl<S: Into<String> + Clone + Stringlike> From<&Vec<S>> for FeelValue {
 
 #[cfg(test)]
 mod tests {
-  use std::clone::Clone;
-  use super::{FeelValue, Numeric};
-  use super::super::qname::{QName, Stringlike};
+  use super::{FeelValue};
+  use super::super::qname::{QName};
   use std::assert_ne;
+  use super::super::duration::Duration;
+  use std::str::FromStr;
 
   #[test]
   fn test_equals() {
@@ -268,6 +288,13 @@ mod tests {
     assert_eq!(FeelValue::String("ABC".to_string()), FeelValue::String("ABC".to_string()), "Equal Strings");
     assert_ne!(FeelValue::String("ABC".to_string()), FeelValue::String("DEF".to_string()), "Unequal Strings");
 
+    assert_eq!(
+      FeelValue::DayTimeDuration(Duration::from_str("PT1H").unwrap()), 
+      FeelValue::DayTimeDuration(Duration::from_str("PT1H").unwrap()), "Equal durations");
+    assert_ne!(
+      FeelValue::DayTimeDuration(Duration::from_str("PT1H").unwrap()), 
+      FeelValue::DayTimeDuration(Duration::from_str("PT2H").unwrap()), "Unequal durations");
+  
   }
 
   #[test]
