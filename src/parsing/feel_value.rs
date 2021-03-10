@@ -1,15 +1,18 @@
-use std::{ops, fmt};
+use std::fmt;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::convert::From;
+use std::string::ToString;
 use chrono::Duration as ChronoDuration;
-use chrono::{NaiveDate, Date, NaiveDateTime, DateTime, NaiveTime, Datelike, offset::TimeZone};
-use super::qname::QName;
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime };
+
+use super::qname::{QName, Stringlike};
 use super::context::Context;
 use super::duration::Duration;
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, ToString, IntoStaticStr)]
 /// Indicates the Type of a Feel language value but does not contain the actual value.
-enum FeelType {
+pub enum FeelType {
   /// A Number
   Number,
   /// A String
@@ -43,7 +46,7 @@ enum FeelType {
 }
 
 #[derive(Clone)]
-/// Any value permitted as input into a Feel language expression or be the result of such an expression.
+/// Any value permitted as input into a Feel language expression or as the result of such an expression.
 pub enum FeelValue {
   /// A Number
   Number(f64),
@@ -77,7 +80,7 @@ pub enum FeelValue {
 
 impl FeelValue {
   /// Get the FeelType that corresponds to the given FeelValue.
-  fn get_type(&self) -> FeelType {
+  pub fn get_type(&self) -> FeelType {
     match self {
       FeelValue::Number(_) => FeelType::Number,
       FeelValue::String(_) => FeelType::String,
@@ -167,39 +170,90 @@ impl fmt::Debug for FeelValue {
 
 impl fmt::Display for FeelValue {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-      match self {
-        FeelValue::Number(n) => write!(f, "{}", n),
-        FeelValue::String(s) => write!(f, "'{}'", s),
-        FeelValue::Name(q) => write!(f, "'{}'", q),
-        FeelValue::Boolean(b) => write!(f, "{}", b),
-        FeelValue::Date(d) => write!(f, "{}", d),
-        FeelValue::Time(t) => write!(f, "{}", t),
-        FeelValue::DateAndTime(dt) => write!(f, "{}", dt),
-        FeelValue::YearMonthDuration(ymd) => write!(f, "{}", ymd),
-        FeelValue::DayTimeDuration(dtd) => write!(f, "{}", dtd),
-        FeelValue::List(l) => {
-          let mut combined = String::with_capacity(1000);
-          let mut comma = "";
-          for item in l.borrow().iter() {
-            combined.push_str(comma);
-            combined.push_str(&format!("{}", item));
-            comma = ", ";
-          }
-          write!(f, "[{}]", combined)
-        },
-        FeelValue::Context(c) => write!(f, "{}", c),
-        FeelValue::Function => write!(f, "{}", "function"),
-        FeelValue::Null => write!(f, "{}", "null"),
-        FeelValue::Error(e) => write!(f, "Error: {}", e),
-      }
+    match self {
+      FeelValue::Number(n) => write!(f, "{}", n),
+      FeelValue::String(s) => write!(f, "'{}'", s),
+      FeelValue::Name(q) => write!(f, "'{}'", q),
+      FeelValue::Boolean(b) => write!(f, "{}", b),
+      FeelValue::Date(d) => write!(f, "{}", d),
+      FeelValue::Time(t) => write!(f, "{}", t),
+      FeelValue::DateAndTime(dt) => write!(f, "{}", dt),
+      FeelValue::YearMonthDuration(ymd) => write!(f, "{}", ymd),
+      FeelValue::DayTimeDuration(dtd) => write!(f, "{}", dtd),
+      FeelValue::List(l) => {
+        let mut combined = String::with_capacity(1000);
+        let mut comma = "";
+        for item in l.borrow().iter() {
+          combined.push_str(comma);
+          combined.push_str(&format!("{}", item));
+          comma = ", ";
+        }
+        write!(f, "[{}]", combined)
+      },
+      FeelValue::Context(c) => write!(f, "{}", c),
+      FeelValue::Function => write!(f, "{}", "function"),
+      FeelValue::Null => write!(f, "{}", "null"),
+      FeelValue::Error(e) => write!(f, "Error: {}", e),
+    }
   }
 }
+
+/////////////// Conversions from Basic Types /////////////////
+
+/// Marker trait so we don't get conflicting trait errors due to the coherence rules.
+pub trait Numeric {}
+impl Numeric for f64 {}
+impl Numeric for f32 {}
+impl Numeric for i64 {}
+impl Numeric for i32 {}
+impl Numeric for i16 {}
+impl Numeric for i8 {}
+impl Numeric for isize {}
+impl Numeric for u64 {}
+impl Numeric for u32 {}
+impl Numeric for u16 {}
+impl Numeric for u8 {}
+impl Numeric for usize {}
+
+
+impl<N: Into<f64> + Numeric> From<N> for FeelValue {
+  fn from(n: N) -> Self {
+    FeelValue::Number(n.into())
+  }
+}
+
+impl From<String> for FeelValue {
+  fn from(s: String) -> Self {
+    FeelValue::String(s)
+  }
+}
+
+impl From<&str> for FeelValue {
+  fn from(s: &str) -> Self {
+    FeelValue::String(s.to_string())
+  }
+}
+
+impl From<bool> for FeelValue {
+  fn from(b: bool) -> Self {
+    FeelValue::Boolean(b)
+  }
+}
+
+impl<S: Into<String> + Clone + Stringlike> From<&Vec<S>> for FeelValue {
+  fn from(v: &Vec<S>) -> Self {
+    FeelValue::Name(v.into())
+  }
+}
+
 
 /////////////// TESTS /////////////////
 
 #[cfg(test)]
 mod tests {
-  use super::FeelValue;
+  use std::clone::Clone;
+  use super::{FeelValue, Numeric};
+  use super::super::qname::{QName, Stringlike};
   use std::assert_ne;
 
   #[test]
@@ -214,6 +268,40 @@ mod tests {
     assert_eq!(FeelValue::String("ABC".to_string()), FeelValue::String("ABC".to_string()), "Equal Strings");
     assert_ne!(FeelValue::String("ABC".to_string()), FeelValue::String("DEF".to_string()), "Unequal Strings");
 
+  }
+
+  #[test]
+  fn test_from_number() {
+    let from_i32: FeelValue = 42_i32.into();
+    let from_f32: FeelValue = 42.0_f32.into();
+    assert_eq!(&from_i32, &from_f32, "From i32 and f32");
+  }
+
+  #[test]
+  fn test_from_string() {
+    let a: FeelValue = "Hello".to_string().into();
+    let b: FeelValue = "Hello".to_string().into();
+    assert_eq!(&a, &b, "Compare equal Strings");
+  }
+
+  #[test]
+  fn test_from_bool() {
+    let t: FeelValue = true.into();
+    let f: FeelValue = false.into();
+    assert_eq!(&t, &FeelValue::Boolean(true), "Verify a true value");
+    assert_eq!(&f, &FeelValue::Boolean(false), "Verify a false value");
+  }
+
+  #[test]
+  fn test_from_str_vec() {
+    let v1 = vec!["John", "Smith"];
+    let qname: QName = (&v1).into();
+    let q1: FeelValue = FeelValue::Name(qname);
+
+    let v2 = vec!["John", "Smith"];
+    let q2: FeelValue = (&v2).into();
+
+    assert_eq!(q1, q2);
   }
 
 }

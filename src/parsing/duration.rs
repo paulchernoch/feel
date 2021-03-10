@@ -3,7 +3,7 @@ use std::cmp;
 use std::ops;
 use std::str::FromStr;
 use chrono::Duration as ChronoDuration;
-use chrono::{NaiveDate, Date, NaiveDateTime, DateTime, Datelike, offset::TimeZone};
+use chrono::{NaiveDate, Date, NaiveDateTime, DateTime, NaiveTime, Datelike, Timelike, offset::TimeZone};
 use super::duration_parser::parse_duration;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -39,6 +39,8 @@ pub struct Duration {
 }
 
 const DAYS_PER_YEAR: f64 = 365.25;
+const SECONDS_PER_DAY: f64 = 24.0 * 60.0 * 60.0;
+const NANOSECONDS_PER_SECOND: f64 = 1000000000.0;
 
 impl Duration {
 
@@ -358,7 +360,7 @@ fn set_day_in_previous_month<D>(date: &D, try_day: u32) -> D where D: Datelike {
   set_day_in_current_month(&first_of_month, try_day)
 }
 
-fn add_datelike_and_duration<Dt>(date: &Dt, rhs: Duration) -> Dt 
+fn add_datelike_and_duration<Dt>(date: &Dt, rhs: Duration) -> Dt
 where Dt: Datelike + Clone
       + ops::Add<ChronoDuration, Output = Dt>
 {
@@ -383,6 +385,33 @@ where Dt: Datelike + Clone
     },
     _ => approx_date
   }
+}
+
+fn add_timelike_and_duration<Tm>(time: &Tm, rhs: Duration) -> Tm 
+where Tm: Timelike + Clone
+      + ops::Add<ChronoDuration, Output = Tm>
+{
+  let seconds = time.num_seconds_from_midnight() as f64 + (time.nanosecond() as f64) / NANOSECONDS_PER_SECOND;
+  let delta_seconds = rhs.total_seconds() as f64;
+  let mut new_seconds = seconds + delta_seconds;
+  if new_seconds < 0.0 {
+    new_seconds = SECONDS_PER_DAY + new_seconds;
+  }
+
+  if new_seconds > SECONDS_PER_DAY {
+    new_seconds = new_seconds % SECONDS_PER_DAY;
+  }
+  let seconds_from_midnight = new_seconds.floor();
+  let nanoseconds = (((new_seconds - seconds_from_midnight) * NANOSECONDS_PER_SECOND).round()) as u32;
+  let s = (seconds_from_midnight % 60.0) as u32;
+  let m = ((seconds_from_midnight % 3600.0) / 60.0).floor() as u32;
+  let h = ((seconds_from_midnight % SECONDS_PER_DAY) / 3600.0).floor() as u32;
+  let new_time = time
+    .with_hour(h).unwrap()
+    .with_minute(m).unwrap()
+    .with_second(s).unwrap()
+    .with_nanosecond(nanoseconds).unwrap();
+  return new_time;
 }
 
 //            NaiveDate or Date and Duration arithmetic
@@ -521,6 +550,42 @@ impl<Tz: TimeZone> ops::Sub<Duration> for DateTime<Tz> {
 
 //      End of DateTime and Duration arithmetic  
 
+//            NaiveTime and Duration arithmetic
+
+/// &NaiveTime + Duration
+impl ops::Add<Duration> for &NaiveTime {
+  type Output = NaiveTime;
+  fn add(self, rhs: Duration) -> Self::Output {
+    add_timelike_and_duration(self, rhs)
+  }
+}
+
+/// NaiveTime + Duration
+impl ops::Add<Duration> for NaiveTime {
+  type Output = NaiveTime;
+  fn add(self, rhs: Duration) -> Self::Output {
+    add_timelike_and_duration(&self, rhs)
+  }
+}
+
+/// &NaiveDateTime - Duration
+impl ops::Sub<Duration> for &NaiveTime {
+  type Output = NaiveTime;
+  fn sub(self, rhs: Duration) -> Self::Output {
+    add_timelike_and_duration(self, -rhs)
+  }
+}
+
+/// NaiveDateTime - Duration
+impl ops::Sub<Duration> for NaiveTime {
+  type Output = NaiveTime;
+  fn sub(self, rhs: Duration) -> Self::Output {
+    add_timelike_and_duration(&self, -rhs)
+  }
+}
+
+
+//      End of NaiveTime and Duration arithmetic
 
 /// Subtract two Durations to get a Duration
 impl ops::Sub<Duration> for Duration {

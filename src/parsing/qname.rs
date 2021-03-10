@@ -43,9 +43,19 @@ impl FromStr for QName {
   }
 }
 
-impl<S: Into<String>> From<S> for QName {
+pub trait Stringlike {}
+impl Stringlike for String {}
+impl Stringlike for &str {}
+
+impl<S: Into<String> + Stringlike> From<S> for QName {
   fn from(item: S) -> Self {
     QName { parts : item.into().split_whitespace().map(|s| s.to_string()).collect() }
+  }
+}
+
+impl<S: Into<String> + Clone + Stringlike> From<&Vec<S>> for QName {
+  fn from(v: &Vec<S>) -> Self {
+    QName{ parts : v.iter().map(|s| s.clone().into()).collect() }
   }
 }
 

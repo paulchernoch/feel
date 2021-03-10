@@ -17,6 +17,10 @@ use parsing::context::Context;
 #[allow(unused_imports)]
 use parsing::feel_value::FeelValue;
 
+extern crate strum;
+#[macro_use]
+extern crate strum_macros;
+
 #[cfg(test)]
 mod tests {
     #[test]
