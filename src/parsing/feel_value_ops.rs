@@ -3,7 +3,7 @@ use std::ops;
 use std::rc::Rc;
 use std::cell::RefCell;
 use super::feel_value::FeelValue;
-use super::duration::{DAYS_PER_MONTH};
+use super::duration::{Duration, DAYS_PER_MONTH};
 
 impl<'a, 'b> ops::Add<&'b FeelValue> for &'a FeelValue {
   type Output = FeelValue;
@@ -62,6 +62,19 @@ impl<'a, 'b> ops::Sub<&'b FeelValue> for &'a FeelValue {
     match (self, rhs) {
       (FeelValue::Error(_), _) => self.clone(),
       (_, FeelValue::Error(_)) => rhs.clone(),
+      (FeelValue::Date(d1), FeelValue::Date(d2)) => {
+        // TODO: Should we instead use date_difference_months?
+        let delta = Duration::date_difference_days(*d1, *d2).as_year_month(DAYS_PER_MONTH as f32);
+        FeelValue::YearMonthDuration(delta)
+      },
+      (FeelValue::DateAndTime(dt1), FeelValue::DateAndTime(dt2)) => {
+        let delta = Duration::datetime_difference(*dt1, *dt2).as_day_time(DAYS_PER_MONTH as f32);
+        FeelValue::YearMonthDuration(delta)
+      },
+      (FeelValue::Time(t1), FeelValue::Time(t2)) => {
+        let delta = Duration::time_difference(*t1, *t2).as_day_time(DAYS_PER_MONTH as f32);
+        FeelValue::DayTimeDuration(delta)
+      },
       (_, _) => {
         let result = self + &(-rhs);
         match result {
@@ -94,7 +107,51 @@ impl<'a, 'b> ops::Mul<&'b FeelValue> for &'a FeelValue {
       _ => FeelValue::Error(format!("Cannot multiply {} by {}", self.get_type().to_string(), rhs.get_type().to_string()))
     }
   }
-  
+}
+
+impl<'a, 'b> ops::Div<&'b FeelValue> for &'a FeelValue {
+  type Output = FeelValue;
+
+  fn div(self, rhs: &'b FeelValue) -> Self::Output {
+    match (self, rhs) {
+      (FeelValue::Error(_), _) => self.clone(),
+      (_, FeelValue::Error(_)) => rhs.clone(),
+      (FeelValue::Null, _) => FeelValue::Null,
+      (_, FeelValue::Null) => FeelValue::Null,
+      (_, FeelValue::Number(r_num)) if *r_num == 0.0 || !r_num.is_finite() => FeelValue::Null, // Division by zero, Infinity or NaN
+      (FeelValue::Number(l_num), FeelValue::Number(r_num)) => {
+        let ratio = l_num / r_num;
+        // Feel language dies not permit Infinities or NaN and uses Null instead.
+        if ratio.is_finite() { FeelValue::Number(ratio) }
+        else { FeelValue::Null }
+      },
+      (FeelValue::YearMonthDuration(l_ymd), FeelValue::Number(r_factor)) => 
+        FeelValue::YearMonthDuration((*l_ymd / (*r_factor as f32)).as_year_month(DAYS_PER_MONTH as f32)),
+      (FeelValue::Number(l_factor), FeelValue::YearMonthDuration(r_ymd)) => 
+        FeelValue::YearMonthDuration((*r_ymd / (*l_factor as f32)).as_year_month(DAYS_PER_MONTH as f32)),
+      (FeelValue::DayTimeDuration(l_dtd), FeelValue::Number(r_factor)) => 
+        FeelValue::DayTimeDuration((*l_dtd / (*r_factor as f32)).as_day_time(DAYS_PER_MONTH as f32)),
+        (FeelValue::YearMonthDuration(l_ymd), FeelValue::YearMonthDuration(r_ymd)) => {
+          let ratio = *l_ymd / *r_ymd;
+          return if ratio.is_finite() {
+            FeelValue::Number(ratio as f64)
+          }
+          else {
+            FeelValue::Null
+          };
+        },
+        (FeelValue::DayTimeDuration(l_dtd), FeelValue::DayTimeDuration(r_dtd)) => {
+          let ratio = *l_dtd / *r_dtd;
+          return if ratio.is_finite() {
+            FeelValue::Number(ratio as f64)
+          }
+          else {
+            FeelValue::Null
+          };
+        },
+        _ => FeelValue::Error(format!("Cannot divide {} by {}", self.get_type().to_string(), rhs.get_type().to_string()))
+    }
+  }
 }
 
 /////////////// TESTS /////////////////
@@ -102,12 +159,10 @@ impl<'a, 'b> ops::Mul<&'b FeelValue> for &'a FeelValue {
 #[cfg(test)]
 mod tests {
   use std::str::FromStr;
-  // use chrono::{ DateTime, Datelike, NaiveDate, NaiveDateTime, ... } 
-  use chrono::{ NaiveTime };
+  use chrono::{ NaiveDate, NaiveTime };
   use super::super::duration::Duration;
   // use super::super::feel_value::{Numeric};
   use super::super::feel_value::{FeelValue};
-  // use super::super::qname::{QName, Stringlike};
   // use std::assert_ne;
 
   #[test]
@@ -155,6 +210,41 @@ mod tests {
     let y: FeelValue = 12.into();
     let expected:FeelValue = (-2).into();
     assert_eq!(expected, &x - &y, "sub numbers");
+  }
+
+  #[test]
+  fn test_div_numbers() {
+    let x: FeelValue = 100.into();
+    let y: FeelValue = 10.into();
+    let expected:FeelValue = 10.into();
+    assert_eq!(expected, &x / &y, "div numbers");
+
+    let z: FeelValue = 0.0.into();
+    assert_eq!(FeelValue::Null, &x / &z, "div by zero");
+  }
+
+  #[test]
+  fn test_div_durations() {
+    let x = FeelValue::DayTimeDuration(Duration::new_day_time(true, 1_u32, 0_u32, 0_u32, 0.0));
+    let y = FeelValue::DayTimeDuration(Duration::new_day_time(true, 0_u32, 2_u32, 0_u32, 0.0));
+    let expected:FeelValue = 12.into();
+    assert_eq!(expected, &x / &y, "div durations");
+  }
+
+  #[test]
+  fn test_sub_dates() {
+    let x = FeelValue::Date(NaiveDate::from_ymd(2020, 3, 15));
+    let y = FeelValue::Date(NaiveDate::from_ymd(2020, 4, 28));
+    let expected = FeelValue::YearMonthDuration(Duration::new_year_month(true, 0_u32, 1_u32));
+    assert_eq!(expected, &y - &x, "sub dates");
+  }
+
+  #[test]
+  fn test_sub_times() {
+    let x = FeelValue::Time(NaiveTime::from_hms(18_u32, 0_u32, 0_u32));
+    let y = FeelValue::Time(NaiveTime::from_hms(16_u32, 30_u32, 0_u32));
+    let expected = FeelValue::DayTimeDuration(Duration::new_day_time(false, 0_u32, 1_u32, 30_u32, 0.0));
+    assert_eq!(expected, &y - &x, "sub times");
   }
 
   #[test]

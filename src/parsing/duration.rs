@@ -3,6 +3,7 @@ use std::cmp;
 use std::ops;
 use std::str::FromStr;
 use chrono::Duration as ChronoDuration;
+use std::time::Duration as OldDuration;
 use chrono::{NaiveDate, Date, NaiveDateTime, DateTime, NaiveTime, Datelike, Timelike, offset::TimeZone};
 use super::duration_parser::parse_duration;
 
@@ -177,6 +178,30 @@ impl Duration {
   pub fn new_from_nanoseconds(nano_seconds: i64) -> Self {
     let seconds = nano_seconds as f64 / 1.0e9;
     Self::new_from_seconds(seconds)
+  }
+
+  /// Compute minuend minus subtrahend, the date difference as a YearMonth Duration (rounded to the nearest month).
+  pub fn date_difference_months(minuend: NaiveDate, subtrahend: NaiveDate) -> Duration {
+    let days_difference = minuend.signed_duration_since(subtrahend).num_days();
+    Duration::new_from_signed(DurationVariety::YearMonth, 0, 0, days_difference as i32, 0, 0, 0.0)
+  }
+
+  /// Compute minuend minus subtrahend, the date difference as a DayTime Duration.
+  pub fn date_difference_days(minuend: NaiveDate, subtrahend: NaiveDate) -> Duration {
+    let days_difference = minuend.signed_duration_since(subtrahend).num_days();
+    Duration::new_from_signed(DurationVariety::DayTime, 0, 0, days_difference as i32, 0, 0, 0.0)
+  }
+
+  /// Compute minuend minus subtrahend, the date difference as a YearMonth Duration (rounded to the nearest month).
+  pub fn datetime_difference(minuend: NaiveDateTime, subtrahend: NaiveDateTime) -> Duration {
+    let difference: ChronoDuration = minuend.signed_duration_since(subtrahend);
+    Duration::new_from_nanoseconds(difference.num_nanoseconds().unwrap())
+  }
+
+  /// Compute minuend minus subtrahend, the time difference as a Duration.
+  pub fn time_difference(minuend: NaiveTime, subtrahend: NaiveTime) -> Duration {
+    let difference: ChronoDuration = minuend.signed_duration_since(subtrahend);
+    Duration::new_from_nanoseconds(difference.num_nanoseconds().unwrap())
   }
 
   /// Are all components of the duration zero or not?
@@ -602,7 +627,7 @@ impl ops::Div<Duration> for Duration {
 
   fn div(self, rhs: Self) -> Self::Output {
       if rhs.is_zero() {
-          panic!("Cannot divide by zero-valued `Duration`!");
+          return f32::NAN;
       };
       self.total_seconds()  / rhs.total_seconds()
   }
@@ -718,11 +743,12 @@ impl From<Duration> for ChronoDuration {
 
 #[cfg(test)]
 mod tests {
+  use std::time::Duration as OldDuration;
   use super::Duration;
-  use super::DAYS_PER_YEAR;
+  use super::{DAYS_PER_YEAR, DAYS_PER_MONTH};
   use std::str::FromStr;
   use chrono::Duration as ChronoDuration;
-  use chrono::{Utc, TimeZone, DateTime};
+  use chrono::{Utc, TimeZone, DateTime, NaiveTime};
 
   #[test]
   fn test_year_month_to_string() {
@@ -909,25 +935,39 @@ mod tests {
       Utc.ymd(2020, 2, 12) - duration, 
     );
   }
-// pub fn parse_from_rfc3339(s: &str) -> ParseResult<DateTime<FixedOffset>>
-// Parses an RFC 3339 and ISO 8601 date and time string such as 1996-12-19T16:39:57-08:00, then returns a new DateTime with a parsed FixedOffset.
-#[test]
-fn test_add_datetime_and_duration() {
-  let duration = Duration::from_str("P2Y8M").unwrap().as_year_month(DAYS_PER_YEAR as f32/ 12.0);
+  // pub fn parse_from_rfc3339(s: &str) -> ParseResult<DateTime<FixedOffset>>
+  // Parses an RFC 3339 and ISO 8601 date and time string such as 1996-12-19T16:39:57-08:00, then returns a new DateTime with a parsed FixedOffset.
+  #[test]
+  fn test_add_datetime_and_duration() {
+    let duration = Duration::from_str("P2Y8M").unwrap().as_year_month(DAYS_PER_YEAR as f32/ 12.0);
 
-  // Rollover into January
-  let dt_a = DateTime::parse_from_rfc3339("2015-05-15T16:39:57-05:00").unwrap();
-  let dt_rollover = DateTime::parse_from_rfc3339("2018-01-15T16:39:57-05:00").unwrap();
-  assert_eq!(
-    dt_rollover, 
-    dt_a + duration, 
-  );
-  // Advance to month with fewer days
-  let dt_b = DateTime::parse_from_rfc3339("2015-01-31T16:39:57-05:00").unwrap();
-  let dt_truncate = DateTime::parse_from_rfc3339("2017-09-30T16:39:57-05:00").unwrap();
-  assert_eq!(
-    dt_truncate, 
-    dt_b + duration, 
-  );
-}
+    // Rollover into January
+    let dt_a = DateTime::parse_from_rfc3339("2015-05-15T16:39:57-05:00").unwrap();
+    let dt_rollover = DateTime::parse_from_rfc3339("2018-01-15T16:39:57-05:00").unwrap();
+    assert_eq!(
+      dt_rollover, 
+      dt_a + duration, 
+    );
+    // Advance to month with fewer days
+    let dt_b = DateTime::parse_from_rfc3339("2015-01-31T16:39:57-05:00").unwrap();
+    let dt_truncate = DateTime::parse_from_rfc3339("2017-09-30T16:39:57-05:00").unwrap();
+    assert_eq!(
+      dt_truncate, 
+      dt_b + duration, 
+    );
+  }
+
+  #[test]
+  fn test_time_difference() {
+    let t1 = NaiveTime::from_hms(14_u32, 20_u32, 0_u32);
+    let t2 = NaiveTime::from_hms(11_u32, 21_u32, 1_u32);
+    let expected_positive_duration = Duration::new(true, 0_u32, 0_u32, 0_u32, 2_u32, 58_u32, 59_f32).as_day_time(DAYS_PER_MONTH as f32);
+    let positive_delta = Duration::time_difference(t1, t2);
+    assert_eq!(expected_positive_duration, positive_delta, "positive time difference");
+
+    let expected_negative_duration = Duration::new(false, 0_u32, 0_u32, 0_u32, 2_u32, 58_u32, 59_f32).as_day_time(DAYS_PER_MONTH as f32);
+    let negative_delta = Duration::time_difference(t2, t1);
+    assert_eq!(expected_negative_duration, negative_delta, "negative time difference");
+
+  }
 }
