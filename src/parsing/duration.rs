@@ -3,7 +3,6 @@ use std::cmp;
 use std::ops;
 use std::str::FromStr;
 use chrono::Duration as ChronoDuration;
-use std::time::Duration as OldDuration;
 use chrono::{NaiveDate, Date, NaiveDateTime, DateTime, NaiveTime, Datelike, Timelike, offset::TimeZone};
 use super::duration_parser::parse_duration;
 
@@ -304,6 +303,12 @@ impl Eq for Duration {}
 impl PartialOrd for Duration {
   fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
     self.total_seconds().partial_cmp(&other.total_seconds())
+  }
+}
+
+impl Ord for Duration {
+  fn cmp(&self, other: &Self) -> cmp::Ordering {
+    self.partial_cmp(other).unwrap()
   }
 }
 
@@ -743,7 +748,6 @@ impl From<Duration> for ChronoDuration {
 
 #[cfg(test)]
 mod tests {
-  use std::time::Duration as OldDuration;
   use super::Duration;
   use super::{DAYS_PER_YEAR, DAYS_PER_MONTH};
   use std::str::FromStr;

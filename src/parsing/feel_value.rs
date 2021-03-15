@@ -9,7 +9,7 @@ use super::qname::{QName, Stringlike};
 use super::context::Context;
 use super::duration::Duration;
 
-#[derive(PartialEq, Eq, Clone, ToString, IntoStaticStr)]
+#[derive(PartialEq, Eq, Clone, Copy, ToString, IntoStaticStr)]
 /// Indicates the Type of a Feel language value but does not contain the actual value.
 pub enum FeelType {
   /// A Number
@@ -117,6 +117,18 @@ impl FeelValue {
     }
   }
 
+  /// Proper Feel semantics for equality, which returns Null for incomparable values.
+  pub fn equal(&self, other: &Self) -> FeelValue {
+    let type1 = self.get_type();
+    let type2 = other.get_type();
+    match (type1, type2) {
+      (_, _) if type1 == type2 => FeelValue::Boolean(self == other),
+      (FeelType::DayTimeDuration, FeelType::YearMonthDuration) => FeelValue::Boolean(self == other),
+      (FeelType::YearMonthDuration, FeelType::DayTimeDuration) => FeelValue::Boolean(self == other),
+      (_, _) => FeelValue::Null
+    }
+  }
+
 }
 
 fn are_vecs_equal<T: PartialEq>(a: &Vec<T>, b: &Vec<T>) -> bool {
@@ -142,6 +154,10 @@ impl PartialEq for FeelValue {
         (FeelValue::DateAndTime(l_dt), FeelValue::DateAndTime(r_dt)) => l_dt == r_dt,
         (FeelValue::YearMonthDuration(l_ymd), FeelValue::YearMonthDuration(r_ymd)) => l_ymd == r_ymd,
         (FeelValue::DayTimeDuration(l_dtd), FeelValue::DayTimeDuration(r_dtd)) => l_dtd == r_dtd,
+        // Special case in the DMN 1.2 Spec, section 9.4: 
+        // The two types of duration can be considered equal if both are zero, but in no other case.
+        (FeelValue::YearMonthDuration(l_ymd), FeelValue::DayTimeDuration(r_dtd)) => l_ymd.is_zero() && r_dtd.is_zero(),
+        (FeelValue::DayTimeDuration(l_dtd), FeelValue::YearMonthDuration(r_ymd)) => r_ymd.is_zero() && l_dtd.is_zero(),
         (FeelValue::List(l_list), FeelValue::List(r_list)) => are_vecs_equal(&*l_list.borrow(), &*r_list.borrow()),
         (FeelValue::Context(l_ctx), FeelValue::Context(r_ctx)) => l_ctx == r_ctx,
         // TODO: Implement Function compare.

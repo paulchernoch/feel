@@ -1,5 +1,6 @@
 use std::fmt;
 use std::ops;
+use std::cmp::Ordering;
 use std::str::FromStr;
 use std::convert::From;
 
@@ -63,6 +64,18 @@ impl PartialEq for QName {
   fn eq(&self, other: &Self) -> bool {
       self.parts.len() == other.parts.len()
       && self.parts.iter().zip(other.parts.iter()).all(|(a, b)| a == b)
+  }
+}
+
+impl PartialOrd for QName {
+  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    self.to_string().partial_cmp(&other.to_string())
+  }
+}
+
+impl Ord for QName {
+  fn cmp(&self, other: &Self) -> Ordering {
+    self.partial_cmp(other).unwrap()
   }
 }
 

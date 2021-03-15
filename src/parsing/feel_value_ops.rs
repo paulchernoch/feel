@@ -1,9 +1,12 @@
 //use std::cmp;
 use std::ops;
+use std::cmp::{Ord, PartialOrd, Ordering};
 use std::rc::Rc;
 use std::cell::RefCell;
-use super::feel_value::FeelValue;
+use super::feel_value::{FeelValue, FeelType};
 use super::duration::{Duration, DAYS_PER_MONTH};
+
+/////////////// Arithmetic Operations: Add, Neg, Sub, Mul, Div /////////////////
 
 impl<'a, 'b> ops::Add<&'b FeelValue> for &'a FeelValue {
   type Output = FeelValue;
@@ -154,6 +157,107 @@ impl<'a, 'b> ops::Div<&'b FeelValue> for &'a FeelValue {
   }
 }
 
+/////////////// Relational Operations /////////////////
+
+impl FeelType {
+
+  /// Get the sort order of the variants of FeelType.
+  /// 
+  /// Observe that DateAndTime values will be interleaved with Dates
+  /// and YearMonthDurations will be interleaved with DayTimeDurations,
+  /// as they are commensurate.
+  pub fn get_sort_order(self) -> i32 {
+    match self {
+      FeelType::Number => 1_i32,
+      FeelType::String => 2_i32,
+      FeelType::Name => 3_i32,
+      FeelType::Boolean => 4_i32,
+      FeelType::Date => 5_i32,
+      FeelType::Time => 6_i32,
+      FeelType::DateAndTime => 5_i32,
+      FeelType::YearMonthDuration => 7_i32,
+      FeelType::DayTimeDuration => 7_i32,
+      FeelType::List => 8_i32,
+      FeelType::Context => 9_i32,
+      FeelType::Function => 10_i32,
+      FeelType::Null => 11_i32,
+      FeelType::Error => 0_i32,
+      FeelType::Any => 12_i32
+    }
+  }
+}
+
+pub fn compare_f64(left: &f64, right: &f64) -> Ordering {
+  match left.partial_cmp(right) {
+    Some(ord) => ord,
+    None => {
+      match (left.is_nan(), right.is_nan()) {
+        (true, true) => Ordering::Equal,
+        (true, false) => Ordering::Less,
+        (false, true) => Ordering::Greater,
+        _ => unreachable!()
+      }
+    }
+  }
+}
+
+impl PartialOrd for FeelValue {
+
+  /// This will force full ordering on values, including floats.
+  /// The rules are more relaxed than the Feel specification dictates. 
+  /// In most cases, the spec only permits comparison of items of the same type, 
+  /// with the exception of DateTime and Date or YearMonthDuration and DayTimeDuration.
+  /// 
+  ///   - Less:         self is less than value.    -or- self is not a number (NaN) and value is a number.
+  ///   - Equal:        self is equal to value.     -or- Both self and value are not a number (NaN), PositiveInfinity, or NegativeInfinity.
+  ///   - Greater than: self is greater than value. -or- self is a number and value is not a number (NaN).
+  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    let left_type_order = FeelType::get_sort_order(self.get_type());
+    let right_type_order = FeelType::get_sort_order(other.get_type());
+    match left_type_order.cmp(&right_type_order) {
+      Ordering::Less => Some(Ordering::Less),
+      Ordering::Greater => Some(Ordering::Greater),
+      Ordering::Equal => {
+        match (self, other) {
+          (FeelValue::Number(l_num), FeelValue::Number(r_num)) => Some(compare_f64(l_num, r_num)),
+          (FeelValue::String(l_str), FeelValue::String(r_str)) => Some(l_str.cmp(r_str)),
+          (FeelValue::Name(l_name), FeelValue::Name(r_name)) => Some(l_name.cmp(r_name)),
+          (FeelValue::Boolean(l_bool), FeelValue::Boolean(r_bool)) => Some(l_bool.cmp(&r_bool)),
+          (FeelValue::Date(l_date), FeelValue::Date(r_date)) => Some(l_date.cmp(&r_date)),
+          (FeelValue::Time(l_time), FeelValue::Time(r_time)) => Some(l_time.cmp(&r_time)),
+          (FeelValue::DateAndTime(l_dt), FeelValue::DateAndTime(r_dt)) => Some(l_dt.cmp(&r_dt)),
+          // Date and DateTime may be compared by extracting the Date from the DateTime.
+          (FeelValue::DateAndTime(l_dt), FeelValue::Date(r_date)) => Some(l_dt.date().cmp(&r_date)),
+          (FeelValue::Date(l_date), FeelValue::DateAndTime(r_dt)) => Some(l_date.cmp(&r_dt.date())),
+          (FeelValue::YearMonthDuration(l_ymd), FeelValue::YearMonthDuration(r_ymd)) => Some(l_ymd.cmp(&r_ymd)),
+          (FeelValue::DayTimeDuration(l_dtd), FeelValue::DayTimeDuration(r_dtd)) => Some(l_dtd.cmp(&r_dtd)),
+          // Special case in the DMN 1.2 Spec, section 9.4: 
+          // The two types of duration can be considered equal if both are zero, but in no other case.
+          // We relax this here, and must tighten it up elsewhere.
+          (FeelValue::YearMonthDuration(l_ymd), FeelValue::DayTimeDuration(r_dtd)) => Some(l_ymd.cmp(&r_dtd)),
+          (FeelValue::DayTimeDuration(l_dtd), FeelValue::YearMonthDuration(r_ymd)) => Some(l_dtd.cmp(&r_ymd)),
+          // TODO: Decide what to do with Lists
+          (FeelValue::List(l_list), FeelValue::List(r_list)) => None,
+          // TODO: Decide what to do with Contexts
+          (FeelValue::Context(l_ctx), FeelValue::Context(r_ctx)) => None,
+          // TODO: Implement Function compare.
+          (FeelValue::Function, FeelValue::Function) => Some(Ordering::Equal),
+          // Normally Nulls are not equal, but for this function they are.
+          (FeelValue::Null, FeelValue::Null) => Some(Ordering::Equal),
+          (FeelValue::Error(l_err), FeelValue::Error(r_err)) => Some(l_err.cmp(&r_err)),
+          _ => None
+        }
+      }
+    }
+  }
+}
+
+impl Ord for FeelValue {
+  fn cmp(&self, other: &Self) -> Ordering {
+      self.partial_cmp(other).unwrap()
+  }
+}
+
 /////////////// TESTS /////////////////
 
 #[cfg(test)]
@@ -262,6 +366,24 @@ mod tests {
     let expected:FeelValue = FeelValue::DayTimeDuration(Duration::from_str("PT3H31M0S").unwrap());
     let product = &x * &y;
     assert_eq!(expected, product, "multiply duration by number");
+  }
+
+  #[test]
+  fn test_cmp_numbers() {
+    let x: FeelValue = 100.into();
+    let y: FeelValue = 10.into();
+    assert_eq!(true, x > y, "x > y");
+    assert_eq!(false, x < y, "x < y");
+    assert_eq!(false, x <= y, "x <= y");
+  }
+
+  #[test]
+  fn test_cmp_nans() {
+    let nan: FeelValue = f64::NAN.into();
+    let y: FeelValue = 10.into();
+    assert_eq!(false, nan > y, "nan > y");
+    assert_eq!(true, nan < y, "nan < y");
+    assert_eq!(true, nan >= nan, "nan >= nan");
   }
 
 }
