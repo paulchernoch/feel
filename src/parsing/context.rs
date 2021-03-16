@@ -17,20 +17,6 @@ pub struct Context {
 }
 
 impl Context {
-  /// Does the Context contain the given key?
-  /// If given a String key, it will be parsed into a QName before checking for the key.
-  pub fn contains_key<Q: Into<QName>>(&self, k: Q) -> bool {
-    self.contents.borrow().contains_key(&k.into())
-  }
-
-  /// Get the value associated with the key, if any.
-  pub fn get<Q: Into<QName>>(&self, k: Q) -> Option<FeelValue> {
-    match self.contents.borrow().get(&k.into()) {
-      Some(value) => Some(value.clone()),
-      None => None
-    }
-  }
-
   /// Insert a key-value pair into the context and return the prior value, if any.
   pub fn insert<Q: Into<QName>>(&self, k: Q, v: FeelValue) -> Option<FeelValue> {
     self.contents.borrow_mut().insert(k.into(), v)
@@ -39,6 +25,31 @@ impl Context {
   pub fn new() -> Self {
     Context { 
       contents: RefCell::new(HashMap::new())
+    }
+  }
+}
+
+pub trait ContextReader {
+  /// Does the Context contain the given key?
+  /// If given a String key, it will be parsed into a QName before checking for the key.
+  fn contains_key<Q: Into<QName>>(&self, k: Q) -> bool;
+
+  /// Get the value associated with the key, if any.
+  fn get<Q: Into<QName> + Clone>(&self, k: Q) -> Option<FeelValue>;
+}
+
+impl ContextReader for Context {
+  /// Does the Context contain the given key?
+  /// If given a String key, it will be parsed into a QName before checking for the key.
+  fn contains_key<Q: Into<QName>>(&self, k: Q) -> bool {
+    self.contents.borrow().contains_key(&k.into())
+  }
+
+  /// Get the value associated with the key, if any.
+  fn get<Q: Into<QName> + Clone>(&self, k: Q) -> Option<FeelValue> {
+    match self.contents.borrow().get(&k.into()) {
+      Some(value) => Some(value.clone()),
+      None => None
     }
   }
 }
@@ -78,7 +89,7 @@ impl Display for Context {
 #[cfg(test)]
 mod tests {
   use super::super::feel_value::FeelValue;
-  use super::Context;
+  use super::{Context, ContextReader};
 
   #[test]
   fn test_contains_key() {

@@ -5,6 +5,7 @@ pub mod duration_parser;
 pub mod feel_value;
 pub mod feel_value_ops;
 pub mod context;
+pub mod range;
 pub mod nested_context;
 
 

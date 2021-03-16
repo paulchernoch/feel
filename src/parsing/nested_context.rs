@@ -1,5 +1,6 @@
 use super::feel_value::{FeelValue, FeelType};
 use super::qname::QName;
+use super::context::ContextReader;
 
 pub struct NestedContext {
   /// The stack holds FeelValues that must all be Contexts.
@@ -29,8 +30,29 @@ impl NestedContext {
     self.stack.pop()
   }
 
+}
+
+impl ContextReader for NestedContext {
+  fn contains_key<Q: Into<QName>>(&self, k: Q) -> bool {
+    let key = k.into();
+    for item in self.stack.iter().rev() {
+      match item {
+        FeelValue::Context(ctx) => {
+          if ctx.contains_key(key.clone()) {
+            return true;
+          }
+          else {
+            ()
+          }       
+        },
+        _ => ()
+      };
+    }
+    false
+  }
+
   /// Get the value associated with the key, if any, starting from the context at the top of the stack.
-  pub fn get<Q: Into<QName> + Clone>(&self, k: Q) -> Option<FeelValue> {
+  fn get<Q: Into<QName> + Clone>(&self, k: Q) -> Option<FeelValue> {
     let key = k.into();
     for item in self.stack.iter().rev() {
       match item {
@@ -40,7 +62,7 @@ impl NestedContext {
             return value;
           }        
         },
-      _ => ()
+        _ => ()
       };
     }
     Option::None
@@ -53,7 +75,7 @@ impl NestedContext {
 mod tests {
   use std::rc::Rc;
   use super::super::feel_value::{FeelValue};
-  use super::super::context::Context;
+  use super::super::context::{Context,ContextReader};
   use super::NestedContext;
 
   fn make_test_data() -> NestedContext {
