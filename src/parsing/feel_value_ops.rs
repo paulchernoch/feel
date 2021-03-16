@@ -237,9 +237,9 @@ impl PartialOrd for FeelValue {
           (FeelValue::YearMonthDuration(l_ymd), FeelValue::DayTimeDuration(r_dtd)) => Some(l_ymd.cmp(&r_dtd)),
           (FeelValue::DayTimeDuration(l_dtd), FeelValue::YearMonthDuration(r_ymd)) => Some(l_dtd.cmp(&r_ymd)),
           // TODO: Decide what to do with Lists
-          (FeelValue::List(l_list), FeelValue::List(r_list)) => None,
+          (FeelValue::List(_), FeelValue::List(_)) => None,
           // TODO: Decide what to do with Contexts
-          (FeelValue::Context(l_ctx), FeelValue::Context(r_ctx)) => None,
+          (FeelValue::Context(_), FeelValue::Context(_)) => None,
           // TODO: Implement Function compare.
           (FeelValue::Function, FeelValue::Function) => Some(Ordering::Equal),
           // Normally Nulls are not equal, but for this function they are.
@@ -386,4 +386,13 @@ mod tests {
     assert_eq!(true, nan >= nan, "nan >= nan");
   }
 
+  #[test]
+  fn test_cmp_strings() {
+    let x: FeelValue = "hello".into();
+    let y: FeelValue = "world".into();
+    assert_eq!(false, x > y, "x > y");
+    assert_eq!(true, x < y, "x < y");
+    assert_eq!(true, x <= y, "x <= y");
+    assert_eq!(false, x >= y, "x >= y");
+  }
 }

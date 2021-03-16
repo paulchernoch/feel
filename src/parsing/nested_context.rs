@@ -1,5 +1,3 @@
-use std::rc::Rc;
-use std::cell::RefCell;
 use super::feel_value::{FeelValue, FeelType};
 use super::qname::QName;
 
@@ -28,7 +26,7 @@ impl NestedContext {
 
   /// Pop the top (last) context from the stack and return it in an Option, or return None if the stack is empty.
   pub fn pop(&mut self) -> Option<FeelValue> {
-    self.pop()
+    self.stack.pop()
   }
 
   /// Get the value associated with the key, if any, starting from the context at the top of the stack.
