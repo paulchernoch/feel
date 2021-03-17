@@ -7,9 +7,10 @@
  - [x] Enum Defined
  - [x] Equality
  - [x] Add, Sub, Mul, Div
- - [ ] Nested Context
- - [ ] Inequality Operators
- - [ ] Range
+ - [x] Nested Context
+ - [x] Inequality Operators
+ - [x] Range includes
+ - [ ] Range added to FeelValue
  - [ ] Remaining Operators
  - [ ] List Functions
  - [ ] User Defined Functions
@@ -25,6 +26,12 @@
 
 ## Simple Expression Tree Walk
 
+ - [ ] Additive
+ - [ ] Multiplicative
+ - [ ] Relational
+ - [ ] Logical
+ - [ ] Conditional
+
 ## Complex Expressions
 
  - [ ] Assembling Lists
@@ -33,6 +40,8 @@
  - [ ] Sorting
  - [ ] Filtering
  - [ ] Rule Chaining
+ - [ ] Defining Functions
+ - [ ] Calling Functions
 
 ## Caching
 
@@ -45,10 +54,17 @@
 
 ## Consequents
 
+ - [ ] Asynchronous REST API Calls
+ - [ ] Synchronous REST API Calls
+
 
 ## State Machines
 
-
+ - [ ] Guards
+ - [ ] Transitions
+ - [ ] States
+ - [ ] Push/Pop Stack
+ - [ ] Error State
 
 
 

@@ -1,3 +1,4 @@
+use std::fmt::{Debug,Display,Formatter,Result};
 use super::feel_value::{FeelValue, FeelType};
 use super::context::ContextReader;
 
@@ -6,6 +7,7 @@ use super::context::ContextReader;
 ///   - The low and high values may be FeelValue::Name values, indicating that they should be looked up
 ///     from a NestedContext.
 ///   - The low and high values may be Option::None, indicating an open range in that direction. 
+#[derive(PartialEq, Eq, Clone)]
 pub struct Range {
   low: Option<FeelValue>,
   high: Option<FeelValue>,
@@ -103,6 +105,26 @@ impl Range {
   }
 }
 
+impl Debug for Range {
+  fn fmt(&self, f: &mut Formatter) -> Result {
+    let left_bracket = if self.low_inclusive { "[" } else { "(" };
+    let right_bracket = if self.high_inclusive { "]" } else { ")" };
+
+    match (&self.low, &self.high) {
+      (None, None) =>  write!(f, "{},{}", left_bracket, right_bracket),
+      (None, Some(value)) =>  write!(f, "{},{:?}{}", left_bracket, value, right_bracket),
+      (Some(value), None) =>  write!(f, "{}{:?},{}", left_bracket, value, right_bracket),
+      (Some(low), Some(high)) =>  write!(f, "{}{:?},{:?}{}", left_bracket, low, high, right_bracket)
+    }
+  }
+}
+
+impl Display for Range {
+  fn fmt(&self, f: &mut Formatter) -> Result {
+      write!(f, "{:?}", self)
+  }
+}
+
 /////////////// TESTS /////////////////
 
 #[cfg(test)]
@@ -144,6 +166,28 @@ mod tests {
 
     assert_eq!(true, failing_range.includes(&grade_50, &ctx), "failing grade in failing range");
     assert_eq!(false, failing_range.includes(&grade_92, &ctx), "passing grade not in failing range");
+  }
+
+
+  #[test]
+  fn test_to_string() {
+    assert_eq!(
+      "[0,65)".to_string(), 
+      (&Range::new(0.into(), 65.into(), true, false)).to_string(), 
+      "inclusive exclusive range"
+    );
+
+    assert_eq!(
+      "(0,65]".to_string(), 
+      (&Range::new(0.into(), 65.into(), false, true)).to_string(), 
+      "exclusive inclusive range"
+    );
+
+    assert_eq!(
+      "[,65)".to_string(), 
+      (&Range::new_with_high(65.into(), false)).to_string(), 
+      "open exclusive range"
+    );
   }
 
 }
