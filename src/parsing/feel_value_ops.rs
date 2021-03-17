@@ -177,12 +177,13 @@ impl FeelType {
       FeelType::DateAndTime => 5_i32,
       FeelType::YearMonthDuration => 7_i32,
       FeelType::DayTimeDuration => 7_i32,
-      FeelType::List => 8_i32,
-      FeelType::Context => 9_i32,
-      FeelType::Function => 10_i32,
-      FeelType::Null => 11_i32,
+      FeelType::Range => 8_i32,
+      FeelType::List => 9_i32,
+      FeelType::Context => 10_i32,
+      FeelType::Function => 11_i32,
+      FeelType::Null => 12_i32,
       FeelType::Error => 0_i32,
-      FeelType::Any => 12_i32
+      FeelType::Any => 13_i32
     }
   }
 }
@@ -236,6 +237,7 @@ impl PartialOrd for FeelValue {
           // We relax this here, and must tighten it up elsewhere.
           (FeelValue::YearMonthDuration(l_ymd), FeelValue::DayTimeDuration(r_dtd)) => Some(l_ymd.cmp(&r_dtd)),
           (FeelValue::DayTimeDuration(l_dtd), FeelValue::YearMonthDuration(r_ymd)) => Some(l_dtd.cmp(&r_ymd)),
+          (FeelValue::Range(l_range), FeelValue::Range(r_range)) => Some(l_range.cmp(&r_range)),
           // TODO: Decide what to do with Lists
           (FeelValue::List(_), FeelValue::List(_)) => None,
           // TODO: Decide what to do with Contexts

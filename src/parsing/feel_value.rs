@@ -8,6 +8,7 @@ use chrono::{NaiveDate, NaiveDateTime, NaiveTime };
 use super::qname::{QName, Stringlike};
 use super::context::Context;
 use super::duration::Duration;
+use super::range::Range;
 
 #[derive(PartialEq, Eq, Clone, Copy, ToString, IntoStaticStr)]
 /// Indicates the Type of a Feel language value but does not contain the actual value.
@@ -30,6 +31,8 @@ pub enum FeelType {
   YearMonthDuration, 
   /// Duration with only days, hours, minutes and seconds filled in
   DayTimeDuration,
+  /// A Range defined as a pair of low and high values
+  Range,
   /// A sequential collection of other values
   List,
   /// A collection of name-value pairs
@@ -65,6 +68,8 @@ pub enum FeelValue {
   YearMonthDuration(Duration), 
   /// Duration with only days, hours, minutes and seconds filled in
   DayTimeDuration(Duration),
+  /// A Range given as a pair of low and high values
+  Range(Range),
   /// A sequential collection of other values
   List(Rc<RefCell<Vec<FeelValue>>>),
   /// A collection of name-value pairs
@@ -90,6 +95,7 @@ impl FeelValue {
       FeelValue::DateAndTime(_) => FeelType::DateAndTime,
       FeelValue::YearMonthDuration(_) => FeelType::YearMonthDuration,
       FeelValue::DayTimeDuration(_) => FeelType::DayTimeDuration,
+      FeelValue::Range(_) => FeelType::Range,
       FeelValue::List(_) => FeelType::List,
       FeelValue::Context(_) => FeelType::Context,
       FeelValue::Function => FeelType::Function,
@@ -158,6 +164,7 @@ impl PartialEq for FeelValue {
         // The two types of duration can be considered equal if both are zero, but in no other case.
         (FeelValue::YearMonthDuration(l_ymd), FeelValue::DayTimeDuration(r_dtd)) => l_ymd.is_zero() && r_dtd.is_zero(),
         (FeelValue::DayTimeDuration(l_dtd), FeelValue::YearMonthDuration(r_ymd)) => r_ymd.is_zero() && l_dtd.is_zero(),
+        (FeelValue::Range(l_range), FeelValue::Range(r_range)) => l_range == r_range,
         (FeelValue::List(l_list), FeelValue::List(r_list)) => are_vecs_equal(&*l_list.borrow(), &*r_list.borrow()),
         (FeelValue::Context(l_ctx), FeelValue::Context(r_ctx)) => l_ctx == r_ctx,
         // TODO: Implement Function compare.
@@ -185,6 +192,7 @@ impl fmt::Debug for FeelValue {
         FeelValue::DateAndTime(dt) => write!(f, "{:?}", dt),
         FeelValue::YearMonthDuration(ymd) => write!(f, "{:?}", ymd),
         FeelValue::DayTimeDuration(dtd) => write!(f, "{:?}", dtd),
+        FeelValue::Range(range) => write!(f, "{:?}", range),
         FeelValue::List(l) => {
           let mut combined = String::with_capacity(1000);
           let mut comma = "";
@@ -215,6 +223,7 @@ impl fmt::Display for FeelValue {
       FeelValue::DateAndTime(dt) => write!(f, "{}", dt),
       FeelValue::YearMonthDuration(ymd) => write!(f, "{}", ymd),
       FeelValue::DayTimeDuration(dtd) => write!(f, "{}", dtd),
+      FeelValue::Range(range) => write!(f, "{}", range),
       FeelValue::List(l) => {
         let mut combined = String::with_capacity(1000);
         let mut comma = "";
