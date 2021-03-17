@@ -1,4 +1,5 @@
 use std::fmt::{Debug,Display,Formatter,Result};
+use std::cmp::{Ord, PartialOrd, Ordering};
 use super::feel_value::{FeelValue, FeelType};
 use super::context::ContextReader;
 
@@ -125,10 +126,47 @@ impl Display for Range {
   }
 }
 
+impl PartialOrd for Range {
+  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    let low_cmp = match (&self.low, &other.low) {
+      (None, None) => match (self.low_inclusive, other.low_inclusive) {
+          (true, false) => Ordering::Less,
+          (false,true) => Ordering::Greater,
+          _ => Ordering::Equal
+        },
+      (None, _) => Ordering::Less,
+      (_, None) => Ordering::Greater,
+      (Some(a), Some(b)) => a.cmp(&b)
+    };
+    if low_cmp != Ordering::Equal {
+      return Some(low_cmp);
+    }
+
+    let high_cmp = match (&self.high, &other.high) {
+      (None, None) => match (self.high_inclusive, other.high_inclusive) {
+          (true, false) => Ordering::Greater,
+          (false,true) => Ordering::Less,
+          _ => Ordering::Equal
+        },
+      (None, _) => Ordering::Greater,
+      (_, None) => Ordering::Less,
+      (Some(a), Some(b)) => a.cmp(&b)
+    };
+    return Some(high_cmp);
+  }
+}
+
+impl Ord for Range {
+  fn cmp(&self, other: &Self) -> Ordering {
+      self.partial_cmp(other).unwrap()
+  }
+}
+
 /////////////// TESTS /////////////////
 
 #[cfg(test)]
 mod tests {
+  use std::cmp::{Ord, PartialOrd, Ordering};
   use super::super::feel_value::{FeelValue};
   use super::super::context::{Context};
   use super::Range;
@@ -190,5 +228,24 @@ mod tests {
     );
   }
 
+  #[test]
+  fn test_partial_cmp() {
+    let r1 = Range::new(5.into(), 65.into(), true, true);
+    let r2 = Range::new(6.into(), 65.into(), true, true);
+    assert_eq!(Ordering::Less, r1.partial_cmp(&r2).unwrap(), "compare ranges differing by low");
+
+    let r3 = Range::new(5.into(), 64.into(), true, true);
+    assert_eq!(Ordering::Greater, r1.partial_cmp(&r3).unwrap(), "compare ranges differing by high");
+  }
+
+  #[test]
+  fn test_cmp() {
+    let r1 = Range::new(5.into(), 65.into(), true, true);
+    let r2 = Range::new(6.into(), 65.into(), true, true);
+    assert_eq!(Ordering::Less, r1.cmp(&r2), "compare ranges differing by low");
+
+    let r3 = Range::new(5.into(), 64.into(), true, true);
+    assert_eq!(Ordering::Greater, r1.cmp(&r3), "compare ranges differing by high");
+  }
 }
 
