@@ -10,7 +10,7 @@
  - [x] Nested Context
  - [x] Inequality Operators
  - [x] Range includes
- - [ ] Range added to FeelValue
+ - [x] Range added to FeelValue
  - [ ] Remaining Operators
  - [ ] List Functions
  - [ ] User Defined Functions
