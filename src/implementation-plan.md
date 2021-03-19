@@ -11,6 +11,8 @@
  - [x] Inequality Operators
  - [x] Range includes
  - [x] Range added to FeelValue
+ - [x] FeelFunction
+ - [x] FeelFunction added to FeelValue
  - [ ] Remaining Operators
  - [ ] List Functions
  - [ ] User Defined Functions

@@ -9,6 +9,7 @@ use super::qname::{QName, Stringlike};
 use super::context::Context;
 use super::duration::Duration;
 use super::range::Range;
+use super::feel_function::FeelFunction;
 
 #[derive(PartialEq, Eq, Clone, Copy, ToString, IntoStaticStr)]
 /// Indicates the Type of a Feel language value but does not contain the actual value.
@@ -75,7 +76,7 @@ pub enum FeelValue {
   /// A collection of name-value pairs
   Context(Rc<Context>),
   /// A function taking a single argument (a FeelValue) and returning a single result (a FeelValue)
-  Function,
+  Function(FeelFunction),
   /// A missing value
   Null,
   /// An execution error
@@ -98,7 +99,7 @@ impl FeelValue {
       FeelValue::Range(_) => FeelType::Range,
       FeelValue::List(_) => FeelType::List,
       FeelValue::Context(_) => FeelType::Context,
-      FeelValue::Function => FeelType::Function,
+      FeelValue::Function(_) => FeelType::Function,
       FeelValue::Null => FeelType::Null,
       FeelValue::Error(_) => FeelType::Error
     }
@@ -119,6 +120,13 @@ impl FeelValue {
   pub fn is_error(&self) -> bool {
     match self {
       FeelValue::Error(_) => true,
+      _ => false
+    }
+  }
+
+  pub fn is_null(&self) -> bool {
+    match self {
+      FeelValue::Null => true,
       _ => false
     }
   }
@@ -168,7 +176,7 @@ impl PartialEq for FeelValue {
         (FeelValue::List(l_list), FeelValue::List(r_list)) => are_vecs_equal(&*l_list.borrow(), &*r_list.borrow()),
         (FeelValue::Context(l_ctx), FeelValue::Context(r_ctx)) => l_ctx == r_ctx,
         // TODO: Implement Function compare.
-        (FeelValue::Function, FeelValue::Function) => true,
+        (FeelValue::Function(l_func), FeelValue::Function(r_func)) => l_func == r_func,
         // Normally Nulls are not equal, but for this function they are.
         (FeelValue::Null, FeelValue::Null) => true,
         (FeelValue::Error(l_err), FeelValue::Error(r_err)) => l_err == r_err,
@@ -204,7 +212,7 @@ impl fmt::Debug for FeelValue {
           write!(f, "[{}]", combined)
         },
         FeelValue::Context(c) => write!(f, "{:?}", c),
-        FeelValue::Function => write!(f, "{}", "function"),
+        FeelValue::Function(func) => write!(f, "{:?}", func),
         FeelValue::Null => write!(f, "{}", "null"),
         FeelValue::Error(e) => write!(f, "Error: {}", e),
       }
@@ -235,7 +243,7 @@ impl fmt::Display for FeelValue {
         write!(f, "[{}]", combined)
       },
       FeelValue::Context(c) => write!(f, "{}", c),
-      FeelValue::Function => write!(f, "{}", "function"),
+      FeelValue::Function(func) => write!(f, "{}", func),
       FeelValue::Null => write!(f, "{}", "null"),
       FeelValue::Error(e) => write!(f, "Error: {}", e),
     }

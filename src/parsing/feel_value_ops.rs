@@ -243,7 +243,7 @@ impl PartialOrd for FeelValue {
           // TODO: Decide what to do with Contexts
           (FeelValue::Context(_), FeelValue::Context(_)) => None,
           // TODO: Implement Function compare.
-          (FeelValue::Function, FeelValue::Function) => Some(Ordering::Equal),
+          (FeelValue::Function(l_func), FeelValue::Function(r_func)) => Some(l_func.cmp(&r_func)),
           // Normally Nulls are not equal, but for this function they are.
           (FeelValue::Null, FeelValue::Null) => Some(Ordering::Equal),
           (FeelValue::Error(l_err), FeelValue::Error(r_err)) => Some(l_err.cmp(&r_err)),
