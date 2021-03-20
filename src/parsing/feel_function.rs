@@ -8,6 +8,7 @@ use std::cmp::{Ord, PartialOrd, Ordering};
 use std::fmt::{Debug,Display,Formatter,Result};
 use super::feel_value::FeelValue;
 use super::nested_context::NestedContext;
+use super::qname::QName;
 
 /// Functions may be builtin or user defined.
 #[derive(PartialEq, Eq, Debug, Clone, Copy, ToString, IntoStaticStr)]
@@ -27,29 +28,33 @@ static ANONYMOUS: &str = "anonymous";
 #[derive(Clone)]
 pub struct FeelFunction {
   pub function_type: FunctionType,
-  name_container: RefCell<String>,
+  /// The function name, being a QName, can have spaces in it!
+  name_container: RefCell<QName>,
   function_container: Rc<dyn Fn(&FeelValue, &mut NestedContext) -> FeelValue>
 }
 
 impl FeelFunction {
-  pub fn new_builtin(name: String, func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) -> Self {
+  /// Create a builtin FeelFunction, required to have a name.
+  pub fn new_builtin<Q: Into<QName>>(name: Q, func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) -> Self {
     FeelFunction {
       function_type: FunctionType::Builtin,
-      name_container: RefCell::new(name),
+      name_container: RefCell::new(name.into()),
       function_container: Rc::new(func)
     }
   }
 
+  /// Create an anonymous (unnamed) user defined FeelFunction.
+  /// Its name may be set after creation via set_name.
   pub fn new_user(func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) -> Self {
     FeelFunction {
       function_type: FunctionType::User,
-      name_container: RefCell::new(ANONYMOUS.to_string()),
+      name_container: RefCell::new(ANONYMOUS.into()),
       function_container: Rc::new(func)
     }
   }
 
   /// Get a clone of the function name.
-  pub fn get_name(&self) -> String {
+  pub fn get_name(&self) -> QName {
     self.name_container.borrow().clone()
   }
 
@@ -60,8 +65,9 @@ impl FeelFunction {
   /// after definition time as soon as it learns the Context key to 
   /// use as the function name.
   /// Note that setting the function's name does not require a mutable reference.
-  pub fn set_name(&self, new_name: String) -> String {
-    self.name_container.replace(new_name)
+  pub fn set_name<Q: Into<QName> + Clone>(&self, new_name: &Q) -> QName {
+    let new_qname: QName = new_name.clone().into();
+    self.name_container.replace(new_qname)
   }
 
 }
@@ -78,7 +84,7 @@ impl PartialEq for FeelFunction {
     if self.function_type == FunctionType::Builtin && other.function_type == FunctionType::Builtin {
       return true;
     }
-    if name == ANONYMOUS {
+    if name.to_string() == ANONYMOUS {
       // The names match, but they are both anonymous, so we assume that the functions are different
       // (unless they have the same pointer value).
       return false;
@@ -133,6 +139,7 @@ mod tests {
   use super::super::feel_value::{FeelValue};
   use super::super::nested_context::NestedContext;
   use super::FeelFunction;
+  use super::super::qname::QName;
 
   fn make_identity_function() -> FeelFunction {
     let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue {
@@ -145,8 +152,8 @@ mod tests {
   #[test]
   fn test_set_name() {
     let ff = make_identity_function();
-    let name = "identity".to_string();
-    ff.set_name(name.clone());
+    let name:QName = "identity".into();
+    ff.set_name(&name);
     assert_eq!(name, ff.get_name(), "get_name of FeelFunction");
   }
 
