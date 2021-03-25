@@ -11,10 +11,10 @@ pub struct QName {
 }
 
 impl QName {
-  fn new<S>(name: S) -> Self where S: Into<String> {
+  fn new<S>(name: &S) -> Self where S: Into<String> + Clone {
     QName { 
       // parts: vec![name.into()] 
-      parts: name.into().split_whitespace().map(|s| s.to_string()).collect()
+      parts: name.clone().into().split_whitespace().map(|s| s.to_string()).collect()
     }
   }
 }
@@ -118,8 +118,8 @@ mod tests {
 
   #[test]
   fn test_qname_hash() {
-    let q1 = &QName::new("Sam") + "Hill";
-    let q2 = &QName::new("Sam") + "Hill";
+    let q1 = &QName::new(&"Sam") + "Hill";
+    let q2 = &QName::new(&"Sam") + "Hill";
     assert_eq!(
       calculate_hash(&q1),
       calculate_hash(&q2)
@@ -142,5 +142,12 @@ mod tests {
       QName { parts: vec_of_strings!["John", "Smith"] },
       q1,
     )
+  }
+
+  #[test]
+  fn test_new() {
+    let q1 = QName::new(&"Faux pas");
+    let q2 = "Faux   pas".parse().unwrap();
+    assert_eq!(q1, q2);
   }
 }

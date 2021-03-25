@@ -2,6 +2,12 @@ use super::feel_value::{FeelValue, FeelType};
 use super::qname::QName;
 use super::context::ContextReader;
 
+/// In Feel, a scope is a list of contexts, called here a NestedContext.
+/// 
+/// In the DMN Spec version 1.3, section 10.3.2.11, it says that the contexts are evaluated 
+/// from first to last, with the last context being the builtin context.
+/// This structure evaluates them from last to first, but stores the contexts in
+/// a stack that holds the values in reverse order, so the end result is the same.
 pub struct NestedContext {
   /// The stack holds FeelValues that must all be Contexts.
   stack: Vec<FeelValue>

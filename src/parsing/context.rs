@@ -5,8 +5,10 @@ use std::fmt::{Debug,Display,Formatter,Result};
 use super::qname::QName;
 use super::feel_value::FeelValue;
 
+// TODO: Permit changing the value of a key for when we have an iteration context,
+// used when iterating over lists. See §10.3.2.14 of the DMN Spec version 1.3.
 
-/// A Feel Context is a dictionary.
+/// A Context is a dictionary which corresponds in the Feel specification to a context or a scope.
 /// 
 /// Interior mutability is required to extend the dictionary by adding key-value pairs.
 /// No Keys may be changed or removed.

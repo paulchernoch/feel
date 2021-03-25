@@ -5,6 +5,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use super::feel_value::{FeelValue, FeelType};
 use super::duration::{Duration, DAYS_PER_MONTH};
+use super::execution_log::ExecutionLog;
 
 /////////////// Arithmetic Operations: Add, Neg, Sub, Mul, Div /////////////////
 
@@ -32,11 +33,12 @@ impl<'a, 'b> ops::Add<&'b FeelValue> for &'a FeelValue {
         new_list.push(r.clone());
         FeelValue::List(Rc::new(RefCell::new(new_list)))
       },
-      (FeelValue::Error(_), _) => self.clone(),
-      (_, FeelValue::Error(_)) => rhs.clone(),
       (FeelValue::Null, _) => FeelValue::Null,
       (_, FeelValue::Null) => FeelValue::Null,
-      _ => FeelValue::Error(format!("Cannot add {} to {}", self.get_type().to_string(), rhs.get_type().to_string()))
+      _ => {
+        ExecutionLog::log(&format!("Cannot add {} to {}", self.get_type().to_string(), rhs.get_type().to_string()));
+        FeelValue::Null
+      } 
     }
   }
   
@@ -62,9 +64,11 @@ impl<'a, 'b> ops::Sub<&'b FeelValue> for &'a FeelValue {
   type Output = FeelValue;
 
   fn sub(self, rhs: &'b FeelValue) -> Self::Output {
+    let type_error = || -> FeelValue {
+      ExecutionLog::log(&format!("Cannot subtract {} minus {}", self.get_type().to_string(), rhs.get_type().to_string()));
+      FeelValue::Null
+    };
     match (self, rhs) {
-      (FeelValue::Error(_), _) => self.clone(),
-      (_, FeelValue::Error(_)) => rhs.clone(),
       (FeelValue::Date(d1), FeelValue::Date(d2)) => {
         // TODO: Should we instead use date_difference_months?
         let delta = Duration::date_difference_days(*d1, *d2).as_year_month(DAYS_PER_MONTH as f32);
@@ -81,7 +85,7 @@ impl<'a, 'b> ops::Sub<&'b FeelValue> for &'a FeelValue {
       (_, _) => {
         let result = self + &(-rhs);
         match result {
-          FeelValue::Error(_) => FeelValue::Error(format!("Cannot subtract {} minus {}", self.get_type().to_string(), rhs.get_type().to_string())),
+          FeelValue::Null => type_error(), 
           _ => result
         }
       }
@@ -93,6 +97,10 @@ impl<'a, 'b> ops::Mul<&'b FeelValue> for &'a FeelValue {
   type Output = FeelValue;
 
   fn mul(self, rhs: &'b FeelValue) -> Self::Output {
+    let type_error = || -> FeelValue {
+      ExecutionLog::log(&format!("Cannot multiply {} by {}", self.get_type().to_string(), rhs.get_type().to_string()));
+      FeelValue::Null
+    };
     match (self, rhs) {
       (FeelValue::Number(l_num), FeelValue::Number(r_num)) => FeelValue::Number(l_num * r_num),
       (FeelValue::YearMonthDuration(l_ymd), FeelValue::Number(r_factor)) => 
@@ -103,11 +111,9 @@ impl<'a, 'b> ops::Mul<&'b FeelValue> for &'a FeelValue {
         FeelValue::DayTimeDuration((*l_dtd * (*r_factor as f32)).as_day_time(DAYS_PER_MONTH as f32)),
       (FeelValue::Number(l_factor), FeelValue::DayTimeDuration(r_dtd)) => 
         FeelValue::DayTimeDuration((*r_dtd * (*l_factor as f32)).as_day_time(DAYS_PER_MONTH as f32)),
-      (FeelValue::Error(_), _) => self.clone(),
-      (_, FeelValue::Error(_)) => rhs.clone(),
-      (FeelValue::Null, _) => FeelValue::Null,
-      (_, FeelValue::Null) => FeelValue::Null,
-      _ => FeelValue::Error(format!("Cannot multiply {} by {}", self.get_type().to_string(), rhs.get_type().to_string()))
+      (FeelValue::Null, _) => type_error(),
+      (_, FeelValue::Null) => type_error(),
+      _ => type_error()
     }
   }
 }
@@ -116,17 +122,27 @@ impl<'a, 'b> ops::Div<&'b FeelValue> for &'a FeelValue {
   type Output = FeelValue;
 
   fn div(self, rhs: &'b FeelValue) -> Self::Output {
+    let type_error = || -> FeelValue {
+      ExecutionLog::log(&format!("Cannot divide {} by {}", self.get_type().to_string(), rhs.get_type().to_string()));
+      FeelValue::Null
+    };
+    let div_zero_error = || -> FeelValue {
+      ExecutionLog::log(&format!("Division by zero, infinity or NaN {:?}", rhs));
+      FeelValue::Null
+    };
+    let infinite_ratio = || -> FeelValue {
+      ExecutionLog::log(&format!("Ratio is infinite {:?} / {:?}", self, rhs));
+      FeelValue::Null
+    };
     match (self, rhs) {
-      (FeelValue::Error(_), _) => self.clone(),
-      (_, FeelValue::Error(_)) => rhs.clone(),
-      (FeelValue::Null, _) => FeelValue::Null,
-      (_, FeelValue::Null) => FeelValue::Null,
-      (_, FeelValue::Number(r_num)) if *r_num == 0.0 || !r_num.is_finite() => FeelValue::Null, // Division by zero, Infinity or NaN
+      (FeelValue::Null, _) => type_error(),
+      (_, FeelValue::Null) => type_error(),
+      (_, FeelValue::Number(r_num)) if *r_num == 0.0 || !r_num.is_finite() => div_zero_error(), // Division by zero, Infinity or NaN
       (FeelValue::Number(l_num), FeelValue::Number(r_num)) => {
         let ratio = l_num / r_num;
         // Feel language dies not permit Infinities or NaN and uses Null instead.
         if ratio.is_finite() { FeelValue::Number(ratio) }
-        else { FeelValue::Null }
+        else { infinite_ratio() }
       },
       (FeelValue::YearMonthDuration(l_ymd), FeelValue::Number(r_factor)) => 
         FeelValue::YearMonthDuration((*l_ymd / (*r_factor as f32)).as_year_month(DAYS_PER_MONTH as f32)),
@@ -136,23 +152,17 @@ impl<'a, 'b> ops::Div<&'b FeelValue> for &'a FeelValue {
         FeelValue::DayTimeDuration((*l_dtd / (*r_factor as f32)).as_day_time(DAYS_PER_MONTH as f32)),
         (FeelValue::YearMonthDuration(l_ymd), FeelValue::YearMonthDuration(r_ymd)) => {
           let ratio = *l_ymd / *r_ymd;
-          return if ratio.is_finite() {
-            FeelValue::Number(ratio as f64)
-          }
-          else {
-            FeelValue::Null
-          };
+          return if ratio.is_finite() { FeelValue::Number(ratio as f64) }
+          else { infinite_ratio() };
         },
         (FeelValue::DayTimeDuration(l_dtd), FeelValue::DayTimeDuration(r_dtd)) => {
           let ratio = *l_dtd / *r_dtd;
           return if ratio.is_finite() {
             FeelValue::Number(ratio as f64)
           }
-          else {
-            FeelValue::Null
-          };
+          else { infinite_ratio() };
         },
-        _ => FeelValue::Error(format!("Cannot divide {} by {}", self.get_type().to_string(), rhs.get_type().to_string()))
+        _ => type_error()
     }
   }
 }
@@ -182,7 +192,6 @@ impl FeelType {
       FeelType::Context => 10_i32,
       FeelType::Function => 11_i32,
       FeelType::Null => 12_i32,
-      FeelType::Error => 0_i32,
       FeelType::Any => 13_i32
     }
   }
@@ -246,7 +255,6 @@ impl PartialOrd for FeelValue {
           (FeelValue::Function(l_func), FeelValue::Function(r_func)) => Some(l_func.cmp(&r_func)),
           // Normally Nulls are not equal, but for this function they are.
           (FeelValue::Null, FeelValue::Null) => Some(Ordering::Equal),
-          (FeelValue::Error(l_err), FeelValue::Error(r_err)) => Some(l_err.cmp(&r_err)),
           _ => None
         }
       }
@@ -269,6 +277,7 @@ mod tests {
   use super::super::duration::Duration;
   // use super::super::feel_value::{Numeric};
   use super::super::feel_value::{FeelValue};
+  use super::super::execution_log::ExecutionLog;
   // use std::assert_ne;
 
   #[test]
@@ -281,10 +290,13 @@ mod tests {
 
   #[test]
   fn test_add_incompatibles() {
+    ExecutionLog::clear();
     let x: FeelValue = 1.into();
     let y: FeelValue = true.into();
-    let expected:FeelValue = FeelValue::Error("Cannot add Number to Boolean".to_string());
+    let expected:FeelValue = FeelValue::Null;
     assert_eq!(expected, &x + &y, "add Number to Boolean");
+    assert_eq!(1, ExecutionLog::count(), "check size of log");
+    ExecutionLog::clear();
   }
 
   #[test]

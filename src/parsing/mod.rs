@@ -8,6 +8,8 @@ pub mod feel_value_ops;
 pub mod context;
 pub mod range;
 pub mod nested_context;
+pub mod builtins;
+pub mod execution_log;
 
 
 pub fn hello() {

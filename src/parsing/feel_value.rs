@@ -10,8 +10,9 @@ use super::context::Context;
 use super::duration::Duration;
 use super::range::Range;
 use super::feel_function::FeelFunction;
+use super::execution_log::ExecutionLog;
 
-#[derive(PartialEq, Eq, Clone, Copy, ToString, IntoStaticStr)]
+#[derive(PartialEq, Debug, Eq, Clone, Copy, ToString, IntoStaticStr)]
 /// Indicates the Type of a Feel language value but does not contain the actual value.
 pub enum FeelType {
   /// A Number
@@ -42,8 +43,6 @@ pub enum FeelType {
   Function,
   /// A missing value
   Null,
-  /// An execution error
-  Error,
   /// A value of any type
   Any
 }
@@ -78,9 +77,7 @@ pub enum FeelValue {
   /// A function taking a single argument (a FeelValue) and returning a single result (a FeelValue)
   Function(FeelFunction),
   /// A missing value
-  Null,
-  /// An execution error
-  Error(String)
+  Null
 }
 
 impl FeelValue {
@@ -100,29 +97,24 @@ impl FeelValue {
       FeelValue::List(_) => FeelType::List,
       FeelValue::Context(_) => FeelType::Context,
       FeelValue::Function(_) => FeelType::Function,
-      FeelValue::Null => FeelType::Null,
-      FeelValue::Error(_) => FeelType::Error
+      FeelValue::Null => FeelType::Null
     }
   }
 
   pub fn negate(&self) -> Self {
+    let type_error = || -> FeelValue {
+      ExecutionLog::log(&format!("Cannot negate {:?}", self.get_type()));
+      FeelValue::Null
+    };
     match self {
       FeelValue::Number(n) => FeelValue::Number(-n),
       FeelValue::Boolean(b) => FeelValue::Boolean(!b),
       FeelValue::YearMonthDuration(ymd) => FeelValue::YearMonthDuration(- *ymd),
       FeelValue::DayTimeDuration(dtd) => FeelValue::DayTimeDuration(- *dtd),
-      FeelValue::Null => FeelValue::Null,
-      FeelValue::Error(_) => self.clone(),
-      _ => FeelValue::Error(format!("Cannot negate {}", self.get_type().to_string()))
+      FeelValue::Null => type_error(),
+      _ => type_error()
     }
   } 
-
-  pub fn is_error(&self) -> bool {
-    match self {
-      FeelValue::Error(_) => true,
-      _ => false
-    }
-  }
 
   pub fn is_null(&self) -> bool {
     match self {
@@ -179,7 +171,6 @@ impl PartialEq for FeelValue {
         (FeelValue::Function(l_func), FeelValue::Function(r_func)) => l_func == r_func,
         // Normally Nulls are not equal, but for this function they are.
         (FeelValue::Null, FeelValue::Null) => true,
-        (FeelValue::Error(l_err), FeelValue::Error(r_err)) => l_err == r_err,
         _ => false
       }
   }
@@ -213,8 +204,7 @@ impl fmt::Debug for FeelValue {
         },
         FeelValue::Context(c) => write!(f, "{:?}", c),
         FeelValue::Function(func) => write!(f, "{:?}", func),
-        FeelValue::Null => write!(f, "{}", "null"),
-        FeelValue::Error(e) => write!(f, "Error: {}", e),
+        FeelValue::Null => write!(f, "{}", "null")
       }
   }
 }
@@ -244,8 +234,7 @@ impl fmt::Display for FeelValue {
       },
       FeelValue::Context(c) => write!(f, "{}", c),
       FeelValue::Function(func) => write!(f, "{}", func),
-      FeelValue::Null => write!(f, "{}", "null"),
-      FeelValue::Error(e) => write!(f, "Error: {}", e),
+      FeelValue::Null => write!(f, "{}", "null")
     }
   }
 }

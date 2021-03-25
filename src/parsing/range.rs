@@ -110,11 +110,13 @@ impl Debug for Range {
   fn fmt(&self, f: &mut Formatter) -> Result {
     let left_bracket = if self.low_inclusive { "[" } else { "(" };
     let right_bracket = if self.high_inclusive { "]" } else { ")" };
+    let lt_operator = if self.high_inclusive { "<=" } else { "<" };
+    let gt_operator = if self.low_inclusive { ">=" } else { ">" };
 
     match (&*self.low, &*self.high) {
       (None, None) =>  write!(f, "{},{}", left_bracket, right_bracket),
-      (None, Some(value)) =>  write!(f, "{},{:?}{}", left_bracket, value, right_bracket),
-      (Some(value), None) =>  write!(f, "{}{:?},{}", left_bracket, value, right_bracket),
+      (None, Some(value)) =>  write!(f, "{} {:?}", lt_operator, value),
+      (Some(value), None) =>  write!(f, "{} {:?}", gt_operator, value),
       (Some(low), Some(high)) =>  write!(f, "{}{:?},{:?}{}", left_bracket, low, high, right_bracket)
     }
   }
@@ -222,9 +224,15 @@ mod tests {
     );
 
     assert_eq!(
-      "[,65)".to_string(), 
+      "< 65".to_string(), 
       (&Range::new_with_high(&65.into(), false)).to_string(), 
       "open exclusive range"
+    );
+
+    assert_eq!(
+      ">= 10".to_string(), 
+      (&Range::new_with_low(&10.into(), true)).to_string(), 
+      "inclusive open range"
     );
   }
 
