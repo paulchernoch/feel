@@ -135,6 +135,24 @@ impl FeelValue {
     }
   }
 
+  /// If the value is a Number that has no fractional part, return true,
+  /// otherwise false.
+  pub fn is_integer(&self) -> bool {
+    match self {
+      FeelValue::Number(n) => n.fract() == 0.0,
+      _ => false
+    }
+  }
+
+  /// True if the type has date information, i.e. is Date or DateAndTime.
+  pub fn has_date(&self) -> bool {
+    match self {
+      FeelValue::Date(_) => true,
+      FeelValue::DateAndTime(_) => true,
+      _ => false
+    }
+  }
+
 }
 
 fn are_vecs_equal<T: PartialEq>(a: &Vec<T>, b: &Vec<T>) -> bool {
@@ -351,6 +369,14 @@ mod tests {
     let q2: FeelValue = (&v2).into();
 
     assert_eq!(q1, q2);
+  }
+
+  #[test]
+  fn test_is_integer() {
+    let x: FeelValue = 5.into();
+    let y: FeelValue = 7.7.into();
+    assert!(x.is_integer(), "Verify an integral value");
+    assert!(!y.is_integer(), "Verify a non-integral value");
   }
 
 }
