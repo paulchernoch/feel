@@ -2,6 +2,9 @@ use std::fmt::{Debug,Display,Formatter,Result};
 use std::cmp::{Ord, PartialOrd, Ordering};
 use super::feel_value::{FeelValue, FeelType};
 use super::context::ContextReader;
+use std::ops::{RangeBounds, Bound};
+
+// Note: Many important functions involving Ranges are implemented in Builtins. 
 
 /// A Feel Range object, that decides whether a value falls within a range of low and high values.
 ///   - The ends of the range may be inclusive or exclusive. 
@@ -55,7 +58,85 @@ impl Range {
     }
   }
 
-  fn satisfies_low<C: ContextReader>(&self, value: &FeelValue, contexts: &C) -> bool {
+  /// Identifies which FeelTypes can be used to define the beginning and end of a Range or
+  /// be a point tested against a range by one of the Builtin Range functions.
+  pub fn is_suitable_as_point(ft: FeelType) -> bool {
+    match ft {
+      FeelType::Boolean => true, // Nonsensical, but allowed.
+      FeelType::Date => true,
+      FeelType::DateAndTime => true,
+      FeelType::Name => true,
+      FeelType::Number => true,
+      FeelType::String => true,
+      FeelType::Time => true,
+      FeelType::YearMonthDuration => true,
+      _ => false
+    }
+  }
+
+  // Note on start_bound and end_bound:
+  //   These methods are inspired by trait std::ops::RangeBounds,
+  //   but we could not use that trait because we need an extra context 
+  //   object passed as an argument.
+
+  /// Gets the start bound of the range (which may be Unbounded).
+  pub fn start_bound<C: ContextReader>(&self, contexts: &C) -> Bound<FeelValue> {
+    match &*(self.low) {
+      None => Bound::Unbounded,
+      Some(FeelValue::Name(qname)) => {
+        let low_from_context_opt = contexts.get(qname.clone());
+        match (low_from_context_opt, self.low_inclusive) {
+          (None, _) => Bound::Included(FeelValue::Null), // TODO: Should log error
+          (Some(low_value_from_ctx), true) => Bound::Included(low_value_from_ctx),
+          (Some(low_value_from_ctx), false) => Bound::Excluded(low_value_from_ctx)
+        }          
+      },
+      Some(low_value) => {
+        if self.low_inclusive {
+          Bound::Included(low_value.clone())
+        }
+        else {
+          Bound::Excluded(low_value.clone())
+        }
+      }
+    }
+  }
+
+  /// Gets the end bound of the range (which may be Unbounded).
+  pub fn end_bound<C: ContextReader>(&self, contexts: &C) -> Bound<FeelValue> {
+    match &*(self.high) {
+      None => Bound::Unbounded,
+      Some(FeelValue::Name(qname)) => {
+        let high_from_context_opt = contexts.get(qname.clone());
+        match (high_from_context_opt, self.high_inclusive) {
+          (None, _) => Bound::Included(FeelValue::Null), // TODO: Should log error
+          (Some(high_value_from_ctx), true) => Bound::Included(high_value_from_ctx),
+          (Some(high_value_from_ctx), false) => Bound::Excluded(high_value_from_ctx)
+        }          
+      },
+      Some(high_value) => {
+        if self.high_inclusive {
+          Bound::Included(high_value.clone())
+        }
+        else {
+          Bound::Excluded(high_value.clone())
+        }
+      }
+    }
+  }
+
+  /// Identify the type of items that may be tested against this range.
+  pub fn get_bounds_type<C: ContextReader>(&self, contexts: &C) -> FeelType {
+    match (self.start_bound(contexts), self.end_bound(contexts)) {
+      (Bound::Included(b), _) => b.get_type(),
+      (Bound::Excluded(b), _) => b.get_type(),
+      (_, Bound::Included(b)) => b.get_type(),
+      (_, Bound::Excluded(b)) => b.get_type(),
+      _ => FeelType::Null // Should never happen
+    }
+  }
+
+  pub fn satisfies_low<C: ContextReader>(&self, value: &FeelValue, contexts: &C) -> bool {
     match &*(self.low) {
       None => true,
       Some(FeelValue::Name(qname)) => {
@@ -77,7 +158,7 @@ impl Range {
     }
   }
 
-  fn satisfies_high<C: ContextReader>(&self, value: &FeelValue, contexts: &C) -> bool {
+  pub fn satisfies_high<C: ContextReader>(&self, value: &FeelValue, contexts: &C) -> bool {
     match &*(self.high) {
       None => true,
       Some(FeelValue::Name(qname)) => {
@@ -104,6 +185,17 @@ impl Range {
   pub fn includes<C: ContextReader>(&self, value: &FeelValue, contexts: &C) -> bool {
     self.satisfies_low(value, contexts) && self.satisfies_high(value, contexts)
   }
+
+  /// Compare the value to the range and decide if it falls before the range starts (Less),
+  /// inside the range (Equal), or after the range ends (Greater).
+  pub fn compare<C: ContextReader>(&self, value: &FeelValue, contexts: &C) -> Ordering {
+    match(self.satisfies_low(value, contexts), self.satisfies_high(value, contexts)) {
+      (false, _) => Ordering::Less,
+      (true, true) => Ordering::Equal,
+      _ => Ordering::Greater
+    }
+  }
+
 }
 
 impl Debug for Range {
@@ -164,11 +256,38 @@ impl Ord for Range {
   }
 }
 
+impl<R: RangeBounds<f64>> From<R> for Range {
+  fn from(r: R) -> Self {
+    let f = |value: &f64| FeelValue::Number(*value);
+    match (r.start_bound(), r.end_bound()) {
+      (Bound::Included(low), Bound::Included(high)) 
+        => Range::new(&f(low), &f(high), true, true),
+      (Bound::Included(low), Bound::Excluded(high)) 
+        => Range::new(&f(low), &f(high), true, false),
+      (Bound::Excluded(low), Bound::Included(high)) 
+        => Range::new(&f(low), &f(high), false, true),
+      (Bound::Excluded(low), Bound::Excluded(high)) 
+        => Range::new(&f(low), &f(high), false, false),
+      (Bound::Included(low), Bound::Unbounded)
+        => Range::new_with_low(&f(low), true),
+      (Bound::Excluded(low), Bound::Unbounded) 
+        => Range::new_with_low(&f(low), false),
+      (Bound::Unbounded, Bound::Included(high)) 
+        => Range::new_with_high(&f(high), true),
+      (Bound::Unbounded, Bound::Excluded(high)) 
+        => Range::new_with_high(&f(high), false),
+      (Bound::Unbounded, Bound::Unbounded) 
+        => panic!("Full range is not supported")
+    }
+  }
+}
+
 /////////////// TESTS /////////////////
 
 #[cfg(test)]
 mod tests {
   use std::cmp::{Ord, PartialOrd, Ordering};
+  use std::ops::Range as OpsRange;
   use super::super::feel_value::{FeelValue};
   use super::super::context::{Context};
   use super::Range;
@@ -254,6 +373,18 @@ mod tests {
 
     let r3 = Range::new(&5.into(), &64.into(), true, true);
     assert_eq!(Ordering::Greater, r1.cmp(&r3), "compare ranges differing by high");
+  }
+
+  #[test]
+  fn test_range_conversion() {
+    let ctx = Context::new();
+    let rust_range: OpsRange<f64> = 10.0..20.0;
+    let feel_range: Range = rust_range.into();
+    assert_eq!(true, feel_range.includes(& (15.into()), &ctx), "included number");
+    assert_eq!(true, feel_range.includes(& (10.into()), &ctx), "included number (inclusive lower bound)");
+    assert_eq!(false, feel_range.includes(& (5.into()), &ctx), "excluded number (too low)");
+    assert_eq!(false, feel_range.includes(& (25.into()), &ctx), "excluded number (too high)");
+    assert_eq!(false, feel_range.includes(& (20.into()), &ctx), "excluded number (exclusive upper bound)");
   }
 }
 

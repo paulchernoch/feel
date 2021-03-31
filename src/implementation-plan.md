@@ -9,8 +9,10 @@
  - [x] Add, Sub, Mul, Div
  - [x] Nested Context
  - [x] Inequality Operators
- - [x] Range includes
- - [x] Range added to FeelValue
+ - [ ] Range
+    - [x] Range includes
+    - [x] Range added to FeelValue
+    - [ ] 14 HL7 Range functions
  - [x] FeelFunction
  - [x] FeelFunction added to FeelValue
  - [x] Execution Log
@@ -31,6 +33,7 @@
     - [ ] 2 Operators
  - [ ] 29 Special Properties of six data types
  - [ ] User Defined Functions
+    - [x] ParameterBinding 
 
 ## Execution Logging
 

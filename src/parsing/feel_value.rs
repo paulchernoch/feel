@@ -4,9 +4,10 @@ use std::cell::RefCell;
 use std::convert::From;
 use std::string::ToString;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime };
+use std::cmp::Ordering;
 
 use super::qname::{QName, Stringlike};
-use super::context::Context;
+use super::context::{Context, ContextReader};
 use super::duration::Duration;
 use super::range::Range;
 use super::feel_function::FeelFunction;
@@ -101,6 +102,10 @@ impl FeelValue {
     }
   }
 
+  pub fn new_list(items: Vec<FeelValue>) -> Self {
+    FeelValue::List(Rc::new(RefCell::new(items)))
+  }
+
   pub fn negate(&self) -> Self {
     let type_error = || -> FeelValue {
       ExecutionLog::log(&format!("Cannot negate {:?}", self.get_type()));
@@ -119,6 +124,20 @@ impl FeelValue {
   pub fn is_null(&self) -> bool {
     match self {
       FeelValue::Null => true,
+      _ => false
+    }
+  }
+
+  pub fn is_true(&self) -> bool {
+    match self {
+      FeelValue::Boolean(b) => *b,
+      _ => false
+    }
+  }
+
+  pub fn is_false(&self) -> bool {
+    match self {
+      FeelValue::Boolean(b) => !*b,
       _ => false
     }
   }
@@ -150,6 +169,17 @@ impl FeelValue {
       FeelValue::Date(_) => true,
       FeelValue::DateAndTime(_) => true,
       _ => false
+    }
+  }
+
+  /// Try to interpret self as a Range and test whether
+  /// the point falls before (Less), in (Equals) or after (Greater) the range.
+  /// If the point cannot be used with Ranges or self is not a Range, return None.
+  pub fn try_range_compare<C: ContextReader>(&self, point: &FeelValue, contexts: &C) -> Option<Ordering> {
+    match (Range::is_suitable_as_point(point.get_type()), self) {
+      (false, _) => None,
+      (true, FeelValue::Range(r)) => Some(r.compare(point, contexts)),
+      (true, _) => None
     }
   }
 

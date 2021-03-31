@@ -8,9 +8,11 @@ pub mod feel_value_ops;
 pub mod context;
 pub mod range;
 pub mod nested_context;
+pub mod arguments;
 pub mod builtins;
 pub mod execution_log;
-
+pub mod parameter_binding;
+pub mod exclusive_inclusive_range;
 
 pub fn hello() {
   println!("Hello!");
