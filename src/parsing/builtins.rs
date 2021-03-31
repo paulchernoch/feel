@@ -130,6 +130,7 @@ impl Builtins {
 
   /// after: Does first argument fall after the second with no overlap?
   pub fn after<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    // before and after are symmetric; just reverse the argument order
     let parameters_reversed = Builtins::reverse_parameters(parameters);
     return Builtins::before_helper("after", parameters_reversed, contexts);
   }
@@ -193,7 +194,7 @@ mod tests {
     FeelValue::new_list(vec![FeelValue::Range(range_a), FeelValue::Range(range_b)])
   }
 
-  /// Test the Examples given in Table 78 of the Spec.
+  /// Test the "before" Examples given in Table 78 of the Spec.
   #[test]
   fn test_before() {
     let ctx = Context::new();
@@ -211,6 +212,27 @@ mod tests {
     assert!(Builtins::before(rng_rng(1.0..10.0, 10.0..=20.0), &ctx).is_true(), "case 11");
     let r_10_to_20 = ExclusiveInclusiveRange { start: &10.0_f64, end: &20.0_f64 };
     assert!(Builtins::before(rng_rng(1.0..=10.0, r_10_to_20), &ctx).is_true(), "case 12"); 
+  }
+
+  /// Test the "after" Examples given in Table 78 of the Spec.
+  #[test]
+  fn test_after() {
+    let ctx = Context::new();
+    let r_11_to_20 = ExclusiveInclusiveRange { start: &11.0_f64, end: &20.0_f64 };
+
+    assert!(Builtins::after(pt_pt(10, 5), &ctx).is_true(), "case 1");
+    assert!(Builtins::after(pt_pt(5, 10), &ctx).is_false(), "case 2");
+    assert!(Builtins::after(pt_rng(12, 1.0..=10.0), &ctx).is_true(), "case 3");
+    assert!(Builtins::after(pt_rng(10, 1.0..10.0), &ctx).is_true(), "case 4"); 
+    assert!(Builtins::after(pt_rng(10, 1.0..=10.0), &ctx).is_false(), "case 5");
+    assert!(Builtins::after(rng_pt(11.0..=20.0, 12), &ctx).is_false(), "case 6");
+    assert!(Builtins::after(rng_pt(11.0..=20.0, 10), &ctx).is_true(), "case 7");
+    assert!(Builtins::after(rng_pt(r_11_to_20, 11), &ctx).is_true(), "case 8");
+    assert!(Builtins::after(rng_pt(11.0..=20.0, 11), &ctx).is_false(), "case 9");
+    assert!(Builtins::after(rng_rng(11.0..=20.0, 1.0..=10.0), &ctx).is_true(), "case 10");
+    assert!(Builtins::after(rng_rng(1.0..=10.0, 11.0..=20.0), &ctx).is_false(), "case 11");
+    assert!(Builtins::after(rng_rng(11.0..=20.0, 1.0..11.0), &ctx).is_true(), "case 12"); 
+    assert!(Builtins::after(rng_rng(r_11_to_20, 1.0..=11.0), &ctx).is_true(), "case 13"); 
   }
    
 }

@@ -217,8 +217,8 @@ The functions marked as "four ways" can take any of these argument lists:
 
 Here are the functions:
 
-  - [ ] **before(four ways)**
-  - [ ] **after(four ways)**
+  - [x] **before(four ways)**
+  - [x] **after(four ways)**
   - [ ] **meets(range1, range2)**
   - [ ] **met by(range1, range2)**
   - [ ] **overlaps(range1, range2)**
