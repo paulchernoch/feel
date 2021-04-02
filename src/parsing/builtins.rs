@@ -66,7 +66,7 @@ impl Builtins {
   }
 
 
-  pub fn before_helper<C: ContextReader>(function_name: &str, parameters: FeelValue, contexts: &C) -> FeelValue {
+  fn before_helper<C: ContextReader>(function_name: &str, parameters: FeelValue, contexts: &C) -> FeelValue {
     match Builtins::make_validator(function_name, parameters)
       .arity(2..3)
       .no_nulls()
@@ -135,9 +135,38 @@ impl Builtins {
     return Builtins::before_helper("after", parameters_reversed, contexts);
   }
 
-  // meets
+  fn meets_helper<C: ContextReader>(function_name: &str, parameters: FeelValue, contexts: &C) -> FeelValue {
+    match Builtins::make_validator(function_name, parameters)
+      .arity(2..3)
+      .no_nulls()
+      .point_or_range(false, true, false, true)
+      .validated() {
+      Ok(arguments) => {
+        match (&arguments[0], &arguments[1]) {
+          (FeelValue::Range(a), FeelValue::Range(b)) => {
+            match (a.end_bound(contexts), b.start_bound(contexts)) {
+              (Bound::Included(a_end), Bound::Included(b_start)) => (a_end == b_start).into(),
+              _ => false.into()
+            }
+          },
+          _ => unreachable!() 
+        }
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
+  /// first range meets the second, with its end included and equaling the start of the next (also included)
+  pub fn meets<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    Builtins::meets_helper("meets", parameters, contexts)
+  }
   
-  // met_by
+  /// first range is met by the second, with its start included and equaling the end of the next (also included)
+  pub fn met_by<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    // meets and met_by are symmetric; just reverse the argument order
+    let parameters_reversed = Builtins::reverse_parameters(parameters);
+    Builtins::meets_helper("met by", parameters_reversed, contexts)
+  }
 
   // overlaps_before
 
@@ -155,7 +184,37 @@ impl Builtins {
 
   // started_by
 
-  // coincides
+  /// The ranges coincide, hence are equal.
+  pub fn coincides<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    match Builtins::make_validator("coincides", parameters)
+      .arity(2..3)
+      .no_nulls()
+      .point_or_range(true, true, true, true)
+      .same_types() // Only permit point-point or range-range
+      .validated() {
+      Ok(arguments) => {
+        match (&arguments[0], &arguments[1]) {
+          (FeelValue::Range(a), FeelValue::Range(b)) => {
+            // We could use the equals operator except for the case when one or both
+            // of the ranges refers to a context value for its bounds.
+            if a.start_bound(contexts) != b.start_bound(contexts) {
+              return false.into(); 
+            }
+            else if a.end_bound(contexts) != b.end_bound(contexts) {
+              return false.into(); 
+            }
+            else {
+              return true.into();
+            }
+          },
+          _ => {
+            (arguments[0] == arguments[1]).into()
+          } 
+        }
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
   //// ///////////// END Range functions /////////////////
 
@@ -173,6 +232,7 @@ mod tests {
   use super::super::range::Range;
   use super::Builtins;
   use super::super::exclusive_inclusive_range::ExclusiveInclusiveRange;
+  use super::super::exclusive_range::ExclusiveRange;
 
   fn pt_rng<R: RangeBounds<f64>>(a: i32, b: R) -> FeelValue {
     let range: Range = b.into();
@@ -194,7 +254,7 @@ mod tests {
     FeelValue::new_list(vec![FeelValue::Range(range_a), FeelValue::Range(range_b)])
   }
 
-  /// Test the "before" Examples given in Table 78 of the Spec.
+  /// Test the "before" examples given in Table 78 of the Spec.
   #[test]
   fn test_before() {
     let ctx = Context::new();
@@ -214,7 +274,7 @@ mod tests {
     assert!(Builtins::before(rng_rng(1.0..=10.0, r_10_to_20), &ctx).is_true(), "case 12"); 
   }
 
-  /// Test the "after" Examples given in Table 78 of the Spec.
+  /// Test the "after" examples given in Table 78 of the Spec.
   #[test]
   fn test_after() {
     let ctx = Context::new();
@@ -234,5 +294,41 @@ mod tests {
     assert!(Builtins::after(rng_rng(11.0..=20.0, 1.0..11.0), &ctx).is_true(), "case 12"); 
     assert!(Builtins::after(rng_rng(r_11_to_20, 1.0..=11.0), &ctx).is_true(), "case 13"); 
   }
+
+  /// Test the "meets" examples given in Table 78 of the Spec.
+  #[test]
+  fn test_meets() {
+    let ctx = Context::new();
+    let r_5_to_10 = ExclusiveInclusiveRange { start: &5.0_f64, end: &10.0_f64 };
+
+    assert!(Builtins::meets(rng_rng(1.0..=5.0, 5.0..=10.0), &ctx).is_true(), "case 1");
+    assert!(Builtins::meets(rng_rng(1.0..5.0, 5.0..=10.0), &ctx).is_false(), "case 2");
+    assert!(Builtins::meets(rng_rng(1.0..=5.0, r_5_to_10), &ctx).is_false(), "case 3"); 
+    assert!(Builtins::meets(rng_rng(1.0..=5.0, 6.0..=10.0), &ctx).is_false(), "case 4"); 
+  }
+
+    /// Test the "met by" examples given in Table 78 of the Spec.
+    #[test]
+    fn test_met_by() {
+      let ctx = Context::new();
+      let r_5_to_10 = ExclusiveInclusiveRange { start: &5.0_f64, end: &10.0_f64 };
+  
+      assert!(Builtins::met_by(rng_rng(5.0..=10.0, 1.0..=5.0), &ctx).is_true(), "case 1");
+      assert!(Builtins::met_by(rng_rng(5.0..=10.0, 1.0..5.0), &ctx).is_false(), "case 2");
+      assert!(Builtins::met_by(rng_rng(r_5_to_10, 1.0..=5.0), &ctx).is_false(), "case 3"); 
+      assert!(Builtins::met_by(rng_rng(6.0..=10.0, 1.0..=5.0), &ctx).is_false(), "case 4"); 
+    }
    
+    /// Test the "coincides" examples given in Table 78 of the Spec.
+    #[test]
+    fn test_coincides() {
+      let ctx = Context::new();
+      let r_1_to_5 = ExclusiveRange { start: &1.0_f64, end: &5.0_f64 };
+  
+      assert!(Builtins::coincides(pt_pt(5, 5), &ctx).is_true(), "case 1");
+      assert!(Builtins::coincides(pt_pt(3, 4), &ctx).is_false(), "case 2");
+      assert!(Builtins::coincides(rng_rng(1.0..=5.0, 1.0..=5.0), &ctx).is_true(), "case 3"); 
+      assert!(Builtins::coincides(rng_rng(r_1_to_5, 1.0..=5.0), &ctx).is_false(), "case 4"); 
+      assert!(Builtins::coincides(rng_rng(1.0..=5.0, 2.0..=6.0), &ctx).is_false(), "case 5"); 
+    }
 }

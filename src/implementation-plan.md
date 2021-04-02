@@ -219,8 +219,8 @@ Here are the functions:
 
   - [x] **before(four ways)**
   - [x] **after(four ways)**
-  - [ ] **meets(range1, range2)**
-  - [ ] **met by(range1, range2)**
+  - [x] **meets(range1, range2)**
+  - [x] **met by(range1, range2)**
   - [ ] **overlaps(range1, range2)**
   - [ ] **overlaps before(range1, range2)**
   - [ ] **overlaps after(range1, range2)**
@@ -230,7 +230,7 @@ Here are the functions:
   - [ ] **during(point, range) or (range1, range2)**
   - [ ] **starts(point, range) or (range1, range2)**
   - [ ] **started by(range, point) or (range1, range2)**
-  - [ ] **coincides(point1, point2) or (range1, range2)**
+  - [x] **coincides(point1, point2) or (range1, range2)**
 
 The spec calls the points "scalars". That certainly means numbers, but we will take it to also refer to dates and date and times.
 

@@ -80,6 +80,7 @@ impl Range {
   //   object passed as an argument.
 
   /// Gets the start bound of the range (which may be Unbounded).
+  /// If it is a QName, look up its actual value from the supplied Context.
   pub fn start_bound<C: ContextReader>(&self, contexts: &C) -> Bound<FeelValue> {
     match &*(self.low) {
       None => Bound::Unbounded,
@@ -103,6 +104,7 @@ impl Range {
   }
 
   /// Gets the end bound of the range (which may be Unbounded).
+  /// If it is a QName, look up its actual value from the supplied Context.
   pub fn end_bound<C: ContextReader>(&self, contexts: &C) -> Bound<FeelValue> {
     match &*(self.high) {
       None => Bound::Unbounded,
@@ -303,6 +305,21 @@ mod tests {
     ctx1.insert("C", 71.into());
     ctx1.insert("perfect", 100.into());
     ctx1
+  }
+
+  #[test]
+  fn test_equals() {
+    let r1:Range = (5.0..10.0).into();
+    let r2:Range = (5.0..10.0).into();
+    let r3:Range = (5.0..=10.0).into();
+    let r4:Range = (..10.0).into();
+    let r5:Range = (..10.0).into();
+    let r6:Range = (..=10.0).into();
+
+    assert_eq!(&r1, &r2, "equal ranges");
+    assert_ne!(&r1, &r3, "unequal ranges due to inclusive-exclusive mismatch");
+    assert_eq!(&r4, &r5, "equal open-ended ranges");
+    assert_ne!(&r4, &r6, "unequal open-ended ranges");
   }
 
   #[test]

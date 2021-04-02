@@ -12,6 +12,7 @@ pub mod arguments;
 pub mod builtins;
 pub mod execution_log;
 pub mod parameter_binding;
+pub mod exclusive_range;
 pub mod exclusive_inclusive_range;
 
 pub fn hello() {
