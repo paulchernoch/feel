@@ -172,17 +172,174 @@ impl Builtins {
 
   // overlaps_after
 
-  // finishes
+  fn finishes_helper<C: ContextReader>(function_name: &str, parameters: FeelValue, contexts: &C) -> FeelValue {
+    match Builtins::make_validator(function_name, parameters)
+      .arity(2..3)
+      .no_nulls()
+      .point_or_range(true, true, false, true)
+      .validated() {
+      Ok(arguments) => {
+        match (&arguments[0], &arguments[1]) {
+          // Range-Range case
+          (FeelValue::Range(a), FeelValue::Range(b)) => {
+            let end_match = match (a.end_bound(contexts), b.end_bound(contexts)) {
+              (Bound::Included(a_end), Bound::Included(b_end)) => a_end == b_end,
+              (Bound::Excluded(a_end), Bound::Excluded(b_end)) => a_end == b_end,
+              _ => false
+            };
+            if !end_match { return false.into(); }
+            let start_match = match (a.start_bound(contexts), b.start_bound(contexts)) {
+              (Bound::Included(a_start), Bound::Included(b_start)) => a_start >= b_start,
+              (Bound::Excluded(a_start), Bound::Excluded(b_start)) => a_start >= b_start,
+              (Bound::Included(a_start), Bound::Excluded(b_start)) => a_start > b_start,
+              (Bound::Excluded(a_start), Bound::Included(b_start)) => a_start >= b_start,
+              (Bound::Unbounded, _) => false,
+              (_, Bound::Unbounded) => true
+            };
+            start_match.into()
+          },
+          // Point-Range Case
+          (a, FeelValue::Range(b)) => {
+            match b.end_bound(contexts) {
+              Bound::Included(b_end) => (*a == b_end).into(),
+              _ => false.into()
+            }
+          },
+          _ => unreachable!() 
+        }
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
-  // finished_by
+  /// One point or range finishes the other, being a subset which matches the 
+  /// end bound of the second argument, which must be a range.
+  pub fn finishes<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    Builtins::finishes_helper("finishes", parameters, contexts)
+  }
 
-  // includes 
+  /// finished_by is symmetric with finishes; just swap parameters.
+  pub fn finished_by<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    let parameters_reversed = Builtins::reverse_parameters(parameters);
+    Builtins::finishes_helper("finished by", parameters_reversed, contexts)
+  }
 
-  // during
+  fn includes_helper<C: ContextReader>(function_name: &str, parameters: FeelValue, contexts: &C) -> FeelValue {
+    match Builtins::make_validator(function_name, parameters)
+      .arity(2..3)
+      .no_nulls()
+      .point_or_range(false, true, true, true)
+      .validated() {
+      Ok(arguments) => {
+        match (&arguments[0], &arguments[1]) {
+          // Range-Range case
+          (FeelValue::Range(a), FeelValue::Range(b)) => {
+            let includes_start = match b.start_bound(contexts) {
+              Bound::Included(b_start) => a.includes(&b_start, contexts),
+              Bound::Excluded(b_start) => {
+                match a.start_bound(contexts) {
+                  Bound::Included(a_start) => a_start <= b_start,
+                  Bound::Excluded(a_start) => a_start <= b_start,
+                  Bound::Unbounded => true
+                }
+              },
+              // Undefined behavior. 
+              // If both ranges have no lower bound, the spec is unclear. 
+              // We return false.
+              Bound::Unbounded => false
+            };
+            if !includes_start { return false.into() }
 
-  // starts
+            let includes_end = match b.end_bound(contexts) {
+              Bound::Included(b_end) => a.includes(&b_end, contexts),
+              Bound::Excluded(b_end) => {
+                match a.end_bound(contexts) {
+                  Bound::Included(a_end) => a_end >= b_end,
+                  Bound::Excluded(a_end) => a_end >= b_end,
+                  Bound::Unbounded => true
+                }
+              },
+              // Undefined behavior. 
+              // If both ranges have no upper bound, the spec is unclear. 
+              // We return false.
+              Bound::Unbounded => false
+            };
+            includes_end.into()
+          },
+          // Range-Point Case
+          (FeelValue::Range(a), b) => a.includes(b, contexts).into(),
+          _ => unreachable!() 
+        }
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
-  // started_by
+  /// The first range includes the second argument (a point or range).
+  /// If the second is a range, all items in the second range are included by the first.
+  pub fn includes<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    Builtins::includes_helper("includes", parameters, contexts)
+  }
+
+  /// First argument (a point or range) falls during the second range 
+  /// (is completely included by it).
+  /// This is symmetric with includes if you swap arguments.
+  pub fn during<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    let parameters_reversed = Builtins::reverse_parameters(parameters);
+    Builtins::includes_helper("during", parameters_reversed, contexts)
+  }
+
+  fn starts_helper<C: ContextReader>(function_name: &str, parameters: FeelValue, contexts: &C) -> FeelValue {
+    match Builtins::make_validator(function_name, parameters)
+      .arity(2..3)
+      .no_nulls()
+      .point_or_range(true, true, false, true)
+      .validated() {
+      Ok(arguments) => {
+        match (&arguments[0], &arguments[1]) {
+          // Range-Range case
+          (FeelValue::Range(a), FeelValue::Range(b)) => {
+            let start_match = match (a.start_bound(contexts), b.start_bound(contexts)) {
+              (Bound::Included(a_start), Bound::Included(b_start)) => a_start == b_start,
+              (Bound::Excluded(a_start), Bound::Excluded(b_start)) => a_start == b_start,
+              _ => false
+            };
+            if !start_match { return false.into(); }
+            let end_match = match (a.end_bound(contexts), b.end_bound(contexts)) {
+              (Bound::Included(a_end), Bound::Included(b_end)) => a_end <= b_end,
+              (Bound::Excluded(a_end), Bound::Excluded(b_end)) => a_end <= b_end,
+              (Bound::Included(a_end), Bound::Excluded(b_end)) => a_end < b_end,
+              (Bound::Excluded(a_end), Bound::Included(b_end)) => a_end <= b_end,
+              (Bound::Unbounded, _) => false,
+              (_, Bound::Unbounded) => true
+            };
+            end_match.into()
+          },
+          // Point-Range Case
+          (a, FeelValue::Range(b)) => {
+            match b.start_bound(contexts) {
+              Bound::Included(b_start) => (*a == b_start).into(),
+              _ => false.into()
+            }
+          },
+          _ => unreachable!() 
+        }
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
+  /// One point or range starts the other, being a subset which matches the 
+  /// start bound of the second argument, which must be a range.
+  pub fn starts<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    Builtins::starts_helper("starts", parameters, contexts)
+  }
+
+  /// started_by is symmetric with starts; just swap parameters.
+  pub fn started_by<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    let parameters_reversed = Builtins::reverse_parameters(parameters);
+    Builtins::starts_helper("started by", parameters_reversed, contexts)
+  }
 
   /// The ranges coincide, hence are equal.
   pub fn coincides<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
@@ -197,15 +354,8 @@ impl Builtins {
           (FeelValue::Range(a), FeelValue::Range(b)) => {
             // We could use the equals operator except for the case when one or both
             // of the ranges refers to a context value for its bounds.
-            if a.start_bound(contexts) != b.start_bound(contexts) {
-              return false.into(); 
-            }
-            else if a.end_bound(contexts) != b.end_bound(contexts) {
-              return false.into(); 
-            }
-            else {
-              return true.into();
-            }
+            (    a.start_bound(contexts) == b.start_bound(contexts)
+              && a.end_bound(contexts)   == b.end_bound(contexts)).into()
           },
           _ => {
             (arguments[0] == arguments[1]).into()
@@ -307,16 +457,134 @@ mod tests {
     assert!(Builtins::meets(rng_rng(1.0..=5.0, 6.0..=10.0), &ctx).is_false(), "case 4"); 
   }
 
-    /// Test the "met by" examples given in Table 78 of the Spec.
+  /// Test the "met by" examples given in Table 78 of the Spec.
+  #[test]
+  fn test_met_by() {
+    let ctx = Context::new();
+    let r_5_to_10 = ExclusiveInclusiveRange { start: &5.0_f64, end: &10.0_f64 };
+
+    assert!(Builtins::met_by(rng_rng(5.0..=10.0, 1.0..=5.0), &ctx).is_true(), "case 1");
+    assert!(Builtins::met_by(rng_rng(5.0..=10.0, 1.0..5.0), &ctx).is_false(), "case 2");
+    assert!(Builtins::met_by(rng_rng(r_5_to_10, 1.0..=5.0), &ctx).is_false(), "case 3"); 
+    assert!(Builtins::met_by(rng_rng(6.0..=10.0, 1.0..=5.0), &ctx).is_false(), "case 4"); 
+  }
+
+  /// Test the "finishes" examples given in Table 78 of the Spec.
+  #[test]
+  fn test_finishes() {
+    let ctx = Context::new();
+    let r_1_to_10xi = ExclusiveInclusiveRange { start: &1.0_f64, end: &10.0_f64 };
+
+    assert!(Builtins::finishes(pt_rng(10, 1.0..=10.0), &ctx).is_true(), "case 1");
+    assert!(Builtins::finishes(pt_rng(10, 1.0..10.0), &ctx).is_false(), "case 2");
+    assert!(Builtins::finishes(rng_rng(5.0..=10.0, 1.0..=10.0), &ctx).is_true(), "case 3");
+    assert!(Builtins::finishes(rng_rng(5.0..10.0, 1.0..=10.0), &ctx).is_false(), "case 4"); 
+    assert!(Builtins::finishes(rng_rng(5.0..10.0, 1.0..10.0), &ctx).is_true(), "case 5");
+    assert!(Builtins::finishes(rng_rng(1.0..=10.0, 1.0..=10.0), &ctx).is_true(), "case 6");
+    assert!(Builtins::finishes(rng_rng(r_1_to_10xi, 1.0..=10.0), &ctx).is_true(), "case 7"); 
+  }
+
+  /// Test the "finished by" examples given in Table 78 of the Spec.
+  #[test]
+  fn test_finished_by() {
+    let ctx = Context::new();
+    let r_1_to_10xi = ExclusiveInclusiveRange { start: &1.0_f64, end: &10.0_f64 };
+
+    assert!(Builtins::finished_by(rng_pt(1.0..=10.0, 10), &ctx).is_true(), "case 1");
+    assert!(Builtins::finished_by(rng_pt(1.0..10.0, 10), &ctx).is_false(), "case 2");
+    assert!(Builtins::finished_by(rng_rng(1.0..=10.0, 5.0..=10.0), &ctx).is_true(), "case 3");
+    assert!(Builtins::finished_by(rng_rng(1.0..=10.0, 5.0..10.0), &ctx).is_false(), "case 4"); 
+    assert!(Builtins::finished_by(rng_rng(1.0..10.0, 5.0..10.0), &ctx).is_true(), "case 5");
+    assert!(Builtins::finished_by(rng_rng(1.0..=10.0, 1.0..=10.0), &ctx).is_true(), "case 6");
+    assert!(Builtins::finished_by(rng_rng(1.0..=10.0, r_1_to_10xi), &ctx).is_true(), "case 7"); 
+  }
+
+  /// Test the "includes" examples given in Table 78 of the Spec.
+  #[test]
+  fn test_includes() {
+    let ctx = Context::new();
+    let r_1_to_5xi = ExclusiveInclusiveRange { start: &1.0_f64, end: &5.0_f64 };
+    let r_1_to_10xi = ExclusiveInclusiveRange { start: &1.0_f64, end: &10.0_f64 };
+    let r_1_to_10xx = ExclusiveRange { start: &1.0_f64, end: &10.0_f64 };
+
+    assert!(Builtins::includes(rng_pt(1.0..=10.0, 5), &ctx).is_true(), "case 1");
+    assert!(Builtins::includes(rng_pt(1.0..=10.0, 12), &ctx).is_false(), "case 2");
+    assert!(Builtins::includes(rng_pt(1.0..=10.0, 1), &ctx).is_true(), "case 3");
+    assert!(Builtins::includes(rng_pt(1.0..=10.0, 10), &ctx).is_true(), "case 4"); 
+    assert!(Builtins::includes(rng_pt(r_1_to_10xi, 1), &ctx).is_false(), "case 5");
+    assert!(Builtins::includes(rng_pt(1.0..10.0, 10), &ctx).is_false(), "case 6");
+    assert!(Builtins::includes(rng_rng(1.0..=10.0, 4.0..=6.0), &ctx).is_true(), "case 7");
+    assert!(Builtins::includes(rng_rng(1.0..=10.0, 1.0..=5.0), &ctx).is_true(), "case 8");
+    assert!(Builtins::includes(rng_rng(r_1_to_10xi, r_1_to_5xi), &ctx).is_true(), "case 9");
+    assert!(Builtins::includes(rng_rng(1.0..=10.0, r_1_to_10xx), &ctx).is_true(), "case 10"); 
+    assert!(Builtins::includes(rng_rng(1.0..10.0, 5.0..10.0), &ctx).is_true(), "case 11"); 
+    assert!(Builtins::includes(rng_rng(1.0..=10.0, 1.0..10.0), &ctx).is_true(), "case 12"); 
+    assert!(Builtins::includes(rng_rng(1.0..=10.0, r_1_to_10xi), &ctx).is_true(), "case 13"); 
+    assert!(Builtins::includes(rng_rng(1.0..=10.0, 1.0..=10.0), &ctx).is_true(), "case 14"); 
+  }
+
+  /// Test the "during" examples given in Table 78 of the Spec.
+  #[test]
+  fn test_during() {
+    let ctx = Context::new();
+    let r_1_to_5xi = ExclusiveInclusiveRange { start: &1.0_f64, end: &5.0_f64 };
+    let r_1_to_10xi = ExclusiveInclusiveRange { start: &1.0_f64, end: &10.0_f64 };
+    let r_1_to_10xx = ExclusiveRange { start: &1.0_f64, end: &10.0_f64 };
+
+    assert!(Builtins::during(pt_rng(5, 1.0..=10.0), &ctx).is_true(), "case 1");
+    assert!(Builtins::during(pt_rng(12, 1.0..=10.0), &ctx).is_false(), "case 2");
+    assert!(Builtins::during(pt_rng(1, 1.0..=10.0), &ctx).is_true(), "case 3");
+    assert!(Builtins::during(pt_rng(10, 1.0..=10.0), &ctx).is_true(), "case 4"); 
+    assert!(Builtins::during(pt_rng(1, r_1_to_10xi), &ctx).is_false(), "case 5");
+    assert!(Builtins::during(pt_rng(10, 1.0..10.0), &ctx).is_false(), "case 6");
+    assert!(Builtins::during(rng_rng(4.0..=6.0, 1.0..=10.0), &ctx).is_true(), "case 7");
+    assert!(Builtins::during(rng_rng(1.0..=5.0, 1.0..=10.0), &ctx).is_true(), "case 8");
+    assert!(Builtins::during(rng_rng(r_1_to_5xi, r_1_to_10xi), &ctx).is_true(), "case 9");
+    assert!(Builtins::during(rng_rng(r_1_to_10xx, 1.0..=10.0), &ctx).is_true(), "case 10"); 
+    assert!(Builtins::during(rng_rng(5.0..10.0, 1.0..10.0), &ctx).is_true(), "case 11"); 
+    assert!(Builtins::during(rng_rng(1.0..10.0, 1.0..=10.0), &ctx).is_true(), "case 12"); 
+    assert!(Builtins::during(rng_rng(r_1_to_10xi, 1.0..=10.0), &ctx).is_true(), "case 13"); 
+    assert!(Builtins::during(rng_rng(1.0..=10.0, 1.0..=10.0), &ctx).is_true(), "case 14"); 
+  }
+
+  /// Test the "starts" examples given in Table 78 of the Spec.
+  #[test]
+  fn test_starts() {
+    let ctx = Context::new();
+    let r_1_to_5xi = ExclusiveInclusiveRange { start: &1.0_f64, end: &5.0_f64 };
+    let r_1_to_10xi = ExclusiveInclusiveRange { start: &1.0_f64, end: &10.0_f64 };
+    let r_1_to_10xx = ExclusiveRange { start: &1.0_f64, end: &10.0_f64 };
+
+    assert!(Builtins::starts(pt_rng(1, 1.0..=10.0), &ctx).is_true(), "case 1");
+    assert!(Builtins::starts(pt_rng(1, r_1_to_10xi), &ctx).is_false(), "case 2");
+    assert!(Builtins::starts(pt_rng(2, 1.0..=10.0), &ctx).is_false(), "case 3");
+    assert!(Builtins::starts(rng_rng(1.0..=5.0, 1.0..10.0), &ctx).is_true(), "case 4"); 
+    assert!(Builtins::starts(rng_rng(r_1_to_5xi, r_1_to_10xi), &ctx).is_true(), "case 5");
+    assert!(Builtins::starts(rng_rng(r_1_to_5xi, 1.0..=10.0), &ctx).is_false(), "case 6");
+    assert!(Builtins::starts(rng_rng(1.0..=5.0, r_1_to_10xi), &ctx).is_false(), "case 7");
+    assert!(Builtins::starts(rng_rng(1.0..10.0, 1.0..=10.0), &ctx).is_true(), "case 8");
+    assert!(Builtins::starts(rng_rng(1.0..10.0, 1.0..=10.0), &ctx).is_true(), "case 9");
+    assert!(Builtins::starts(rng_rng(r_1_to_10xx, r_1_to_10xi), &ctx).is_true(), "case 10"); 
+  }
+
+    /// Test the "started by" examples given in Table 78 of the Spec.
     #[test]
-    fn test_met_by() {
+    fn test_started_by() {
       let ctx = Context::new();
-      let r_5_to_10 = ExclusiveInclusiveRange { start: &5.0_f64, end: &10.0_f64 };
+      let r_1_to_5xi = ExclusiveInclusiveRange { start: &1.0_f64, end: &5.0_f64 };
+      let r_1_to_10xi = ExclusiveInclusiveRange { start: &1.0_f64, end: &10.0_f64 };
+      let r_1_to_10xx = ExclusiveRange { start: &1.0_f64, end: &10.0_f64 };
   
-      assert!(Builtins::met_by(rng_rng(5.0..=10.0, 1.0..=5.0), &ctx).is_true(), "case 1");
-      assert!(Builtins::met_by(rng_rng(5.0..=10.0, 1.0..5.0), &ctx).is_false(), "case 2");
-      assert!(Builtins::met_by(rng_rng(r_5_to_10, 1.0..=5.0), &ctx).is_false(), "case 3"); 
-      assert!(Builtins::met_by(rng_rng(6.0..=10.0, 1.0..=5.0), &ctx).is_false(), "case 4"); 
+      assert!(Builtins::started_by(rng_pt(1.0..=10.0, 1), &ctx).is_true(), "case 1");
+      assert!(Builtins::started_by(rng_pt(r_1_to_10xi, 1), &ctx).is_false(), "case 2");
+      assert!(Builtins::started_by(rng_pt(1.0..=10.0, 2), &ctx).is_false(), "case 3");
+      assert!(Builtins::started_by(rng_rng(1.0..10.0, 1.0..=5.0), &ctx).is_true(), "case 4"); 
+      assert!(Builtins::started_by(rng_rng(r_1_to_10xi, r_1_to_5xi), &ctx).is_true(), "case 5");
+      assert!(Builtins::started_by(rng_rng(1.0..=10.0, r_1_to_5xi), &ctx).is_false(), "case 6");
+      assert!(Builtins::started_by(rng_rng(r_1_to_10xi, 1.0..=5.0), &ctx).is_false(), "case 7");
+      assert!(Builtins::started_by(rng_rng(1.0..=10.0, 1.0..10.0), &ctx).is_true(), "case 8");
+      assert!(Builtins::started_by(rng_rng(1.0..=10.0, 1.0..10.0), &ctx).is_true(), "case 9");
+      assert!(Builtins::started_by(rng_rng(r_1_to_10xi, r_1_to_10xx), &ctx).is_true(), "case 10"); 
     }
    
     /// Test the "coincides" examples given in Table 78 of the Spec.

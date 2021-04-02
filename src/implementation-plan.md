@@ -224,12 +224,12 @@ Here are the functions:
   - [ ] **overlaps(range1, range2)**
   - [ ] **overlaps before(range1, range2)**
   - [ ] **overlaps after(range1, range2)**
-  - [ ] **finishes(point, range) or (range1, range2)**
-  - [ ] **finished by(range, point) or (range1, range2)**
-  - [ ] **includes(range, point) or (range1, range2)**
-  - [ ] **during(point, range) or (range1, range2)**
-  - [ ] **starts(point, range) or (range1, range2)**
-  - [ ] **started by(range, point) or (range1, range2)**
+  - [x] **finishes(point, range) or (range1, range2)**
+  - [x] **finished by(range, point) or (range1, range2)**
+  - [x] **includes(range, point) or (range1, range2)**
+  - [x] **during(point, range) or (range1, range2)**
+  - [x] **starts(point, range) or (range1, range2)**
+  - [x] **started by(range, point) or (range1, range2)**
   - [x] **coincides(point1, point2) or (range1, range2)**
 
 The spec calls the points "scalars". That certainly means numbers, but we will take it to also refer to dates and date and times.
