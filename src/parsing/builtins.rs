@@ -168,6 +168,53 @@ impl Builtins {
     Builtins::meets_helper("met by", parameters_reversed, contexts)
   }
 
+  // overlaps
+
+  pub fn overlaps<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    match Builtins::make_validator("overlaps", parameters)
+      .arity(2..3)
+      .no_nulls()
+      .point_or_range(false, true, false, true)
+      .validated() {
+      Ok(arguments) => {
+        let (a, b) = (&arguments[0], &arguments[1]);
+        match (a, b) {
+          (FeelValue::Range(a_range), FeelValue::Range(b_range)) => {
+            // Sorting the ranges into which starts the earliest or latest makes the rest of the 
+            // comparisons much simpler.
+            let range_cmp = a_range.cmp(b_range);
+            if range_cmp == Ordering::Equal {
+              return true.into();
+            }
+            let (low, high) = if range_cmp == Ordering::Less { (a_range, b_range) } else { (b_range, a_range) };
+
+            // Had to work out these cases using a truth table - there are 81 cases! 
+            // If there is an edge case with an error, this is the place to look first...
+            match (low.start_bound(contexts), high.start_bound(contexts), low.end_bound(contexts), high.end_bound(contexts)) {
+              (_, Bound::Unbounded, _, _) => true.into(),
+              (Bound::Unbounded, _, Bound::Unbounded, _) => true.into(),
+              (_, _, Bound::Unbounded, _) => true.into(),
+              (_, _, Bound::Included(earliest_end), Bound::Unbounded) => high.includes(&earliest_end, contexts).into(),
+              (_, Bound::Excluded(latest_start), Bound::Excluded(earliest_end), Bound::Unbounded) => (latest_start > earliest_end).into(),
+              (_, Bound::Included(latest_start), _, _) => low.includes(&latest_start, contexts).into(),
+              (_, _, Bound::Included(earliest_end), Bound::Included(latest_end) ) => {
+                (high.includes(&earliest_end, contexts) || earliest_end >= latest_end).into()
+              },
+              (_, _, Bound::Included(earliest_end), Bound::Excluded(latest_end) ) => {
+                (high.includes(&earliest_end, contexts) || earliest_end >= latest_end).into()
+              },
+              (_, Bound::Excluded(latest_start), Bound::Excluded(earliest_end), Bound::Included(_)) => (latest_start < earliest_end).into(),
+              (_, Bound::Excluded(latest_start), Bound::Excluded(earliest_end), Bound::Excluded(_)) => (latest_start < earliest_end).into()
+            }
+          },
+          _ => unreachable!()
+        }        
+
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
   // overlaps_before
 
   // overlaps_after
@@ -467,6 +514,30 @@ mod tests {
     assert!(Builtins::met_by(rng_rng(5.0..=10.0, 1.0..5.0), &ctx).is_false(), "case 2");
     assert!(Builtins::met_by(rng_rng(r_5_to_10, 1.0..=5.0), &ctx).is_false(), "case 3"); 
     assert!(Builtins::met_by(rng_rng(6.0..=10.0, 1.0..=5.0), &ctx).is_false(), "case 4"); 
+  }
+
+  /// Test the "overlaps" examples  given in Table 78 of the Spec.
+  #[test]
+  fn test_overlaps() {
+    // TODO: There are 81 different cases possible, but we only test 14.
+    // This would be a good place to add more test cases than the spec has.
+    let ctx = Context::new();
+    let r_5_to_8 = ExclusiveInclusiveRange { start: &5.0_f64, end: &8.0_f64 };
+
+    assert!(Builtins::overlaps(rng_rng(1.0..=5.0, 3.0..=8.0), &ctx).is_true(), "case 1");
+    assert!(Builtins::overlaps(rng_rng(3.0..=8.0, 1.0..=5.0), &ctx).is_true(), "case 2");
+    assert!(Builtins::overlaps(rng_rng(1.0..=8.0, 3.0..=5.0), &ctx).is_true(), "case 3"); 
+    assert!(Builtins::overlaps(rng_rng(3.0..=5.0, 1.0..=8.0), &ctx).is_true(), "case 4"); 
+    assert!(Builtins::overlaps(rng_rng(1.0..=5.0, 6.0..=8.0), &ctx).is_false(), "case 5"); 
+    assert!(Builtins::overlaps(rng_rng(6.0..=8.0, 1.0..=5.0), &ctx).is_false(), "case 6"); 
+    assert!(Builtins::overlaps(rng_rng(1.0..=5.0, 5.0..=8.0), &ctx).is_true(), "case 7"); 
+    assert!(Builtins::overlaps(rng_rng(1.0..=5.0, r_5_to_8), &ctx).is_false(), "case 8"); 
+    assert!(Builtins::overlaps(rng_rng(1.0..5.0, 5.0..=8.0), &ctx).is_false(), "case 9"); 
+    assert!(Builtins::overlaps(rng_rng(1.0..5.0, r_5_to_8), &ctx).is_false(), "case 10"); 
+    assert!(Builtins::overlaps(rng_rng(5.0..=8.0, 1.0..=5.0), &ctx).is_true(), "case 11"); 
+    assert!(Builtins::overlaps(rng_rng(r_5_to_8, 1.0..=5.0), &ctx).is_false(), "case 12"); 
+    assert!(Builtins::overlaps(rng_rng(5.0..=8.0, 1.0..5.0), &ctx).is_false(), "case 13"); 
+    assert!(Builtins::overlaps(rng_rng(r_5_to_8, 1.0..5.0), &ctx).is_false(), "case 14"); 
   }
 
   /// Test the "finishes" examples given in Table 78 of the Spec.

@@ -221,7 +221,7 @@ Here are the functions:
   - [x] **after(four ways)**
   - [x] **meets(range1, range2)**
   - [x] **met by(range1, range2)**
-  - [ ] **overlaps(range1, range2)**
+  - [x] **overlaps(range1, range2)**
   - [ ] **overlaps before(range1, range2)**
   - [ ] **overlaps after(range1, range2)**
   - [x] **finishes(point, range) or (range1, range2)**

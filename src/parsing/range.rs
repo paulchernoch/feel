@@ -223,16 +223,29 @@ impl Display for Range {
 }
 
 impl PartialOrd for Range {
+  /// Order the ranges first by the low, then by the high limit. 
+  /// Assume low unbounded ranges come earliest.
+  /// If two ranges have the same bound but one is included and the other excluded,
+  /// for the low bound the included comes before the excluded,
+  /// but for the high bound it is the reverse. 
   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
     let low_cmp = match (&*self.low, &*other.low) {
-      (None, None) => match (self.low_inclusive, other.low_inclusive) {
-          (true, false) => Ordering::Less,
-          (false,true) => Ordering::Greater,
-          _ => Ordering::Equal
-        },
+      (None, None) => Ordering::Equal, // Inclusivity is ignored for open-ended ranges
       (None, _) => Ordering::Less,
       (_, None) => Ordering::Greater,
-      (Some(a), Some(b)) => a.cmp(&b)
+      (Some(a), Some(b)) => { 
+        match a.cmp(&b) {
+          Ordering::Less => Ordering::Less,
+          Ordering::Greater => Ordering::Greater,
+          Ordering::Equal => {
+            match (self.low_inclusive, other.low_inclusive) {
+              (true, false) => Ordering::Less,
+              (false, true) => Ordering::Greater,
+              _ => Ordering::Equal
+            }
+          }
+        }
+      }
     };
     if low_cmp != Ordering::Equal {
       return Some(low_cmp);
@@ -246,7 +259,19 @@ impl PartialOrd for Range {
         },
       (None, _) => Ordering::Greater,
       (_, None) => Ordering::Less,
-      (Some(a), Some(b)) => a.cmp(&b)
+      (Some(a), Some(b)) => { 
+        match a.cmp(&b) {
+          Ordering::Less => Ordering::Less,
+          Ordering::Greater => Ordering::Greater,
+          Ordering::Equal => {
+            match (self.high_inclusive, other.high_inclusive) {
+              (true, false) => Ordering::Greater,
+              (false, true) => Ordering::Less,
+              _ => Ordering::Equal
+            }
+          }
+        }
+      }
     };
     return Some(high_cmp);
   }
