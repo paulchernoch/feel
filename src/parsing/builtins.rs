@@ -38,6 +38,71 @@ impl Builtins {
     builtin_context
   }
 
+  //// ///////////// Numeric functions /////////////////
+  
+  // decimal(number, places)
+
+  // floor(number)
+
+  // ceiling(number)
+
+  // abs(number)
+
+  // modulo(dividend,divisor)
+
+  // sqrt(number)
+
+  // log(number)
+
+  // exp(number)
+
+  /// even(number) returns true for integers that are even, false for
+  /// odd integers or numbers with a fractional component, and Null for
+  /// anything that is not a Number. 
+  pub fn even<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    match Builtins::make_validator("even", parameters)
+      .arity(1..2)
+      .no_nulls()
+      .expect_type(0_usize, FeelType::Number, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::Number(value) => {
+            if value % 2.0 == 0.0 { true.into() }
+            else { false.into() }
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
+  /// odd(number) returns true for integers that are odd, false for
+  /// even integers or numbers with a fractional component, and Null for
+  /// anything that is not a Number. 
+  pub fn odd<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    match Builtins::make_validator("odd", parameters)
+      .arity(1..2)
+      .no_nulls()
+      .expect_type(0_usize, FeelType::Number, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::Number(value) => {
+            if value % 2.0 == 0.0 { false.into() }
+            else if value % 1.0 == 0.0 { true.into() }
+            else { false.into() }
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
   //// ///////////// Range functions /////////////////
 
   // The Range Builtin functions are inspired by HL7 CQL 1.4 (Clinical Query Language).
@@ -526,6 +591,33 @@ mod tests {
   use super::super::exclusive_inclusive_range::ExclusiveInclusiveRange;
   use super::super::exclusive_range::ExclusiveRange;
 
+  //// Numeric function tests
+  
+  /// Tests of even builtin function from the spec, plus more
+  #[test]
+  fn test_even() {
+    let ctx = Context::new();
+    assert!(Builtins::even(5.into(), &ctx).is_false(), "case 1");
+    assert!(Builtins::even(2.into(), &ctx).is_true(), "case 2");
+    assert!(Builtins::even(8.5.into(), &ctx).is_false(), "case 3");
+    assert!(Builtins::even("Bad".into(), &ctx).is_null(), "case 4");
+
+    let list = FeelValue::new_list(vec![8.into()]);
+    assert!(Builtins::even(list, &ctx).is_true(), "case 5");
+  }
+
+  /// Tests of odd builtin function from the spec, plus more
+  #[test]
+  fn test_odd() {
+    let ctx = Context::new();
+    assert!(Builtins::odd(5.into(), &ctx).is_true(), "case 1");
+    assert!(Builtins::odd(2.into(), &ctx).is_false(), "case 2");
+    assert!(Builtins::odd(8.5.into(), &ctx).is_false(), "case 3");
+    assert!(Builtins::odd("Bad".into(), &ctx).is_null(), "case 4");
+  }
+
+  //// Helper functions for Range tests
+
   fn pt_rng<R: RangeBounds<f64>>(a: i32, b: R) -> FeelValue {
     let range: Range = b.into();
     FeelValue::new_list(vec![FeelValue::Number(a as f64), FeelValue::Range(range)])
@@ -545,6 +637,8 @@ mod tests {
     let range_b: Range = b.into();
     FeelValue::new_list(vec![FeelValue::Range(range_a), FeelValue::Range(range_b)])
   }
+
+  //// Range function Tests
 
   /// Test the "before" examples given in Table 78 of the Spec.
   #[test]

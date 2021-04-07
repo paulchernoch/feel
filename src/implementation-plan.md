@@ -12,7 +12,7 @@
  - [ ] Range
     - [x] Range includes
     - [x] Range added to FeelValue
-    - [ ] 14 HL7 Range functions
+    - [!] 14 HL7 CQL Range functions => implemented in Builtins instead.
  - [x] FeelFunction
  - [x] FeelFunction added to FeelValue
  - [x] Execution Log
@@ -27,7 +27,7 @@
     - [ ] 4 Temporal
     - [ ] 2 Duration
     - [ ] 22 List
-    - [ ] 14 Range
+    - [x] 14 Range
     - [ ] 2 Context
     - [ ] 1 Sort
     - [ ] 2 Operators
@@ -122,8 +122,8 @@ Ten numeric functions.
   - [ ] **sqrt(number)**
   - [ ] **log(number)**
   - [ ] **exp(number)**
-  - [ ] **odd(number)**
-  - [ ] **even(number)**
+  - [x] **odd(number)**
+  - [x] **even(number)**
 
 **Booleans**:
 
@@ -223,7 +223,7 @@ Here are the functions:
   - [x] **met by(range1, range2)**
   - [x] **overlaps(range1, range2)**
   - [x] **overlaps before(range1, range2)**
-  - [ ] **overlaps after(range1, range2)**
+  - [x] **overlaps after(range1, range2)**
   - [x] **finishes(point, range) or (range1, range2)**
   - [x] **finished by(range, point) or (range1, range2)**
   - [x] **includes(range, point) or (range1, range2)**
