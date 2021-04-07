@@ -6,6 +6,9 @@ edition = "2018"
 description = "Domain Model and Notation Feel Language interpreter"
 keywords = ["Domain Model and Notation", "DMN", "Feel", "Friendly Enough Expression Language"]
 
+[lib]
+doctest = false
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

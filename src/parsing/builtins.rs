@@ -123,6 +123,46 @@ impl Builtins {
     };
   }
 
+  /// Compare two bounds to see which is less or greater than the other, 
+  /// respecting whether they are a lower bound or an upper bound.
+  pub fn compare_bounds<T: Ord>(a: &Bound<T>, a_is_lower_bound: bool, b: &Bound<T>, b_is_lower_bound: bool) -> Ordering {
+    match (a, a_is_lower_bound, b, b_is_lower_bound) {
+      (Bound::Unbounded, true, Bound::Unbounded, true) => Ordering::Equal,
+      (Bound::Unbounded, true, _, _) => Ordering::Less,
+      (_, _, Bound::Unbounded, true) => Ordering::Greater,
+      (Bound::Unbounded, false, Bound::Unbounded, false) => Ordering::Equal,
+      (Bound::Unbounded, false, _, _) => Ordering::Greater,
+      (_, _, Bound::Unbounded, false) => Ordering::Less,
+      (Bound::Included(a_value), _, Bound::Included(b_value), _) => a_value.cmp(b_value),
+      (Bound::Excluded(a_value), _, Bound::Excluded(b_value), _) => a_value.cmp(b_value),
+      (Bound::Included(a_value), true, Bound::Excluded(b_value), true) => {
+        if a_value <= b_value { Ordering::Less } else { Ordering::Greater }
+      },
+      (Bound::Included(a_value), false, Bound::Excluded(b_value), false) => {
+        if a_value >= b_value { Ordering::Greater } else { Ordering::Less }
+      },
+      (Bound::Included(a_value), true, Bound::Excluded(b_value), false) => {
+        if a_value >= b_value { Ordering::Greater } else { Ordering::Less }
+      },
+      (Bound::Included(a_value), false, Bound::Excluded(b_value), true) => {
+        if a_value <= b_value { Ordering::Less } else { Ordering::Greater }
+      },
+
+      (Bound::Excluded(a_value), true, Bound::Included(b_value), true) => {
+        if a_value < b_value { Ordering::Less } else { Ordering::Greater }
+      },
+      (Bound::Excluded(a_value), false, Bound::Included(b_value), false) => {
+        if a_value > b_value { Ordering::Greater } else { Ordering::Less }
+      },
+      (Bound::Excluded(a_value), true, Bound::Included(b_value), false) => {
+        if a_value >= b_value { Ordering::Greater } else { Ordering::Less }
+      },
+      (Bound::Excluded(a_value), false, Bound::Included(b_value), true) => {
+        if a_value <= b_value { Ordering::Less } else { Ordering::Greater }
+      }
+    }
+  }
+
   /// before: Does first argument fall before the second with no overlap?
   pub fn before<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
     Builtins::before_helper("before", parameters, contexts)
@@ -168,8 +208,7 @@ impl Builtins {
     Builtins::meets_helper("met by", parameters_reversed, contexts)
   }
 
-  // overlaps
-
+  /// check if first range overlaps the seconds
   pub fn overlaps<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
     match Builtins::make_validator("overlaps", parameters)
       .arity(2..3)
@@ -209,15 +248,70 @@ impl Builtins {
           },
           _ => unreachable!()
         }        
-
       },
       Err(_) => FeelValue::Null
     }
   }
 
-  // overlaps_before
+  /// Checks if first range "overlaps before" the second, meaning that the first range must start before
+  /// the second and may not go past the end of the second.
+  pub fn overlaps_before<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    match Builtins::make_validator("overlaps before", parameters)
+      .arity(2..3)
+      .no_nulls()
+      .point_or_range(false, true, false, true)
+      .validated() {
+      Ok(arguments) => {
+        let (a, b) = (&arguments[0], &arguments[1]);
+        match (a, b) {
+          (FeelValue::Range(a_range), FeelValue::Range(b_range)) => {
+            let a_start = a_range.start_bound(contexts);
+            let b_start = b_range.start_bound(contexts);
+            let a_end = a_range.end_bound(contexts);
+            let b_end = b_range.end_bound(contexts);
+            // We must have a_start < b_start <= a_end <= b_end  
+            if Builtins::compare_bounds(&a_start, true, &b_start, true) != Ordering::Less { return false.into(); }
+            if Builtins::compare_bounds(&b_start, true, &a_end, false) == Ordering::Greater { return false.into(); }
+            if Builtins::compare_bounds(&a_end, false, &b_end, false) == Ordering::Greater { return false.into(); }
+            true.into()
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
   // overlaps_after
+
+  /// Checks if first range "overlaps after" the second, meaning that the first range must end after
+  /// the second and may not go before the start of the second.
+  pub fn overlaps_after<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    match Builtins::make_validator("overlaps after", parameters)
+      .arity(2..3)
+      .no_nulls()
+      .point_or_range(false, true, false, true)
+      .validated() {
+      Ok(arguments) => {
+        let (a, b) = (&arguments[0], &arguments[1]);
+        match (a, b) {
+          (FeelValue::Range(a_range), FeelValue::Range(b_range)) => {
+            let a_start = a_range.start_bound(contexts);
+            let b_start = b_range.start_bound(contexts);
+            let a_end = a_range.end_bound(contexts);
+            let b_end = b_range.end_bound(contexts);
+            // We must have a_end > b_end >= a_start >= b_start 
+            if Builtins::compare_bounds(&a_end, false, &b_end, false) != Ordering::Greater { return false.into(); }
+            if Builtins::compare_bounds(&b_end, false, &a_start, true) == Ordering::Less { return false.into(); }
+            if Builtins::compare_bounds(&a_start, true, &b_start, true) == Ordering::Less { return false.into(); }
+            true.into()
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
   fn finishes_helper<C: ContextReader>(function_name: &str, parameters: FeelValue, contexts: &C) -> FeelValue {
     match Builtins::make_validator(function_name, parameters)
@@ -425,7 +519,8 @@ impl Builtins {
 mod tests {
   use super::super::feel_value::{FeelValue};
   use super::super::context::{Context};
-  use std::ops::{RangeBounds};
+  use std::ops::{RangeBounds, Bound};
+  use std::cmp::Ordering;
   use super::super::range::Range;
   use super::Builtins;
   use super::super::exclusive_inclusive_range::ExclusiveInclusiveRange;
@@ -538,6 +633,51 @@ mod tests {
     assert!(Builtins::overlaps(rng_rng(r_5_to_8, 1.0..=5.0), &ctx).is_false(), "case 12"); 
     assert!(Builtins::overlaps(rng_rng(5.0..=8.0, 1.0..5.0), &ctx).is_false(), "case 13"); 
     assert!(Builtins::overlaps(rng_rng(r_5_to_8, 1.0..5.0), &ctx).is_false(), "case 14"); 
+  }
+
+  /// Test the "overlaps before" examples  given in Table 78 of the Spec.
+  #[test]
+  fn test_overlaps_before() {
+    // TODO: There are 81 different cases possible, but we only test 14.
+    // This would be a good place to add more test cases than the spec has.
+    let ctx = Context::new();
+    let r_5_to_8 = ExclusiveInclusiveRange { start: &5.0_f64, end: &8.0_f64 };
+    let r_1_to_5 = ExclusiveInclusiveRange { start: &1.0_f64, end: &5.0_f64 };
+
+    assert!(Builtins::overlaps_before(rng_rng(1.0..=5.0, 3.0..=8.0), &ctx).is_true(), "case 1");
+    assert!(Builtins::overlaps_before(rng_rng(1.0..=5.0, 6.0..=8.0), &ctx).is_false(), "case 2");
+    assert!(Builtins::overlaps_before(rng_rng(1.0..=5.0, 5.0..=8.0), &ctx).is_true(), "case 3"); 
+    assert!(Builtins::overlaps_before(rng_rng(1.0..=5.0, r_5_to_8), &ctx).is_false(), "case 4"); 
+    assert!(Builtins::overlaps_before(rng_rng(1.0..5.0, 5.0..=8.0), &ctx).is_false(), "case 5"); 
+    assert!(Builtins::overlaps_before(rng_rng(1.0..5.0, r_1_to_5), &ctx).is_true(), "case 6"); 
+    assert!(Builtins::overlaps_before(rng_rng(1.0..=5.0, r_1_to_5), &ctx).is_true(), "case 7"); 
+    assert!(Builtins::overlaps_before(rng_rng(1.0..5.0, 1.0..=5.0), &ctx).is_false(), "case 8"); 
+    assert!(Builtins::overlaps_before(rng_rng(1.0..=5.0, 1.0..=5.0), &ctx).is_false(), "case 9"); 
+  }
+
+  /// Test the "overlaps after" examples  given in Table 78 of the Spec.
+  #[test]
+  fn test_overlaps_after() {
+    // TODO: There are 81 different cases possible, but we only test 14.
+    // This would be a good place to add more test cases than the spec has.
+    let ctx = Context::new();
+    let r_5_to_8 = ExclusiveInclusiveRange { start: &5.0_f64, end: &8.0_f64 };
+    let r_1_to_5 = ExclusiveInclusiveRange { start: &1.0_f64, end: &5.0_f64 };
+
+    assert!(Builtins::overlaps_after(rng_rng(3.0..=8.0, 1.0..=5.0), &ctx).is_true(), "case 1");
+    assert!(Builtins::overlaps_after(rng_rng(6.0..=8.0, 1.0..=5.0), &ctx).is_false(), "case 2");
+    assert!(Builtins::overlaps_after(rng_rng(5.0..=8.0, 1.0..=5.0), &ctx).is_true(), "case 3"); 
+    assert!(Builtins::overlaps_after(rng_rng(r_5_to_8, 1.0..=5.0), &ctx).is_false(), "case 4"); 
+    assert!(Builtins::overlaps_after(rng_rng(5.0..=8.0, 1.0..5.0), &ctx).is_false(), "case 5"); 
+    assert!(Builtins::overlaps_after(rng_rng(r_1_to_5, 1.0..5.0), &ctx).is_true(), "case 6"); 
+    // The following case has a "true" expectation in the DMN Spec, but appears to be incorrect.
+    // The first range must end after the second range, not be coterminous. 
+    // The spec has a missing clause in its logic and does not explain the semantics in words.
+    // Consulted the HL7 CQL documentation for a textual description of the intended semantics. 
+    assert!(Builtins::overlaps_after(rng_rng(r_1_to_5, 1.0..=5.0), &ctx).is_false(), "case 7"); 
+    // Again, the spec has a wrong answer for this test case as well. 
+    assert!(Builtins::overlaps_after(rng_rng(1.0..=5.0, 1.0..5.0), &ctx).is_true(), "case 8"); 
+    assert!(Builtins::overlaps_after(rng_rng(1.0..=5.0, 1.0..=5.0), &ctx).is_false(), "case 9"); 
   }
 
   /// Test the "finishes" examples given in Table 78 of the Spec.
@@ -669,5 +809,85 @@ mod tests {
       assert!(Builtins::coincides(rng_rng(1.0..=5.0, 1.0..=5.0), &ctx).is_true(), "case 3"); 
       assert!(Builtins::coincides(rng_rng(r_1_to_5, 1.0..=5.0), &ctx).is_false(), "case 4"); 
       assert!(Builtins::coincides(rng_rng(1.0..=5.0, 2.0..=6.0), &ctx).is_false(), "case 5"); 
+    }
+
+    #[test]
+    fn test_compare_bounds() {
+      compare_bounds_test_case("[!", "[!", Ordering::Equal);
+      compare_bounds_test_case("[3", "[3", Ordering::Equal);
+      compare_bounds_test_case("(3", "(3", Ordering::Equal);
+      compare_bounds_test_case("[3", "3]", Ordering::Equal);
+      compare_bounds_test_case("3]", "[3", Ordering::Equal);
+      compare_bounds_test_case("3]", "3]", Ordering::Equal);
+      compare_bounds_test_case("3)", "3)", Ordering::Equal);
+      compare_bounds_test_case("!]", "!]", Ordering::Equal);
+
+      compare_bounds_test_case("[!", "!]", Ordering::Less);
+      compare_bounds_test_case("[!", "[3", Ordering::Less);
+      compare_bounds_test_case("[!", "(3", Ordering::Less);
+      compare_bounds_test_case("[!", "3]", Ordering::Less);
+      compare_bounds_test_case("[!", "3)", Ordering::Less);
+      compare_bounds_test_case("[3", "[4", Ordering::Less);
+      compare_bounds_test_case("[3", "(4", Ordering::Less);
+      compare_bounds_test_case("[3", "(3", Ordering::Less);
+      compare_bounds_test_case("(3", "[4", Ordering::Less);
+      compare_bounds_test_case("(3", "(4", Ordering::Less);
+      compare_bounds_test_case("[3", "4]", Ordering::Less);
+      compare_bounds_test_case("[3", "4)", Ordering::Less);
+      compare_bounds_test_case("(3", "!]", Ordering::Less);
+      compare_bounds_test_case("[3", "!]", Ordering::Less);
+      compare_bounds_test_case("3]", "4]", Ordering::Less);
+      compare_bounds_test_case("3]", "4)", Ordering::Less);
+      compare_bounds_test_case("3]", "(3", Ordering::Less);
+      compare_bounds_test_case("3)", "[4", Ordering::Less);
+      compare_bounds_test_case("3)", "(4", Ordering::Less);
+      compare_bounds_test_case("3)", "[3", Ordering::Less); // Failing
+
+      compare_bounds_test_case("!]", "[3", Ordering::Greater);
+      compare_bounds_test_case("!]", "(3", Ordering::Greater);
+      compare_bounds_test_case("!]", "[!", Ordering::Greater);
+      compare_bounds_test_case("[4", "[3", Ordering::Greater);
+      compare_bounds_test_case("[4", "(3", Ordering::Greater);
+      compare_bounds_test_case("[4", "[!", Ordering::Greater);
+      compare_bounds_test_case("(4", "[4", Ordering::Greater);
+      compare_bounds_test_case("(4", "(3", Ordering::Greater);
+      compare_bounds_test_case("(4", "[3", Ordering::Greater);
+      compare_bounds_test_case("4]", "3]", Ordering::Greater);
+      compare_bounds_test_case("4]", "4)", Ordering::Greater);
+      compare_bounds_test_case("4]", "[!", Ordering::Greater);
+      compare_bounds_test_case("4]", "[3", Ordering::Greater);
+      compare_bounds_test_case("4]", "(3", Ordering::Greater);
+      compare_bounds_test_case("4)", "3)", Ordering::Greater);
+      compare_bounds_test_case("!]", "4)", Ordering::Greater);
+      compare_bounds_test_case("!]", "4]", Ordering::Greater);
+    }
+
+    /// Parse a string into a Bound, with the following syntax (where # is an integer):
+    /// 
+    ///   [#  ... Lower bound, inclusive
+    ///   (#  ... Lower bound, exclusive
+    ///   [!  ... Lower bound, unbounded
+    ///   #]  ... Upper bound, inclusive
+    ///   #)  ... Upper bound, exclusive
+    ///   !]  ... Upper bound, unbounded
+    /// 
+    /// Returns a tuple, where the first item is true for a lower bound, false for an upper bound.
+    fn parse_bound(s: &str) -> (bool, Bound<FeelValue>) {
+      match (s, s.chars().nth(0).unwrap(), s.chars().last().unwrap()) {
+        ("[!", _, _) => (true, Bound::Unbounded),
+        ("!]", _, _) => (false, Bound::Unbounded),
+        (_, '[', _) => (true, Bound::Included(s[1..].parse::<i32>().unwrap().into())),
+        (_, '(', _) => (true, Bound::Excluded(s[1..].parse::<i32>().unwrap().into())),
+        (_, _, ']') => (false, Bound::Included(s[..s.len()-1].parse::<i32>().unwrap().into())),
+        (_, _, ')') => (false, Bound::Excluded(s[..s.len()-1].parse::<i32>().unwrap().into())),
+        _ => panic!("Bad format")
+      }
+    }
+
+    fn compare_bounds_test_case(a_pattern: &str, b_pattern: &str, expect: Ordering) -> () {
+      let (a_is_lower_bound, a) = parse_bound(a_pattern);
+      let (b_is_lower_bound, b) = parse_bound(b_pattern);
+      let actual = Builtins::compare_bounds(&a, a_is_lower_bound, &b, b_is_lower_bound);
+      assert!(expect == actual, "Comparison {:?} vs {:?} of {:?} with {:?} got {:?} but expected {:?}", a_pattern, b_pattern, a, b, actual, expect);
     }
 }

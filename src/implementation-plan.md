@@ -222,7 +222,7 @@ Here are the functions:
   - [x] **meets(range1, range2)**
   - [x] **met by(range1, range2)**
   - [x] **overlaps(range1, range2)**
-  - [ ] **overlaps before(range1, range2)**
+  - [x] **overlaps before(range1, range2)**
   - [ ] **overlaps after(range1, range2)**
   - [x] **finishes(point, range) or (range1, range2)**
   - [x] **finished by(range, point) or (range1, range2)**
