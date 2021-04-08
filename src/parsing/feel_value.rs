@@ -170,6 +170,7 @@ impl FeelValue {
     }
   }
 
+  /// Is the value a Number that represents positive or negative infinity?
   pub fn is_infinite(&self) -> bool {
     match self {
       FeelValue::Number(n) => n.is_infinite(),

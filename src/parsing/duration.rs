@@ -208,6 +208,11 @@ impl Duration {
     self.years == 0 && self.months == 0 && self.days == 0 && self.hours == 0 && self.minutes == 0 && self.seconds == 0.0
   }
 
+  /// Does the Duration represent a negative quantity?
+  pub fn is_negative(&self) -> bool {
+    !self.positive && !self.is_zero()
+  }
+
   pub fn are_hms_zero(&self) -> bool {
     self.hours == 0 && self.minutes == 0 && self.seconds == 0.0
   }

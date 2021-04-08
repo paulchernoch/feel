@@ -97,14 +97,26 @@ impl Builtins {
     match Builtins::make_validator(fname, parameters)
       .arity(1..2)
       .no_nulls()
-      .expect_type(0_usize, FeelType::Number, false)
       .validated() {
       Ok(arguments) => {
         let a = &arguments[0];
         match a {
           FeelValue::Number(value) => Builtins::validate_number(value.abs(), format!("{:?}({:?})", fname, value)),
-          // TODO: Implement abs for durations
-          _ => unreachable!()
+          FeelValue::YearMonthDuration(duration) => {
+            if duration.is_negative() { a.negate() }
+            else { a.clone() }
+          },
+          FeelValue::DayTimeDuration(duration) => {
+            if duration.is_negative() { a.negate() }
+            else { a.clone() }
+          },
+          _ => {
+            ExecutionLog::log(&format!(
+              "Called {:?} with {:?} for argument 1, expected a Number or a duration type", 
+              fname, a.get_type()
+            ));
+            FeelValue::Null
+          }
         }        
       },
       Err(_) => FeelValue::Null
@@ -728,10 +740,12 @@ mod tests {
   use super::super::context::{Context};
   use std::ops::{RangeBounds, Bound};
   use std::cmp::Ordering;
+  use std::str::FromStr;
   use super::super::range::Range;
   use super::Builtins;
   use super::super::exclusive_inclusive_range::ExclusiveInclusiveRange;
   use super::super::exclusive_range::ExclusiveRange;
+  use super::super::duration::Duration;
 
   //// Numeric function tests
   
@@ -766,7 +780,11 @@ mod tests {
     assert!(are_near(&Builtins::abs(10.into(), &ctx), &10.0_f64.into(), 0.00000000005_f64), "case 1");
     assert!(are_near(&Builtins::abs((-10.0).into(), &ctx), &10.0_f64.into(), 0.00000000005_f64), "case 2");
 
-    // TODO: Test abs(Duration) 
+    let negative_duration = FeelValue::DayTimeDuration(Duration::from_str("-PT5H").unwrap());
+    let positive_duration = FeelValue::DayTimeDuration(Duration::from_str("PT5H").unwrap());
+
+    assert!(positive_duration == Builtins::abs(positive_duration.clone(), &ctx), "case 3");
+    assert!(positive_duration == Builtins::abs(negative_duration, &ctx), "case 4");
   }
 
   /// Tests of sqrt builtin function from the spec, plus more

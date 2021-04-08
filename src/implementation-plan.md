@@ -2,6 +2,8 @@
 
 ## Grammar Recognizer
 
+ - [ ] Add support for Duration literals like @"PT5H"
+
 ## FeelValue
 
  - [x] Enum Defined
@@ -117,7 +119,7 @@ Ten numeric functions.
   - [ ] **decimal(number, places)**
   - [x] **floor(number)**
   - [x] **ceiling(number)**
-  - [ ] **abs(number)**
+  - [x] **abs(number)**
   - [ ] **modulo(dividend,divisor)**
   - [x] **sqrt(number)**
   - [x] **log(number)**
