@@ -163,6 +163,27 @@ impl FeelValue {
     }
   }
 
+  pub fn is_nan(&self) -> bool {
+    match self {
+      FeelValue::Number(n) => n.is_nan(),
+      _ => false
+    }
+  }
+
+  pub fn is_infinite(&self) -> bool {
+    match self {
+      FeelValue::Number(n) => n.is_infinite(),
+      _ => false
+    }
+  }
+
+  pub fn is_finite(&self) -> bool {
+    match self {
+      FeelValue::Number(n) => n.is_finite(),
+      _ => false
+    }
+  }
+
   /// True if the type has date information, i.e. is Date or DateAndTime.
   pub fn has_date(&self) -> bool {
     match self {

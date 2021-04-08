@@ -115,13 +115,13 @@ Three miscellaneous functions.
 Ten numeric functions.
 
   - [ ] **decimal(number, places)**
-  - [ ] **floor(number)**
-  - [ ] **ceiling(number)**
+  - [x] **floor(number)**
+  - [x] **ceiling(number)**
   - [ ] **abs(number)**
   - [ ] **modulo(dividend,divisor)**
-  - [ ] **sqrt(number)**
-  - [ ] **log(number)**
-  - [ ] **exp(number)**
+  - [x] **sqrt(number)**
+  - [x] **log(number)**
+  - [x] **exp(number)**
   - [x] **odd(number)**
   - [x] **even(number)**
 

@@ -4,7 +4,7 @@ use std::ops::Bound;
 use super::range::Range;
 use super::context::{Context,ContextReader};
 use super::feel_value::{FeelValue, FeelType};
-// use super::execution_log::ExecutionLog;
+use super::execution_log::ExecutionLog;
 use super::arguments::{Arguments,Validity};
 
 pub enum RangeCase {
@@ -40,26 +40,168 @@ impl Builtins {
 
   //// ///////////// Numeric functions /////////////////
   
+  fn validate_number<S: Into<String>>(n: f64, action: S) -> FeelValue {
+    if !n.is_finite() {
+      ExecutionLog::log(&format!("{:?} did not yield a finite result, substituting null", action.into()));
+      FeelValue::Null
+    }
+    else {
+      FeelValue::Number(n)
+    }
+  }
+  
   // decimal(number, places)
 
-  // floor(number)
 
-  // ceiling(number)
+  /// floor(number) returns the largest integer less than or equal to the number.
+  pub fn floor<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "floor";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..2)
+      .no_nulls()
+      .expect_type(0_usize, FeelType::Number, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::Number(value) => Builtins::validate_number(value.floor(), format!("{:?}({:?})", fname, value)),
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
-  // abs(number)
+  /// ceiling(number) returns the smallest integer greater than or equal to the number.
+  pub fn ceiling<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "ceiling";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..2)
+      .no_nulls()
+      .expect_type(0_usize, FeelType::Number, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::Number(value) => Builtins::validate_number(value.ceil(), format!("{:?}({:?})", fname, value)),
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
+  /// abs(number) returns the absolute value of a number, a year month duration or a day time duration.
+  pub fn abs<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "abs";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..2)
+      .no_nulls()
+      .expect_type(0_usize, FeelType::Number, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::Number(value) => Builtins::validate_number(value.abs(), format!("{:?}({:?})", fname, value)),
+          // TODO: Implement abs for durations
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
 
   // modulo(dividend,divisor)
 
-  // sqrt(number)
+  /// sqrt(number) returns the square root.
+  /// Return Null on negative numbers.
+  pub fn sqrt<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "sqrt";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..2)
+      .no_nulls()
+      .expect_type(0_usize, FeelType::Number, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::Number(value) => {
+            if !value.is_finite() {
+              ExecutionLog::log(&format!("Input to {}() is not finite, substituting null", fname));
+              FeelValue::Null
+            }
+            else if *value < 0.0_f64 {
+              ExecutionLog::log(&format!("Input to {}() is negative, substituting null", fname));
+              FeelValue::Null
+            }
+            else {
+              Builtins::validate_number(value.sqrt(), format!("{:?}({:?})", fname, value))
+            }
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
-  // log(number)
+  /// log(number) returns the natural log.
+  /// Return Null on non-positive numbers.
+  pub fn log<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "log";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..2)
+      .no_nulls()
+      .expect_type(0_usize, FeelType::Number, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::Number(value) => {
+            if !value.is_finite() {
+              ExecutionLog::log(&format!("Input to {}() is not finite, substituting null", fname));
+              FeelValue::Null
+            }
+            else if *value <= 0.0_f64 {
+              ExecutionLog::log(&format!("Input to {}() is not positive, substituting null", fname));
+              FeelValue::Null
+            }
+            else {
+              Builtins::validate_number(value.ln(), format!("{:?}({:?})", fname, value))
+            }
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
-  // exp(number)
+  /// exp(number) returns Euler's number e raised to the given power.
+  /// Return Null on Overflow.
+  pub fn exp<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "exp";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..2)
+      .no_nulls()
+      .expect_type(0_usize, FeelType::Number, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::Number(value) => Builtins::validate_number(value.exp(), format!("{:?}({:?})", fname, value)),
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
   /// even(number) returns true for integers that are even, false for
   /// odd integers or numbers with a fractional component, and Null for
   /// anything that is not a Number. 
-  pub fn even<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+  pub fn even<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     match Builtins::make_validator("even", parameters)
       .arity(1..2)
       .no_nulls()
@@ -82,7 +224,7 @@ impl Builtins {
   /// odd(number) returns true for integers that are odd, false for
   /// even integers or numbers with a fractional component, and Null for
   /// anything that is not a Number. 
-  pub fn odd<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+  pub fn odd<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     match Builtins::make_validator("odd", parameters)
       .arity(1..2)
       .no_nulls()
@@ -593,6 +735,70 @@ mod tests {
 
   //// Numeric function tests
   
+  /// Test if two Numbers are approximately equal, differing by no more than delta.
+  fn are_near(a: &FeelValue, b: &FeelValue, delta: f64) -> bool {
+    match (a, b) {
+      (FeelValue::Number(x), FeelValue::Number(y)) => x.is_finite() && y.is_finite() && (x - y).abs() <= delta,
+      _ => false
+    }
+  }
+
+  /// Tests of floor builtin function from the spec
+  #[test]
+  fn test_floor() {
+    let ctx = Context::new();
+    assert!(are_near(&Builtins::floor(1.5.into(), &ctx), &1.0_f64.into(), 0.00000000005_f64), "case 1");
+    assert!(are_near(&Builtins::floor((-1.5).into(), &ctx), &(-2.0_f64).into(), 0.00000000005_f64), "case 2");
+  }
+
+  /// Tests of ceiling builtin function from the spec
+  #[test]
+  fn test_ceiling() {
+    let ctx = Context::new();
+    assert!(are_near(&Builtins::ceiling(1.5.into(), &ctx), &2.0_f64.into(), 0.00000000005_f64), "case 1");
+    assert!(are_near(&Builtins::ceiling((-1.5).into(), &ctx), &(-1.0_f64).into(), 0.00000000005_f64), "case 2");
+  }
+
+  /// Tests of abs builtin function from the spec
+  #[test]
+  fn test_abs() {
+    let ctx = Context::new();
+    assert!(are_near(&Builtins::abs(10.into(), &ctx), &10.0_f64.into(), 0.00000000005_f64), "case 1");
+    assert!(are_near(&Builtins::abs((-10.0).into(), &ctx), &10.0_f64.into(), 0.00000000005_f64), "case 2");
+
+    // TODO: Test abs(Duration) 
+  }
+
+  /// Tests of sqrt builtin function from the spec, plus more
+  #[test]
+  fn test_sqrt() {
+    let ctx = Context::new();
+    assert!(are_near(&Builtins::sqrt(16.into(), &ctx), &4.0_f64.into(), 0.00000000005_f64), "case 1");
+    assert!(are_near(&Builtins::sqrt(1.into(), &ctx), &1.0_f64.into(), 0.000000000005_f64), "case 2");
+    assert!(are_near(&Builtins::sqrt(0.into(), &ctx), &0.0_f64.into(), 0.000000000005_f64), "case 3");
+    assert!(Builtins::sqrt((-1.0).into(), &ctx).is_null(), "case 4");
+  }
+
+  /// Tests of log builtin function from the spec, plus more
+  #[test]
+  fn test_log() {
+    let ctx = Context::new();
+    assert!(are_near(&Builtins::log(10.into(), &ctx), &2.30258509299_f64.into(), 0.00000000005_f64), "case 1");
+    assert!(are_near(&Builtins::log(std::f64::consts::E.into(), &ctx), &1.0_f64.into(), 0.000000000005_f64), "case 2");
+    assert!(are_near(&Builtins::log(1.into(), &ctx), &0.0_f64.into(), 0.000000000005_f64), "case 3");
+    assert!(Builtins::log(0.0.into(), &ctx).is_null(), "case 4");
+    assert!(Builtins::log((-1.0).into(), &ctx).is_null(), "case 5");
+  }
+  
+  /// Tests of exp builtin function from the spec, plus more
+  #[test]
+  fn test_exp() {
+    let ctx = Context::new();
+    assert!(are_near(&Builtins::exp(5.into(), &ctx), &148.413159102577_f64.into(), 0.000000000005_f64), "case 1");
+    assert!(are_near(&Builtins::exp(0.into(), &ctx), &1.0_f64.into(), 0.000000000005_f64), "case 2");
+    assert!(Builtins::exp(99999999.into(), &ctx).is_null(), "case 3");
+  }
+
   /// Tests of even builtin function from the spec, plus more
   #[test]
   fn test_even() {
