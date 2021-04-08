@@ -126,6 +126,37 @@ impl Builtins {
 
   // modulo(dividend,divisor)
 
+  /// modulo(dividend,divisor) returns the remainder of the division of dividend by divisor.
+  /// If either is negative, take the sign of the divisor.
+  /// If the divisor is zero, return null.
+  pub fn modulo<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "modulo";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..3)
+      .no_nulls()
+      .expect_type(0_usize, FeelType::Number, false)
+      .expect_type(1_usize, FeelType::Number, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        match (a, b) {
+          (_, FeelValue::Number(divisor)) if *divisor == 0.0_f64 => {
+            ExecutionLog::log(&format!("{:?} attempted division by zero", fname));
+            FeelValue::Null
+          },
+          (FeelValue::Number(dividend), FeelValue::Number(divisor)) => {
+            // For negative values, the FEEL semantics for modulo are NOT the same as Rust's % operator! 
+            let remainder = *dividend - *divisor * (*dividend / *divisor).floor();
+            FeelValue::Number(remainder)
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
   /// sqrt(number) returns the square root.
   /// Return Null on negative numbers.
   pub fn sqrt<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
@@ -786,6 +817,30 @@ mod tests {
     assert!(positive_duration == Builtins::abs(positive_duration.clone(), &ctx), "case 3");
     assert!(positive_duration == Builtins::abs(negative_duration, &ctx), "case 4");
   }
+
+  // Tests of modulo builtin function from the spec
+  #[test]
+  fn test_modulo() {
+    fn mod_case(a: f64, b: f64, expected: f64, case_number: u32) -> () {
+      let ctx = Context::new();
+      let a_value: FeelValue = a.into();
+      let b_value: FeelValue = b.into();
+      let exp: FeelValue = expected.into();
+      let args = FeelValue::new_list(vec![a_value, b_value]);
+      let actual = Builtins::modulo(args, &ctx);
+      let message = format!("expected modulo({},{}) = {}, actual = {:?} [case {}]", a, b, expected, actual, case_number);
+      assert!(are_near(&actual, &exp, 0.00000000001_f64), message);
+    }
+    mod_case(12.0_f64, 5.0_f64, 2.0_f64, 1);
+    mod_case(-12.0_f64, 5.0_f64, 3.0_f64, 2);
+    mod_case(12.0_f64, -5.0_f64, -3.0_f64, 3);
+    mod_case(-12.0_f64, -5.0_f64, -2.0_f64, 4);
+    mod_case(10.1_f64, 4.5_f64, 1.1_f64, 5);
+    mod_case(-10.1_f64, 4.5_f64, 3.4_f64, 6);
+    mod_case(10.1_f64, -4.5_f64, -3.4_f64, 7);
+    mod_case(-10.1_f64, -4.5_f64, -1.1_f64, 8);
+  }
+
 
   /// Tests of sqrt builtin function from the spec, plus more
   #[test]

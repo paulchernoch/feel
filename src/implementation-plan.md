@@ -11,7 +11,7 @@
  - [x] Add, Sub, Mul, Div
  - [x] Nested Context
  - [x] Inequality Operators
- - [ ] Range
+ - [x] Range
     - [x] Range includes
     - [x] Range added to FeelValue
     - [!] 14 HL7 CQL Range functions => implemented in Builtins instead.
@@ -120,7 +120,7 @@ Ten numeric functions.
   - [x] **floor(number)**
   - [x] **ceiling(number)**
   - [x] **abs(number)**
-  - [ ] **modulo(dividend,divisor)**
+  - [x] **modulo(dividend,divisor)**
   - [x] **sqrt(number)**
   - [x] **log(number)**
   - [x] **exp(number)**

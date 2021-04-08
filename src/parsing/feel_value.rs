@@ -119,7 +119,19 @@ impl FeelValue {
       FeelValue::Null => type_error(),
       _ => type_error()
     }
-  } 
+  }
+
+  /// Is the value something that can take a sign and is that sign negative?
+  /// Consider Boolean False values to be negative.
+  pub fn is_negative(&self) -> bool {
+    match self {
+      FeelValue::Number(n) => *n < 0.0_f64,
+      FeelValue::Boolean(b) => !b,
+      FeelValue::YearMonthDuration(ymd) => ymd.is_negative(),
+      FeelValue::DayTimeDuration(dtd) => dtd.is_negative(),
+      _ => false
+    }
+  }
 
   pub fn is_null(&self) -> bool {
     match self {
