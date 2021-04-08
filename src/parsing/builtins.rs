@@ -1,6 +1,7 @@
 use std::rc::Rc;
 use std::cmp::Ordering;
 use std::ops::Bound;
+use math::round;
 use super::range::Range;
 use super::context::{Context,ContextReader};
 use super::feel_value::{FeelValue, FeelType};
@@ -49,8 +50,43 @@ impl Builtins {
       FeelValue::Number(n)
     }
   }
-  
-  // decimal(number, places)
+
+
+  /// decimal(number, places) rounds the number to the desired scale.
+  /// It uses the "round to even" rule.
+  /// For example, 1.5 rounds to 2.0, but so does 2.5. 
+  /// The round to even rule reduces bias when performing many calculations that involve rounded numbers. 
+  pub fn decimal<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "decimal";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..3)
+      .no_nulls()
+      .expect_type(0_usize, FeelType::Number, false)
+      .expect_integer(1_usize, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        match (a, b) {
+          (_, FeelValue::Number(places)) if *places < -127.0_f64 => {
+            ExecutionLog::log(&format!("{:?} attempted to round to too many negative places", fname));
+            FeelValue::Null
+          },    
+          (_, FeelValue::Number(places)) if *places > 127.0_f64 => {
+            ExecutionLog::log(&format!("{:?} attempted to round to too many places", fname));
+            FeelValue::Null
+          },
+          (FeelValue::Number(number), FeelValue::Number(places)) => {
+            let u_places = *places as i8;
+            let rounded = round::half_to_even(*number, u_places);
+            FeelValue::Number(rounded)
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
 
   /// floor(number) returns the largest integer less than or equal to the number.
@@ -122,9 +158,6 @@ impl Builtins {
       Err(_) => FeelValue::Null
     }
   }
-
-
-  // modulo(dividend,divisor)
 
   /// modulo(dividend,divisor) returns the remainder of the division of dividend by divisor.
   /// If either is negative, take the sign of the divisor.
@@ -788,6 +821,25 @@ mod tests {
     }
   }
 
+  // Tests of decimal builtin function from the spec (plus one more)
+  #[test]
+  fn test_decimal() {
+    fn decimal_case(a: f64, b: f64, expected: f64, case_number: u32) -> () {
+      let ctx = Context::new();
+      let a_value: FeelValue = a.into();
+      let b_value: FeelValue = b.into();
+      let exp: FeelValue = expected.into();
+      let args = FeelValue::new_list(vec![a_value, b_value]);
+      let actual = Builtins::decimal(args, &ctx);
+      let message = format!("expected decimal({},{}) = {}, actual = {:?} [case {}]", a, b, expected, actual, case_number);
+      assert!(are_near(&actual, &exp, 0.00000000001_f64), "{}", message);
+    }
+    decimal_case(1.0_f64/3.0_f64, 2.0_f64, 0.33_f64, 1);
+    decimal_case(1.5_f64, 0.0_f64, 2.0_f64, 2);
+    decimal_case(2.5_f64, 0.0_f64, 2.0_f64, 3);
+    decimal_case(4321.0_f64, -2.0_f64, 4300.0_f64, 4);
+  }
+
   /// Tests of floor builtin function from the spec
   #[test]
   fn test_floor() {
@@ -829,7 +881,7 @@ mod tests {
       let args = FeelValue::new_list(vec![a_value, b_value]);
       let actual = Builtins::modulo(args, &ctx);
       let message = format!("expected modulo({},{}) = {}, actual = {:?} [case {}]", a, b, expected, actual, case_number);
-      assert!(are_near(&actual, &exp, 0.00000000001_f64), message);
+      assert!(are_near(&actual, &exp, 0.00000000001_f64), "{}", message);
     }
     mod_case(12.0_f64, 5.0_f64, 2.0_f64, 1);
     mod_case(-12.0_f64, 5.0_f64, 3.0_f64, 2);
