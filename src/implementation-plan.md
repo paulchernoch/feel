@@ -21,8 +21,8 @@
  - [x] Arguments & validation
  - [ ] **80** Built-in functions / operators:
     - [ ] 3 Miscellaneous conversion
-    - [ ] 10 Numeric
-    - [ ] 1 Boolean
+    - [x] 10 Numeric
+    - [x] 1 Boolean
     - [ ] 12 String
     - [ ] 6 Date and Time conversion
     - [ ] 1 Date and time
@@ -116,7 +116,7 @@ Three miscellaneous functions.
 
 Ten numeric functions.
 
-  - [ ] **decimal(number, places)**
+  - [x] **decimal(number, places)**
   - [x] **floor(number)**
   - [x] **ceiling(number)**
   - [x] **abs(number)**

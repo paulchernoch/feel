@@ -39,8 +39,32 @@ impl Builtins {
     builtin_context
   }
 
+  //// ///////////// Boolean function /////////////////
+  
+  /// not(b) returns false for a true value, true for a false, and Null for all others.
+  pub fn not<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "not";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..2)
+      .no_nulls()
+      .expect_type(0_usize, FeelType::Boolean, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::Boolean(b) => (!b).into(),
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+  
+ 
   //// ///////////// Numeric functions /////////////////
   
+  /// Helper function for validation of numbers that on failure performs logging and returns a Null.
+  /// Rejects NaN and infinity. 
   fn validate_number<S: Into<String>>(n: f64, action: S) -> FeelValue {
     if !n.is_finite() {
       ExecutionLog::log(&format!("{:?} did not yield a finite result, substituting null", action.into()));
@@ -810,6 +834,16 @@ mod tests {
   use super::super::exclusive_inclusive_range::ExclusiveInclusiveRange;
   use super::super::exclusive_range::ExclusiveRange;
   use super::super::duration::Duration;
+
+  //// Boolean function tests
+  
+  /// Tests of floor builtin function from the spec
+  #[test]
+  fn test_not() {
+    let ctx = Context::new();
+    assert!(Builtins::not(FeelValue::Boolean(true), &ctx) == FeelValue::Boolean(false));
+    assert!(Builtins::not(FeelValue::Boolean(false), &ctx) == FeelValue::Boolean(true));
+  }
 
   //// Numeric function tests
   
