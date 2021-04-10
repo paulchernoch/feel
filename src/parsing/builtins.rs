@@ -1108,7 +1108,21 @@ mod tests {
     ss("\u{01F40E}ab", 2, None, "ab"); // Unicode character of three bytes is one single character.
   }
 
-  // Test of builtin string length(string)
+  /// Test of builtin string length(string)
+  #[test]
+  fn test_string_length() {
+    fn sl(s: &str, exp: usize) {
+      let ctx = Context::new();
+      let f_string: FeelValue = s.into();
+      let f_expected: FeelValue = FeelValue::Number(exp as f64);
+      let actual = Builtins::string_length(f_string, &ctx);
+      assert!(actual == f_expected, "string length({:?}) = {:?} expected, found {:?}", s, exp, actual);
+    }
+    sl("foo", 3);
+    sl("\u{01F40E}ab", 3);
+  }
+
+
   // Test of builtin upper case(string)
   // Test of builtin lower case(string)
   // Test of builtin substring before(string, match)

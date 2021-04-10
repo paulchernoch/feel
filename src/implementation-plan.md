@@ -135,8 +135,8 @@ Ten numeric functions.
 
 Twelve string functions.
 
-  - [ ] **substring(string, start position, length?)**: Return a portion of the input string, where start position may be negative to count from the end of the string and length is optional, meaning to include all remaining characters.
-  - [ ] **string length(string)**: return the number of characters in the string
+  - [x] **substring(string, start position, length?)**: Return a portion of the input string, where start position may be negative to count from the end of the string and length is optional, meaning to include all remaining characters.
+  - [x] **string length(string)**: return the number of characters in the string
   - [ ] **upper case(string)**
   - [ ] **lower case(string)**
   - [ ] **substring before(string, match)**: Return all the string that comes before the match, or an empty string if no match.
