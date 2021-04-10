@@ -116,6 +116,7 @@ impl Builtins {
   // substring(string, start position, length?) returns a portion of the input string, where start position 
   // may be negative to count from the end of the string and length is optional, meaning to include 
   // all remaining characters.
+  // start position is one based.
   pub fn substring<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "substring";
     match Builtins::make_validator(fname, parameters)
@@ -128,12 +129,19 @@ impl Builtins {
         let a = &arguments[0];
         let b = &arguments[1];
         let c = &arguments[2];
+        // Ensure that one-based positions are converted to zero-based before calling internal substring.
         match (a, b, c) {
+          (FeelValue::String(search_string), FeelValue::Number(start_position), _) if *start_position == 0.0 => {
+            ExecutionLog::log(&format!("{:?} called with a position of zero. Positions are one-based.", fname));
+            FeelValue::Null
+          },
           (FeelValue::String(search_string), FeelValue::Number(start_position), FeelValue::Null) => {
-            FeelValue::String(search_string.substring(*start_position as i32, None))
+            let position = if *start_position > 0.0 { *start_position as i32 - 1 } else { *start_position as i32 };
+            FeelValue::String(search_string.substring(position, None))
           },
           (FeelValue::String(search_string), FeelValue::Number(start_position), FeelValue::Number(length)) => {
-            FeelValue::String(search_string.substring(*start_position as i32, Some(*length as usize)))
+            let position = if *start_position > 0.0 { *start_position as i32 - 1 } else { *start_position as i32 };
+            FeelValue::String(search_string.substring(position, Some(*length as usize)))
           },
           _ => unreachable!()
         }        
@@ -1071,6 +1079,46 @@ mod tests {
     assert!(Builtins::not(FeelValue::Boolean(true), &ctx) == FeelValue::Boolean(false));
     assert!(Builtins::not(FeelValue::Boolean(false), &ctx) == FeelValue::Boolean(true));
   }
+
+  //// String function tests
+  
+  /// Test of builtin substring(string, start position, length?)
+  #[test]
+  fn test_substring() {
+    fn ss(search: &str, start: i32, len_opt: Option<usize>, exp: &str) {
+      let ctx = Context::new();
+      let f_search: FeelValue = search.into();
+      let f_start: FeelValue = start.into();
+      let args = match len_opt {
+        Some(len) => {
+          let f_len = FeelValue::Number(len as f64);
+          FeelValue::new_list(vec![f_search, f_start, f_len])
+        },
+        None => {
+          FeelValue::new_list(vec![f_search, f_start])
+        }
+      };
+      let actual = Builtins::substring(args, &ctx);
+      let expected = FeelValue::String(exp.into());
+      assert!(actual == expected, "substring({:?}, {:?}, {:?}) = {:?} expected, found {:?}", search, start, len_opt, exp, actual);
+    }
+    ss("foobar", 3, None, "obar");
+    ss("foobar", 3, Some(3), "oba");
+    ss("foobar", -2, Some(1), "a");
+    ss("\u{01F40E}ab", 2, None, "ab"); // Unicode character of three bytes is one single character.
+  }
+
+  // Test of builtin string length(string)
+  // Test of builtin upper case(string)
+  // Test of builtin lower case(string)
+  // Test of builtin substring before(string, match)
+  // Test of builtin substring after(string, match)
+  // Test of builtin replace(input, pattern, replacement, flags?)
+  // Test of builtin contains(string, match)
+  // Test of builtin starts with(string, match)
+  // Test of builtin ends with(string, match)
+  // Test of builtin matches(input, pattern, flags?)
+  // Test of builtin split(string, delimiter)
 
   //// Numeric function tests
   
