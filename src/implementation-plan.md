@@ -129,7 +129,7 @@ Ten numeric functions.
 
 **Booleans**:
 
-  - [ ] **not(anything)** -> bool or null: If given a non-boolean, returns null.
+  - [x] **not(anything)** -> bool or null: If given a non-boolean, returns null.
 
 **Strings**:
 

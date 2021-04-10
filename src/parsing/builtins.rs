@@ -1,12 +1,14 @@
 use std::rc::Rc;
 use std::cmp::Ordering;
 use std::ops::Bound;
+use regex::Regex; // TODO: Should have a Regex LRU cache.
 use math::round;
 use super::range::Range;
 use super::context::{Context,ContextReader};
 use super::feel_value::{FeelValue, FeelType};
 use super::execution_log::ExecutionLog;
 use super::arguments::{Arguments,Validity};
+use super::substring::Substring;
 
 pub enum RangeCase {
   PointRange,
@@ -59,8 +61,233 @@ impl Builtins {
       Err(_) => FeelValue::Null
     }
   }
+
+  //// ///////////// String functions /////////////////
   
- 
+  fn string_transform<C: ContextReader, F: FnOnce(&String) -> FeelValue>(parameters: FeelValue, _contexts: &C, fname: &str, xform: F) -> FeelValue {
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..2)
+      .no_nulls()
+      .expect_type(0_usize, FeelType::String, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::String(s) => xform(s),
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
+  /// Helper function for performing a tailored search of a string for a match.
+  fn string_match<C: ContextReader, F: FnOnce(&String, &String) -> FeelValue>(parameters: FeelValue, _contexts: &C, fname: &str, matcher: F) -> FeelValue {
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..3)
+      .no_nulls()
+      .expect_type(0_usize, FeelType::String, false)
+      .expect_type(1_usize, FeelType::String, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        match (a, b) {
+          (FeelValue::String(search_string), FeelValue::String(match_string)) => matcher(search_string, match_string),
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
+  /// Validate regex flags: only i, s, m and x permitted. 
+  fn are_flags_valid<S: Into<String>>(flags: S) -> bool {
+    let string_flags: String = flags.into();
+    let mut found = 0_usize;
+    if string_flags.contains('i') { found += 1_usize; }
+    if string_flags.contains('s') { found += 1_usize; }
+    if string_flags.contains('m') { found += 1_usize; }
+    if string_flags.contains('x') { found += 1_usize; }
+    found == string_flags.len()
+  }
+  
+
+  // substring(string, start position, length?) returns a portion of the input string, where start position 
+  // may be negative to count from the end of the string and length is optional, meaning to include 
+  // all remaining characters.
+  pub fn substring<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "substring";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..4)
+      .expect_type(0_usize, FeelType::String, false)
+      .expect_integer(1_usize, false)
+      .expect_integer(2_usize, true) // Optional length parameter, so can be Null
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        let c = &arguments[2];
+        match (a, b, c) {
+          (FeelValue::String(search_string), FeelValue::Number(start_position), FeelValue::Null) => {
+            FeelValue::String(search_string.substring(*start_position as i32, None))
+          },
+          (FeelValue::String(search_string), FeelValue::Number(start_position), FeelValue::Number(length)) => {
+            FeelValue::String(search_string.substring(*start_position as i32, Some(*length as usize)))
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
+  /// string length(string) returns the number of characters in the string.
+  /// Note that this does not count the number of bytes in the string, but the number of Unicode code points. 
+  /// An accented non-Latin character may contain two bytes but count as one character.
+  pub fn string_length<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    Builtins::string_transform(parameters, _contexts, "string length", |s| FeelValue::Number(s.chars().count() as f64))
+  }
+
+  /// upper case(string) returns the string with all lowercase characters made uppercase.
+  pub fn upper_case<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    Builtins::string_transform(parameters, _contexts, "upper case", |s| s.to_uppercase().into())
+  }
+
+  // lower case(string) returns the string with all uppercase characters made lowercase.
+  /// upper case(string) returns the string with all lowercase characters made uppercase.
+  pub fn lower_case<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    Builtins::string_transform(parameters, _contexts, "lower case", |s| s.to_lowercase().into())
+  }
+
+  /// substring before(string, match) returns all the string that comes before the match, or an empty string if no match.
+  pub fn substring_before<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    Builtins::string_match(
+      parameters, 
+      _contexts, 
+      "substring before", 
+      |search_string, match_string| {
+        match search_string.find(match_string.as_str()) {
+          Some(position) => search_string[0..position].to_string().into(),
+          None => "".into()
+        }
+      }
+    )
+  }
+
+  /// substring after(string, match) returns all the string that comes after the match, or an empty string if no match.
+  pub fn substring_after<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    Builtins::string_match(
+      parameters, 
+      _contexts, 
+      "substring after", 
+      |search_string, match_string| {
+        match search_string.find(match_string.as_str()) {
+          Some(position) => search_string[position + match_string.len() ..].to_string().into(),
+          None => "".into()
+        }
+      }
+    )
+  }
+
+  // replace(input, pattern, replacement, flags?) Regular expression pattern matching and replacement with optional flags.
+  
+  /// contains(string, match) Does the string contain the match?
+  pub fn contains<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    Builtins::string_match(
+      parameters, 
+      _contexts, 
+      "contains", 
+      |search_string, match_string| {
+        match search_string.find(match_string.as_str()) {
+          Some(_) => true.into(),
+          None => false.into()
+        }
+      }
+    )
+  }
+  
+  /// starts with(string, match) Does the string start with the match?
+  pub fn starts_with<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    Builtins::string_match(
+      parameters, 
+      _contexts, 
+      "starts with", 
+      |search_string, match_string| search_string.starts_with(match_string.as_str()).into()
+    )
+  }
+
+  /// ends with(string, match) Does the string end with the match?
+  pub fn ends_with<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    Builtins::string_match(
+      parameters, 
+      _contexts, 
+      "ends with", 
+      |search_string, match_string| search_string.ends_with(match_string.as_str()).into()
+    )
+  }
+
+  /// matches(input, pattern, flags?) Does the input match the regexp pattern?
+  /// The flags are optional. If present, the string may be empty or contain
+  /// any or all of the letters i, s, m or x.
+  ///   i ... Case insensitive search. 
+  ///   s ... Enables single-line mode. Dot matches newlines.
+  ///   m ... Enables Multiline-mode. Caret and dollar match before and after newlines. 
+  ///   x ... Enables Free-spacing mode. Ignore whitespace between regex tokens (for readability). 
+  /// If the flags are invalid or the regex is invalid, a FeelValue::Null is returned. 
+  /// If no match is found, FeelValue::Boolean(false) is returned. 
+  /// If a match is found, FeelValue::Boolean(true) is returned. 
+   pub fn matches<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "matches";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..4)
+      .expect_type(0_usize, FeelType::String, false)
+      .expect_type(1_usize, FeelType::String, false)
+      .expect_type(2_usize, FeelType::String, true) // flags are Optional
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        let c = &arguments[2];
+        match (a, b, c) {
+          (FeelValue::String(input), FeelValue::String(pattern), FeelValue::Null) => {
+            match Regex::new(&pattern) {
+              Ok(regex) => {
+                FeelValue::Boolean(regex.is_match(&input))
+              },
+              Err(err) => {
+                ExecutionLog::log(&format!("{:?} called with invalid pattern {:?}. Regex error: {:?}.", fname, pattern, err));
+                FeelValue::Null
+              }
+            }
+          },
+          (FeelValue::String(input), FeelValue::String(pattern), FeelValue::String(flags)) => {
+            if ! Builtins::are_flags_valid(flags) {
+              ExecutionLog::log(&format!("{:?} called with invalid flags {:?}. Only i, s, m and x supported.", fname, flags));
+              return FeelValue::Null;
+            }
+            FeelValue::Null
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+  
+  /// split(string, delimiter) splits the string into a list of substrings, breaking at each occurrence of the delimiter pattern.
+  pub fn split<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    Builtins::string_match(
+      parameters, 
+      _contexts, 
+      "split", 
+      |search_string, delimiter| {
+        let pieces: Vec<FeelValue> = search_string.split(delimiter.as_str()).map(|piece| FeelValue::String(piece.into())).collect();
+        FeelValue::new_list(pieces)
+      }
+    )
+  }
+
   //// ///////////// Numeric functions /////////////////
   
   /// Helper function for validation of numbers that on failure performs logging and returns a Null.
