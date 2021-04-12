@@ -283,15 +283,25 @@ impl Builtins {
     }
   }
   
-  /// split(string, delimiter) splits the string into a list of substrings, breaking at each occurrence of the delimiter pattern.
+  /// split(string, delimiter) splits the string into a list of substrings, breaking at each occurrence of the delimiter pattern,
+  /// which may be a regex.
   pub fn split<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     Builtins::string_match(
       parameters, 
       _contexts, 
       "split", 
       |search_string, delimiter| {
-        let pieces: Vec<FeelValue> = search_string.split(delimiter.as_str()).map(|piece| FeelValue::String(piece.into())).collect();
-        FeelValue::new_list(pieces)
+        // delimiter may be a regex. If creating a regex from the string fails, then assume it is a regular string delimiter. 
+        match Regex::new(delimiter) {
+          Ok(regex) => {
+            let pieces: Vec<FeelValue> = regex.split(search_string).map(|piece| FeelValue::String(piece.into())).collect();
+            FeelValue::new_list(pieces)
+          },
+          Err(_) => {
+            let pieces: Vec<FeelValue> = search_string.split(delimiter.as_str()).map(|piece| FeelValue::String(piece.into())).collect();
+            FeelValue::new_list(pieces)
+          }
+        }
       }
     )
   }
@@ -1234,8 +1244,22 @@ mod tests {
   // Test of builtin matches(input, pattern, flags?)
  
  
-  // Test of builtin split(string, delimiter)
-
+  /// Test of builtin split(string, delimiter)
+  #[test]
+  fn test_split() {
+    fn split(s: &str, delimiter: &str, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let f_string: FeelValue = s.into();
+      let f_delimiter: FeelValue = delimiter.into();
+      let args = FeelValue::new_list(vec![f_string, f_delimiter]);
+      let actual = Builtins::split(args, &ctx);
+      assert!(actual == f_expected, "split({:?}, {:?}) = {:?} expected, found {:?}", s, delimiter, f_expected, actual);
+    }
+    // Split by Regex pattern
+    split("John Doe", "\\s", FeelValue::new_list(vec!["John".into(), "Doe".into()]));
+    // Split by string
+    split("a;b;c;;", ";", FeelValue::new_list(vec!["a".into(), "b".into(), "c".into(), "".into(), "".into()]));
+  }
 
   //// Numeric function tests
   
