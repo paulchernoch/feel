@@ -41,6 +41,23 @@ impl Builtins {
     builtin_context
   }
 
+  /// Prepare the Arguments object and a validator. 
+  /// If the supplied parameters is a single FeelValue::List, it will be flattened into a list of
+  /// possibly many arguments.
+  fn make_validator(function_name: &str, parameters: FeelValue) -> Validity {
+    let args: Rc<Arguments> = Rc::new(parameters.into()); // Flattens if a FeelValue::List.
+    let name: Rc<String> = Rc::new(function_name.into());
+    Validity::new(&name, &args)
+  }
+
+  /// Prepare the Arguments object and a validator for situations where the argument is a FeelValue::List
+  /// that should not be flattened into a longer parameter list. 
+  fn make_list_validator(function_name: &str, parameters: FeelValue) -> Validity {
+    let args: Rc<Arguments> = Rc::new(Arguments::new1(parameters)); // No flattening.
+    let name: Rc<String> = Rc::new(function_name.into());
+    Validity::new(&name, &args)
+  }
+
   //// ////////////////////////////////////////////////
   ////                                             ////
   ////             Boolean function                ////
@@ -139,7 +156,7 @@ impl Builtins {
         let c = &arguments[2];
         // Ensure that one-based positions are converted to zero-based before calling internal substring.
         match (a, b, c) {
-          (FeelValue::String(search_string), FeelValue::Number(start_position), _) if *start_position == 0.0 => {
+          (_, FeelValue::Number(start_position), _) if *start_position == 0.0 => {
             ExecutionLog::log(&format!("{:?} called with a position of zero. Positions are one-based.", fname));
             FeelValue::Null
           },
@@ -385,6 +402,107 @@ impl Builtins {
       }
     )
   }
+
+  //// ////////////////////////////////////////////////
+  ////                                             ////
+  ////               List functions                ////
+  ////                                             ////
+  //// ////////////////////////////////////////////////
+
+  /// Handles common validation and extraction of relevant data for 
+  /// functions expecting a single FeelValue::List as argument.
+  fn list_helper<C: ContextReader, F: FnOnce(&Vec<FeelValue>) -> FeelValue>(parameters: FeelValue, _contexts: &C, fname: &str, xform: F) -> FeelValue {
+    match Builtins::make_list_validator(fname, parameters)
+      .arity(1..2)
+      .expect_type(0_usize, FeelType::List, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::List(rr_list) => {
+            xform(&rr_list.borrow())
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
+  // list contains(list, element)**: Does the list contain the element? Can even find nulls.
+
+
+  /// count(list)**: return size of list, or zero if list is empty
+  pub fn count<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    Builtins::list_helper(parameters, contexts, "count", 
+      |list| (list.len() as f64).into()
+    )
+  }
+  
+
+  // min(list or varargs)**
+
+
+  // max(list or varargs)**
+
+
+  // sum(list or varargs)**
+
+
+  // mean(list or varargs)**
+
+
+  // all(list or varargs)**
+
+
+  // any(list or varargs)**
+
+
+  // sublist(list, start position, length?)**
+
+
+  // append(list, item...)**: Append one or more items to the list, returning a new list.
+
+
+  // concatenate(list...)**: Concatenate one or more lists to form a new list.
+
+
+  // insert before(list, position, newItem)**
+
+
+  // remove(list, position)**
+
+
+  /// reverse(list) creates a new list with the elements in reverse order
+  pub fn reverse<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    Builtins::list_helper(parameters, contexts, "reverse", 
+      |list| FeelValue::new_list(list.iter().rev().cloned().collect())
+    )
+  }
+
+
+  // index of(list, match)**
+
+
+  // union(list...)**: concatenate with duplicate removal.
+
+
+  // distinct values(list)**: Duplicate removal.
+
+
+  // flatten(list)**: Flatten nested lists.
+
+
+  // product(list or varargs)**: Returns the product of the numbers.
+
+
+  // median(list or varargs)**
+
+
+  // stddev(list or varargs)**
+
+
+  // mode(list or varargs)**
   
   //// ////////////////////////////////////////////////
   ////                                             ////
@@ -701,11 +819,6 @@ impl Builtins {
     }
   }
 
-  fn make_validator(function_name: &str, parameters: FeelValue) -> Validity {
-    let args: Rc<Arguments> = Rc::new(parameters.into());
-    let name: Rc<String> = Rc::new(function_name.into());
-    Validity::new(&name, &args)
-  }
 
   fn before_helper<C: ContextReader>(function_name: &str, parameters: FeelValue, contexts: &C) -> FeelValue {
     match Builtins::make_validator(function_name, parameters)
@@ -1381,6 +1494,77 @@ mod tests {
     // Split by string
     split("a;b;c;;", ";", FeelValue::new_list(vec!["a".into(), "b".into(), "c".into(), "".into(), "".into()]));
   }
+
+  //// List function tests
+  
+  // Test of list contains(list, element)
+
+  /// Test of count(list)
+  #[test]
+  fn test_count() {
+    fn count(list: Vec<FeelValue>, exp: usize) {
+      let ctx = Context::new();
+      let args = FeelValue::new_list(list);
+      let f_expected: FeelValue = (exp as f64).into();
+      let actual = Builtins::count(args, &ctx);
+      assert!(actual == f_expected, "count(list) = {:?} expected, found {:?}", f_expected, actual);
+    }
+    count(vec![1.into(),2.into(),3.into()], 3);
+    count(vec![], 0);
+    count(vec![1.into(), FeelValue::new_list(vec![2.into(),3.into()])], 2);
+  }
+
+  // Test of min(list or varargs)
+
+  // Test of max(list or varargs)
+
+  // Test of sum(list or varargs)
+
+  // Test of mean(list or varargs)
+
+  // Test of all(list or varargs)
+
+  // Test of any(list or varargs)
+
+  // Test of sublist(list, start position, length?)
+
+  // Test of append(list, item...)
+
+  // Test of concatenate(list...)
+
+  // Test of insert before(list, position, newItem)
+
+  // Test of remove(list, position)
+
+  // Test of reverse(list)
+  #[test]
+  fn test_reverse() {
+    fn reverse(list: Vec<FeelValue>, exp: Vec<FeelValue>) {
+      let ctx = Context::new();
+      let args = FeelValue::new_list(list);
+      let f_expected = FeelValue::new_list(exp);
+      let actual = Builtins::reverse(args, &ctx);
+      assert!(actual == f_expected, "reverse(list) = {:?} expected, found {:?}", f_expected, actual);
+    }
+    reverse(vec![1.into(),2.into(),3.into()], vec![3.into(),2.into(),1.into()]);
+  }
+
+  // Test of index of(list, match)
+
+  // Test of union(list...)
+
+  // Test of distinct values(list)
+
+  // Test of flatten(list)
+
+  // Test of product(list or varargs)
+
+  // Test of median(list or varargs)
+
+  // Test of stddev(list or varargs)
+
+  // Test of mode(list or varargs)
+  
 
   //// Numeric function tests
   

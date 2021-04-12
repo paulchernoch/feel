@@ -197,19 +197,19 @@ Four temporal functions (in addition to the conversion functions).
 Twenty-two list functions. Some of the functions can take either a list or a variable number of arguments (all numbers) that will be treated as if it were a list. These functions will be noted as (list or varargs).
 
   - [ ] **list contains(list, element)**: Does the list contain the element? Can even find nulls.
-  - [ ] **count(list)**: return size of list, or zero if list is empty
+  - [x] **count(list)**: return size of list, or zero if list is empty
   - [ ] **min(list or varargs)**
   - [ ] **max(list or varargs)**
   - [ ] **sum(list or varargs)**
   - [ ] **mean(list or varargs)**
   - [ ] **all(list or varargs)**
   - [ ] **any(list or varargs)**
-  - [ ] **sublist(ist, start position, length?)**
+  - [ ] **sublist(list, start position, length?)**
   - [ ] **append(list, item...)**: Append one or more items to the list, returning a new list.
   - [ ] **concatenate(list...)**: Concatenate one or more lists to form a new list.
   - [ ] **insert before(list, position, newItem)**
   - [ ] **remove(list, position)**
-  - [ ] **reverse(list)**
+  - [x] **reverse(list)**
   - [ ] **index of(list, match)**
   - [ ] **union(list...)**: concatenate with duplicate removal.
   - [ ] **distinct values(list)**: Duplicate removal.
