@@ -3,6 +3,7 @@
 ## Grammar Recognizer
 
  - [ ] Add support for Duration literals like @"PT5H"
+ - [ ] Add support for any other literals new to DMN 1.3 (Dates? Times?)
 
 ## FeelValue
 
@@ -23,7 +24,7 @@
     - [ ] 3 Miscellaneous conversion
     - [x] 10 Numeric
     - [x] 1 Boolean
-    - [ ] 12 String
+    - [x] 12 String
     - [ ] 6 Date and Time conversion
     - [ ] 1 Date and time
     - [ ] 4 Temporal
@@ -41,7 +42,8 @@
 
 Do not want to pass a logger object around to every function, so I need a way to store a logger with each thread and free it when the thread exits. The logger will be available to every function without needing to pass it in as an argument. 
 
- - [ ] A thread-based contextual logger
+ - [x] A thread-based contextual logger
+
 ## Simple Expression Tree Walk
 
  - [ ] Additive
@@ -76,20 +78,31 @@ These properties are listed in Table 65 and Table 66 of §10.3.2.15 of the DMN v
  - [ ] Calling Functions
  - [ ] Iteration contexts (lists, for loops)
 
-## Caching
+## Caching and Related Performance Enhancements
 
  - [ ] LRU Rule Cache
  - [ ] Redis Cache
  - [ ] Memoization
+ - [ ] Regex Cache
 
 ## Service
 
+ - [ ] REST Service
+ - [ ] Create Rule
+ - [ ] Read Rule
+ - [ ] Execute Rule
+ - [ ] Delete Rule
+ - [ ] Create State Machine
+ - [ ] Read State Machine Definition
+ - [ ] Read State Machine Current State
+ - [ ] Post Event to State Machine
+ - [ ] Delete State Machine
+ - [ ] Support Rule Consequents in Create Rule
 
 ## Consequents
 
  - [ ] Asynchronous REST API Calls
  - [ ] Synchronous REST API Calls
-
 
 ## State Machines
 
@@ -141,12 +154,12 @@ Twelve string functions.
   - [x] **lower case(string)**
   - [x] **substring before(string, match)**: Return all the string that comes before the match, or an empty string if no match.
   - [x] **substring after(string, match)**: Return all the string that comes after the match, or an empty string if no match.
-  - [ ] **replace(input, pattern, replacement, flags?)**: Regular expression pattern matching and replacement with optional flags.
+  - [x] **replace(input, pattern, replacement, flags?)**: Regular expression pattern matching and replacement with optional flags.
   - [x] **contains(string, match)**: Does the string contain the match?
   - [x] **starts with(string, match)**: Does the string start with the match?
   - [x] **ends with(string, match)**: Does the string end with the match?
-  - [ ] **matches(input, pattern, flags?)**: Does the input match the regexp pattern?
-  - [ ] **split(string, delimiter)**: Splits the string into a list of substrings, breaking at each occurrence of the delimiter pattern.
+  - [x] **matches(input, pattern, flags?)**: Does the input match the regexp pattern?
+  - [x] **split(string, delimiter)**: Splits the string into a list of substrings, breaking at each occurrence of the delimiter pattern.
 
 **Date, Time and Date and Time Conversion functions**:
 

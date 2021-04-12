@@ -207,7 +207,70 @@ impl Builtins {
   }
 
   // replace(input, pattern, replacement, flags?) Regular expression pattern matching and replacement with optional flags.
-  
+  /// The flags are optional. If present, the string may be empty or contain
+  /// any or all of the letters i, s, m or x.
+  ///   i ... Case insensitive search. 
+  ///   s ... Enables single-line mode. Dot matches newlines.
+  ///   m ... Enables Multiline-mode. Caret and dollar match before and after newlines. 
+  ///   x ... Enables Free-spacing mode. Ignore whitespace between regex tokens (for readability). 
+  /// If the flags are invalid or the regex is invalid, a FeelValue::Null is returned. 
+  /// If no match is found, the input is returned unchanged. 
+  /// If one or more matches are found, only the first mathch is replaced by the replacement and the resulting string returned.
+  /// The replacement string may contain backreferences to matched substrings as $1, $2, etc. 
+  /// Such backreferences will be replaced by the corresponding capture group.
+  /// 
+  /// Note: The DMN Version 1.3 Spec does not say whether one match or all matches should be replaced, so
+  ///       here we will only replace the first match. 
+  pub fn replace<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "replace";
+    match Builtins::make_validator(fname, parameters)
+      .arity(3..5)
+      .expect_type(0_usize, FeelType::String, false) // input
+      .expect_type(1_usize, FeelType::String, false) // pattern
+      .expect_type(2_usize, FeelType::String, false) // replacement
+      .expect_type(3_usize, FeelType::String, true)  // flags (Optional)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        let c = &arguments[2];
+        let d = &arguments[3];
+        match (a, b, c, d) {
+          (FeelValue::String(input), FeelValue::String(pattern), FeelValue::String(replacement), FeelValue::Null) => {
+            match Regex::new(&pattern) {
+              Ok(regex) => {
+                regex.replace(&input, replacement).into_owned().into()
+              },
+              Err(err) => {
+                ExecutionLog::log(&format!("{:?} called with invalid pattern {:?}. Regex error: {:?}.", fname, pattern, err));
+                FeelValue::Null
+              }
+            }
+          },
+          (FeelValue::String(input), FeelValue::String(pattern), FeelValue::String(replacement), FeelValue::String(flags)) => {
+            if ! Builtins::are_flags_valid(flags) {
+              ExecutionLog::log(&format!("{:?} called with invalid flags {:?}. Only i, s, m and x supported.", fname, flags));
+              return FeelValue::Null;
+            }
+            let flagged_pattern = if flags.len() == 0 { format!("{}", pattern) } else { format!("(?{}){}", flags, pattern) };
+            match Regex::new(&flagged_pattern) {
+              Ok(regex) => {
+                regex.replace(&input, replacement).into_owned().into()
+              },
+              Err(err) => {
+                ExecutionLog::log(&format!("{:?} called with invalid pattern {:?}. Regex error: {:?}.", fname, pattern, err));
+                FeelValue::Null
+              }
+            }
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
+
   /// contains(string, match) Does the string contain the match?
   pub fn contains<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     Builtins::string_match(
@@ -253,7 +316,7 @@ impl Builtins {
   /// If the flags are invalid or the regex is invalid, a FeelValue::Null is returned. 
   /// If no match is found, FeelValue::Boolean(false) is returned. 
   /// If a match is found, FeelValue::Boolean(true) is returned. 
-   pub fn matches<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+  pub fn matches<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "matches";
     match Builtins::make_validator(fname, parameters)
       .arity(2..4)
@@ -1105,6 +1168,7 @@ mod tests {
   use super::super::exclusive_inclusive_range::ExclusiveInclusiveRange;
   use super::super::exclusive_range::ExclusiveRange;
   use super::super::duration::Duration;
+  use super::super::execution_log::ExecutionLog;
 
   //// Boolean function tests
   
@@ -1216,8 +1280,24 @@ mod tests {
     sa("", "a", "");
   }
  
-  // Test of builtin replace(input, pattern, replacement, flags?)
- 
+  /// Test of builtin replace(input, pattern, replacement, flags?)
+  #[test]
+  fn test_replace() {
+    fn replace(s: &str, m: &str, repl: &str, flags: &str, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let f_string: FeelValue = s.into();
+      let f_match: FeelValue = m.into();
+      let f_replacement: FeelValue = repl.into();
+      let f_flags: FeelValue = flags.into();
+      ExecutionLog::clear();
+      let args = FeelValue::new_list(vec![f_string, f_match, f_replacement, f_flags]);
+      let actual = Builtins::replace(args, &ctx);
+      // ExecutionLog::print("Replace Error: ");
+      assert!(actual == f_expected, "replace({:?}, {:?}, {:?}, {:?}) = {:?} expected, found {:?}", s, m, repl, flags, f_expected, actual);
+    }
+    replace("abcd", "(ab)|(a)", "[1=$1][2=$2]", "", "[1=ab][2=]cd".into());
+    replace("abcd", "((ab)|(a)", "[1=$1][2=$2]", "", FeelValue::Null); // Regex syntax error
+  }
  
   /// Test of builtin contains(string, match)
   #[test]

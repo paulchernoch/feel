@@ -69,6 +69,16 @@ impl ExecutionLog {
       exec_log.empty();
     });
   }
+
+  pub fn print(prefix: &str) {
+    let mut entries: Vec<String> = Vec::new();
+    FEEL_EXECUTION_LOG.with(|exec_log| {
+      entries = exec_log.read();
+    });
+    for entry in entries {
+      println!("{}{}", prefix, entry);
+    }
+  }
 }
 
 
