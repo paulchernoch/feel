@@ -1148,7 +1148,7 @@ mod tests {
     lc("aBc4", "abc4");
   }
  
-  // Test of builtin substring before(string, match)
+  /// Test of builtin substring before(string, match)
   #[test]
   fn test_substring_before() {
     fn sb(s: &str, m: &str, exp: &str) {
@@ -1164,8 +1164,21 @@ mod tests {
     sb("foobar", "xyz", "");
   }
  
-  // Test of builtin substring after(string, match)
- 
+  /// Test of builtin substring after(string, match)
+  #[test]
+  fn test_substring_after() {
+    fn sa(s: &str, m: &str, exp: &str) {
+      let ctx = Context::new();
+      let f_string: FeelValue = s.into();
+      let f_match: FeelValue = m.into();
+      let args = FeelValue::new_list(vec![f_string, f_match]);
+      let f_expected: FeelValue = exp.into();
+      let actual = Builtins::substring_after(args, &ctx);
+      assert!(actual == f_expected, "substring after({:?}, {:?}) = {:?} expected, found {:?}", s, m, exp, actual);
+    }
+    sa("foobar", "ob", "ar");
+    sa("", "a", "");
+  }
  
   // Test of builtin replace(input, pattern, replacement, flags?)
  
