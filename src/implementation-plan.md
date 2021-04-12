@@ -140,9 +140,9 @@ Twelve string functions.
   - [x] **upper case(string)**
   - [x] **lower case(string)**
   - [x] **substring before(string, match)**: Return all the string that comes before the match, or an empty string if no match.
-  - [ ] **substring after(string, match)**: Return all the string that comes after the match, or an empty string if no match.
+  - [x] **substring after(string, match)**: Return all the string that comes after the match, or an empty string if no match.
   - [ ] **replace(input, pattern, replacement, flags?)**: Regular expression pattern matching and replacement with optional flags.
-  - [ ] **contains(string, match)**: Does the string contain the match?
+  - [x] **contains(string, match)**: Does the string contain the match?
   - [ ] **starts with(string, match)**: Does the string start with the match?
   - [ ] **ends with(string, match)**: Does the string end with the match?
   - [ ] **matches(input, pattern, flags?)**: Does the input match the regexp pattern?

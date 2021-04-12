@@ -1183,8 +1183,21 @@ mod tests {
   // Test of builtin replace(input, pattern, replacement, flags?)
  
  
-  // Test of builtin contains(string, match)
- 
+  /// Test of builtin contains(string, match)
+  #[test]
+  fn test_contains() {
+    fn contains(s: &str, m: &str, exp: bool) {
+      let ctx = Context::new();
+      let f_string: FeelValue = s.into();
+      let f_match: FeelValue = m.into();
+      let args = FeelValue::new_list(vec![f_string, f_match]);
+      let f_expected: FeelValue = exp.into();
+      let actual = Builtins::contains(args, &ctx);
+      assert!(actual == f_expected, "contains({:?}, {:?}) = {:?} expected, found {:?}", s, m, exp, actual);
+    }
+    contains("foobar", "of", false);
+    contains("foobar", "ob", true);
+  }
  
   // Test of builtin starts with(string, match)
  
