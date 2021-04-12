@@ -1199,11 +1199,37 @@ mod tests {
     contains("foobar", "ob", true);
   }
  
-  // Test of builtin starts with(string, match)
+  /// Test of builtin starts with(string, match)
+  #[test]
+  fn test_starts_with() {
+    fn starts_with(s: &str, m: &str, exp: bool) {
+      let ctx = Context::new();
+      let f_string: FeelValue = s.into();
+      let f_match: FeelValue = m.into();
+      let args = FeelValue::new_list(vec![f_string, f_match]);
+      let f_expected: FeelValue = exp.into();
+      let actual = Builtins::starts_with(args, &ctx);
+      assert!(actual == f_expected, "starts with({:?}, {:?}) = {:?} expected, found {:?}", s, m, exp, actual);
+    }
+    starts_with("foobar", "fo", true);
+    starts_with("foobar", "oo", false);
+  }
  
- 
-  // Test of builtin ends with(string, match)
- 
+  /// Test of builtin ends with(string, match)
+  #[test]
+  fn test_ends_with() {
+    fn ends_with(s: &str, m: &str, exp: bool) {
+      let ctx = Context::new();
+      let f_string: FeelValue = s.into();
+      let f_match: FeelValue = m.into();
+      let args = FeelValue::new_list(vec![f_string, f_match]);
+      let f_expected: FeelValue = exp.into();
+      let actual = Builtins::ends_with(args, &ctx);
+      assert!(actual == f_expected, "ends with({:?}, {:?}) = {:?} expected, found {:?}", s, m, exp, actual);
+    }
+    ends_with("foobar", "r", true);
+    ends_with("foobar", "ba", false);
+  }
  
   // Test of builtin matches(input, pattern, flags?)
  

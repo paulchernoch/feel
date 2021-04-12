@@ -143,8 +143,8 @@ Twelve string functions.
   - [x] **substring after(string, match)**: Return all the string that comes after the match, or an empty string if no match.
   - [ ] **replace(input, pattern, replacement, flags?)**: Regular expression pattern matching and replacement with optional flags.
   - [x] **contains(string, match)**: Does the string contain the match?
-  - [ ] **starts with(string, match)**: Does the string start with the match?
-  - [ ] **ends with(string, match)**: Does the string end with the match?
+  - [x] **starts with(string, match)**: Does the string start with the match?
+  - [x] **ends with(string, match)**: Does the string end with the match?
   - [ ] **matches(input, pattern, flags?)**: Does the input match the regexp pattern?
   - [ ] **split(string, delimiter)**: Splits the string into a list of substrings, breaking at each occurrence of the delimiter pattern.
 
