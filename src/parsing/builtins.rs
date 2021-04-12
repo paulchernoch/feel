@@ -41,7 +41,11 @@ impl Builtins {
     builtin_context
   }
 
-  //// ///////////// Boolean function /////////////////
+  //// ////////////////////////////////////////////////
+  ////                                             ////
+  ////             Boolean function                ////
+  ////                                             ////
+  //// ////////////////////////////////////////////////
   
   /// not(b) returns false for a true value, true for a false, and Null for all others.
   pub fn not<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
@@ -62,7 +66,11 @@ impl Builtins {
     }
   }
 
-  //// ///////////// String functions /////////////////
+  //// ////////////////////////////////////////////////
+  ////                                             ////
+  ////             String functions                ////
+  ////                                             ////
+  //// ////////////////////////////////////////////////
   
   fn string_transform<C: ContextReader, F: FnOnce(&String) -> FeelValue>(parameters: FeelValue, _contexts: &C, fname: &str, xform: F) -> FeelValue {
     match Builtins::make_validator(fname, parameters)
@@ -274,7 +282,16 @@ impl Builtins {
               ExecutionLog::log(&format!("{:?} called with invalid flags {:?}. Only i, s, m and x supported.", fname, flags));
               return FeelValue::Null;
             }
-            FeelValue::Null
+            let flagged_pattern = if flags.len() == 0 { format!("{}", pattern) } else { format!("(?{}){}", flags, pattern) };
+            match Regex::new(&flagged_pattern) {
+              Ok(regex) => {
+                FeelValue::Boolean(regex.is_match(&input))
+              },
+              Err(err) => {
+                ExecutionLog::log(&format!("{:?} called with invalid pattern {:?}. Regex error: {:?}.", fname, pattern, err));
+                FeelValue::Null
+              }
+            }
           },
           _ => unreachable!()
         }        
@@ -305,9 +322,14 @@ impl Builtins {
       }
     )
   }
-
-  //// ///////////// Numeric functions /////////////////
   
+  //// ////////////////////////////////////////////////
+  ////                                             ////
+  ////             Numeric functions               ////
+  ////                                             ////
+  //// ////////////////////////////////////////////////
+
+
   /// Helper function for validation of numbers that on failure performs logging and returns a Null.
   /// Rejects NaN and infinity. 
   fn validate_number<S: Into<String>>(n: f64, action: S) -> FeelValue {
@@ -590,7 +612,12 @@ impl Builtins {
     }
   }
 
-  //// ///////////// Range functions /////////////////
+  //// ////////////////////////////////////////////////
+  ////                                             ////
+  ////             Range functions                 ////
+  ////                                             ////
+  //// ////////////////////////////////////////////////
+
 
   // The Range Builtin functions are inspired by HL7 CQL 1.4 (Clinical Query Language).
   // Arguments may be points or Ranges, where a Point (normally a Number or a date type) 
@@ -616,7 +643,6 @@ impl Builtins {
     let name: Rc<String> = Rc::new(function_name.into());
     Validity::new(&name, &args)
   }
-
 
   fn before_helper<C: ContextReader>(function_name: &str, parameters: FeelValue, contexts: &C) -> FeelValue {
     match Builtins::make_validator(function_name, parameters)
@@ -1241,8 +1267,23 @@ mod tests {
     ends_with("foobar", "ba", false);
   }
  
-  // Test of builtin matches(input, pattern, flags?)
- 
+  /// Test of builtin matches(input, pattern, flags?)
+  #[test]
+  fn test_matches() {
+    fn matches(s: &str, m: &str, flags: &str, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let f_string: FeelValue = s.into();
+      let f_match: FeelValue = m.into();
+      let f_flags: FeelValue = flags.into();
+      let args = FeelValue::new_list(vec![f_string, f_match, f_flags]);
+      let actual = Builtins::matches(args, &ctx);
+      assert!(actual == f_expected, "matches({:?}, {:?}, {:?}) = {:?} expected, found {:?}", s, m, flags, f_expected, actual);
+    }
+    matches("foobar", "^fo*b", "", true.into());
+    matches("foobar", "FOO", "", false.into()); // Case sensitive match
+    matches("foobar", "FOO", "i", true.into()); // Case insensitive match
+    matches("foobar", "^foo", "!", FeelValue::Null); // Bad flag
+  }
  
   /// Test of builtin split(string, delimiter)
   #[test]
