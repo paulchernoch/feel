@@ -1122,17 +1122,68 @@ mod tests {
     sl("\u{01F40E}ab", 3);
   }
 
-
-  // Test of builtin upper case(string)
-  // Test of builtin lower case(string)
+  /// Test of builtin upper case(string)
+  #[test]
+  fn test_upper_case() {
+    fn uc(s: &str, exp: &str) {
+      let ctx = Context::new();
+      let f_string: FeelValue = s.into();
+      let f_expected: FeelValue = exp.into();
+      let actual = Builtins::upper_case(f_string, &ctx);
+      assert!(actual == f_expected, "upper case({:?}) = {:?} expected, found {:?}", s, exp, actual);
+    }
+    uc("aBc4", "ABC4");
+  }
+ 
+  /// Test of builtin lower case(string)
+  #[test]
+  fn test_lower_case() {
+    fn lc(s: &str, exp: &str) {
+      let ctx = Context::new();
+      let f_string: FeelValue = s.into();
+      let f_expected: FeelValue = exp.into();
+      let actual = Builtins::lower_case(f_string, &ctx);
+      assert!(actual == f_expected, "lower case({:?}) = {:?} expected, found {:?}", s, exp, actual);
+    }
+    lc("aBc4", "abc4");
+  }
+ 
   // Test of builtin substring before(string, match)
+  #[test]
+  fn test_substring_before() {
+    fn sb(s: &str, m: &str, exp: &str) {
+      let ctx = Context::new();
+      let f_string: FeelValue = s.into();
+      let f_match: FeelValue = m.into();
+      let args = FeelValue::new_list(vec![f_string, f_match]);
+      let f_expected: FeelValue = exp.into();
+      let actual = Builtins::substring_before(args, &ctx);
+      assert!(actual == f_expected, "substring before({:?}, {:?}) = {:?} expected, found {:?}", s, m, exp, actual);
+    }
+    sb("foobar", "bar", "foo");
+    sb("foobar", "xyz", "");
+  }
+ 
   // Test of builtin substring after(string, match)
+ 
+ 
   // Test of builtin replace(input, pattern, replacement, flags?)
+ 
+ 
   // Test of builtin contains(string, match)
+ 
+ 
   // Test of builtin starts with(string, match)
+ 
+ 
   // Test of builtin ends with(string, match)
+ 
+ 
   // Test of builtin matches(input, pattern, flags?)
+ 
+ 
   // Test of builtin split(string, delimiter)
+
 
   //// Numeric function tests
   
