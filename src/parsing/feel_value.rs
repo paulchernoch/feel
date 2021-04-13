@@ -134,6 +134,7 @@ impl FeelValue {
     }
   }
 
+  /// Is this value a FeelValue::Null?
   pub fn is_null(&self) -> bool {
     match self {
       FeelValue::Null => true,
@@ -141,13 +142,15 @@ impl FeelValue {
     }
   }
 
+  /// Is this value a FeelValue::Boolean(true)?
   pub fn is_true(&self) -> bool {
     match self {
       FeelValue::Boolean(b) => *b,
       _ => false
     }
   }
-
+  
+  /// Is this value a FeelValue::Boolean(false)?
   pub fn is_false(&self) -> bool {
     match self {
       FeelValue::Boolean(b) => !*b,
@@ -215,6 +218,26 @@ impl FeelValue {
       (false, _) => None,
       (true, FeelValue::Range(r)) => Some(r.compare(point, contexts)),
       (true, _) => None
+    }
+  }
+
+  /// Flatten a hierarchy of FeelValues where most FeelValues are leaves, but FeelValue::List's are
+  /// considered branches. 
+  ///   - Use depth-first ordering during the tree walk. 
+  ///   - Collect all values into the supplied list. 
+  ///   - The output will have no FeelValue::Lists in it.
+  pub fn flatten_into(&self, flat_list: &mut Vec<FeelValue>) {
+    match self {
+      FeelValue::List(source_list) => {
+        for item in source_list.borrow().iter() {
+          item.flatten_into(flat_list);
+          ()
+        }
+      },
+      _ => { 
+        flat_list.push(self.clone()); 
+        () 
+      }
     }
   }
 

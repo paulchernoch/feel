@@ -411,7 +411,8 @@ impl Builtins {
   //// ////////////////////////////////////////////////
 
   /// Handles common validation and extraction of relevant data for 
-  /// functions expecting a single FeelValue::List as argument.
+  /// functions expecting a single FeelValue::List as argument 
+  /// and are not expected to handle varargs as an implicit list.
   fn list_helper<C: ContextReader, F: FnOnce(&Vec<FeelValue>) -> FeelValue>(parameters: FeelValue, _contexts: &C, fname: &str, xform: F) -> FeelValue {
     match Builtins::make_list_validator(fname, parameters)
       .arity(1..2)
@@ -430,7 +431,7 @@ impl Builtins {
     }
   }
 
-  // list contains(list, element)**: Does the list contain the element? Can even find nulls.
+  // list contains(list, element): Does the list contain the element? Can even find nulls.
 
 
   /// count(list)**: return size of list, or zero if list is empty
@@ -503,8 +504,18 @@ impl Builtins {
     )
   }
 
-  // flatten(list)**: Flatten nested lists.
-
+  /// flatten(list): Flatten nested lists.
+  pub fn flatten<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    Builtins::list_helper(parameters, contexts, "flatten", 
+      |list| { 
+        let mut flat_list: Vec<FeelValue> = Vec::new();
+        for item in list.iter() {
+          item.flatten_into(&mut flat_list);
+        }
+        FeelValue::new_list(flat_list) 
+      }
+    )
+  }
 
   // product(list or varargs): Returns the product of the numbers.
 
@@ -1583,7 +1594,24 @@ mod tests {
     );
   }
 
-  // Test of flatten(list)
+  /// Test of flatten(list)
+  #[test]
+  fn test_flatten() {
+    fn flatten(args: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let actual = Builtins::flatten(args, &ctx);
+      assert!(actual == f_expected, "flatten(list) = {:?} expected, found {:?}", f_expected, actual);
+    }
+    // In JSON, the following unflattened object would be [[1,2],[[3]],4]
+    let unflattened = FeelValue::new_list(
+        vec![
+          FeelValue::new_list(vec![1.into(), 2.into()]), 
+          FeelValue::new_list(vec![FeelValue::new_list(vec![3.into()])]), 
+          4.into()]
+    );
+    let flattened = FeelValue::new_list(vec![1.into(), 2.into(), 3.into(), 4.into()]);
+    flatten(unflattened, flattened);
+  }
 
   // Test of product(list or varargs)
 

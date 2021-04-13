@@ -212,8 +212,8 @@ Twenty-two list functions. Some of the functions can take either a list or a var
   - [x] **reverse(list)**
   - [ ] **index of(list, match)**
   - [ ] **union(list...)**: concatenate with duplicate removal.
-  - [ ] **distinct values(list)**: Duplicate removal.
-  - [ ] **flatten(list)**: Flatten nested lists.
+  - [x] **distinct values(list)**: Duplicate removal.
+  - [x] **flatten(list)**: Flatten nested lists.
   - [ ] **product(list or varargs)**: Returns the product of the numbers.
   - [ ] **median(list or varargs)**
   - [ ] **stddev(list or varargs)**
