@@ -2,6 +2,7 @@ use std::fmt;
 use std::cmp;
 use std::ops;
 use std::str::FromStr;
+use std::hash::{Hash, Hasher};
 use chrono::Duration as ChronoDuration;
 use chrono::{NaiveDate, Date, NaiveDateTime, DateTime, NaiveTime, Datelike, Timelike, offset::TimeZone};
 use super::duration_parser::parse_duration;
@@ -15,6 +16,9 @@ pub enum DurationVariety {
   /// Duration may have any values set to a nonzero value.
   Full
 }
+
+// NOTE: Cannot derive Hash for Duration because equivalent Durations may have
+//       different representations.
 
 /// Measures a duration of time in years, months, days, hours, minutes and seconds.
 /// Supports arithmetic like adding, subtracting and dividing pairs of Durations,
@@ -265,6 +269,12 @@ impl Duration {
       DurationVariety::DayTime => Duration::new_day_time(!self.positive, self.days, self.hours, self.minutes, self.seconds),
       DurationVariety::Full => Duration::new(! self.positive, self.years, self.months, self.days, self.hours, self.minutes, self.seconds)
     }
+  }
+}
+
+impl Hash for Duration {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    ((self.total_seconds() * 1000000.0_f32) as i128).hash(state);
   }
 }
 

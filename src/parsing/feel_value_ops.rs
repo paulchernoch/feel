@@ -197,6 +197,7 @@ impl FeelType {
   }
 }
 
+/// Compare two f64 values, forcing NaNs to be sortable.
 pub fn compare_f64(left: &f64, right: &f64) -> Ordering {
   match left.partial_cmp(right) {
     Some(ord) => ord,
@@ -209,6 +210,32 @@ pub fn compare_f64(left: &f64, right: &f64) -> Ordering {
       }
     }
   }
+}
+
+pub fn compare_lists(left: &Vec<FeelValue>, right: &Vec<FeelValue>) -> Ordering {
+  let mut it_left = left.iter();
+  let mut it_right = right.iter();
+  let mut comparison = Ordering::Equal;
+  loop {
+      match (it_left.next(), it_right.next()) {
+          (Some(x), Some(y)) => {
+            comparison = x.cmp(y);
+            if comparison != Ordering::Equal {
+              break;
+            }
+          },
+          (Some(_), None) => {
+            comparison = Ordering::Greater;
+            break
+          } , 
+          (None, Some(_)) => { 
+            comparison = Ordering::Less;
+            break
+          }, 
+          (None, None) =>  break
+      }
+  }
+  comparison
 }
 
 impl PartialOrd for FeelValue {
@@ -247,8 +274,7 @@ impl PartialOrd for FeelValue {
           (FeelValue::YearMonthDuration(l_ymd), FeelValue::DayTimeDuration(r_dtd)) => Some(l_ymd.cmp(&r_dtd)),
           (FeelValue::DayTimeDuration(l_dtd), FeelValue::YearMonthDuration(r_ymd)) => Some(l_dtd.cmp(&r_ymd)),
           (FeelValue::Range(l_range), FeelValue::Range(r_range)) => Some(l_range.cmp(&r_range)),
-          // TODO: Decide what to do with Lists
-          (FeelValue::List(_), FeelValue::List(_)) => None,
+          (FeelValue::List(left), FeelValue::List(right)) => Some(compare_lists(&left.borrow(), &right.borrow())),
           // TODO: Decide what to do with Contexts
           (FeelValue::Context(_), FeelValue::Context(_)) => None,
           // TODO: Implement Function compare.

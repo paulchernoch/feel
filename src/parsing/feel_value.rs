@@ -5,6 +5,7 @@ use std::convert::From;
 use std::string::ToString;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime };
 use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
 
 use super::qname::{QName, Stringlike};
 use super::context::{Context, ContextReader};
@@ -366,6 +367,29 @@ impl From<bool> for FeelValue {
 impl<S: Into<String> + Clone + Stringlike> From<&Vec<S>> for FeelValue {
   fn from(v: &Vec<S>) -> Self {
     FeelValue::Name(v.into())
+  }
+}
+
+impl Hash for FeelValue {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    match self {
+      // TODO: Implement a proper hash function for f64. This is slow and may overflow!
+      FeelValue::Number(v) => ((*v * 1000000.0) as i128).hash(state),
+      FeelValue::String(v) => v.hash(state),
+      FeelValue::Name(v) => v.hash(state),
+      FeelValue::Boolean(v) => v.hash(state),
+      FeelValue::Date(v) => v.hash(state),
+      FeelValue::Time(v) => v.hash(state),
+      FeelValue::DateAndTime(v) => v.hash(state),
+      FeelValue::YearMonthDuration(v) => v.hash(state),
+      FeelValue::DayTimeDuration(v) => v.hash(state),
+      FeelValue::Range(v) => v.hash(state),
+      FeelValue::List(v) => v.borrow().len().hash(state),
+      // TODO: Implement proper Hash for Context
+      FeelValue::Context(_) => "context".hash(state),
+      FeelValue::Function(func) => func.get_name().hash(state),
+      FeelValue::Null => "null".hash(state)
+    }
   }
 }
 

@@ -3,6 +3,7 @@ use std::cmp::{Ord, PartialOrd, Ordering};
 use super::feel_value::{FeelValue, FeelType};
 use super::context::ContextReader;
 use std::ops::{RangeBounds, Bound};
+use std::hash::{Hash};
 
 // Note: Many important functions involving Ranges are implemented in Builtins. 
 
@@ -11,7 +12,7 @@ use std::ops::{RangeBounds, Bound};
 ///   - The low and high values may be FeelValue::Name values, indicating that they should be looked up
 ///     from a NestedContext.
 ///   - The low and high values may be Option::None, indicating an open range in that direction. 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone, Hash)]
 pub struct Range {
   low: Box<Option<FeelValue>>,
   high: Box<Option<FeelValue>>,

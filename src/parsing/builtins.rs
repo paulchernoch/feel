@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use std::ops::Bound;
 use regex::Regex; // TODO: Should have a Regex LRU cache.
 use math::round;
+use std::collections::HashSet;
 use super::range::Range;
 use super::context::{Context,ContextReader};
 use super::feel_value::{FeelValue, FeelType};
@@ -236,8 +237,8 @@ impl Builtins {
   /// The replacement string may contain backreferences to matched substrings as $1, $2, etc. 
   /// Such backreferences will be replaced by the corresponding capture group.
   /// 
-  /// Note: The DMN Version 1.3 Spec does not say whether one match or all matches should be replaced, so
-  ///       here we will only replace the first match. 
+  /// Note: The DMN Version 1.3 Spec does not say whether one match or all matches should be replaced,
+  ///       but the TCK tests have an example that indicates all occurrances should be replaced. 
   pub fn replace<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "replace";
     match Builtins::make_validator(fname, parameters)
@@ -256,7 +257,7 @@ impl Builtins {
           (FeelValue::String(input), FeelValue::String(pattern), FeelValue::String(replacement), FeelValue::Null) => {
             match Regex::new(&pattern) {
               Ok(regex) => {
-                regex.replace(&input, replacement).into_owned().into()
+                regex.replace_all(&input, replacement).into_owned().into()
               },
               Err(err) => {
                 ExecutionLog::log(&format!("{:?} called with invalid pattern {:?}. Regex error: {:?}.", fname, pattern, err));
@@ -272,7 +273,7 @@ impl Builtins {
             let flagged_pattern = if flags.len() == 0 { format!("{}", pattern) } else { format!("(?{}){}", flags, pattern) };
             match Regex::new(&flagged_pattern) {
               Ok(regex) => {
-                regex.replace(&input, replacement).into_owned().into()
+                regex.replace_all(&input, replacement).into_owned().into()
               },
               Err(err) => {
                 ExecutionLog::log(&format!("{:?} called with invalid pattern {:?}. Regex error: {:?}.", fname, pattern, err));
@@ -481,28 +482,40 @@ impl Builtins {
   }
 
 
-  // index of(list, match)**
+  // index of(list, match)
 
 
-  // union(list...)**: concatenate with duplicate removal.
+  // union(list...): concatenate with duplicate removal.
 
 
-  // distinct values(list)**: Duplicate removal.
-
+  /// distinct values(list): Duplicate removal that preserves order.
+  pub fn distinct_values<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    Builtins::list_helper(parameters, contexts, "distinct values", 
+      |list| { 
+        let mut set: HashSet<&FeelValue> = HashSet::with_capacity(list.len());
+        let deduped: Vec<FeelValue> = list
+          .iter()
+          .filter(|item| set.insert(item))
+          .cloned()
+          .collect();
+        FeelValue::new_list(deduped) 
+      }
+    )
+  }
 
   // flatten(list)**: Flatten nested lists.
 
 
-  // product(list or varargs)**: Returns the product of the numbers.
+  // product(list or varargs): Returns the product of the numbers.
 
 
-  // median(list or varargs)**
+  // median(list or varargs)
 
 
-  // stddev(list or varargs)**
+  // stddev(list or varargs)
 
 
-  // mode(list or varargs)**
+  // mode(list or varargs)
   
   //// ////////////////////////////////////////////////
   ////                                             ////
@@ -1410,6 +1423,7 @@ mod tests {
     }
     replace("abcd", "(ab)|(a)", "[1=$1][2=$2]", "", "[1=ab][2=]cd".into());
     replace("abcd", "((ab)|(a)", "[1=$1][2=$2]", "", FeelValue::Null); // Regex syntax error
+    replace("bananas", "a", "o", "", "bononos".into()); // Replace multiple occurrances
   }
  
   /// Test of builtin contains(string, match)
@@ -1536,7 +1550,7 @@ mod tests {
 
   // Test of remove(list, position)
 
-  // Test of reverse(list)
+  /// Test of reverse(list)
   #[test]
   fn test_reverse() {
     fn reverse(list: Vec<FeelValue>, exp: Vec<FeelValue>) {
@@ -1553,7 +1567,21 @@ mod tests {
 
   // Test of union(list...)
 
-  // Test of distinct values(list)
+  /// Test of distinct values(list)
+  #[test]
+  fn test_distinct_values() {
+    fn distinct_values(list: Vec<FeelValue>, exp: Vec<FeelValue>) {
+      let ctx = Context::new();
+      let args = FeelValue::new_list(list);
+      let f_expected = FeelValue::new_list(exp);
+      let actual = Builtins::distinct_values(args, &ctx);
+      assert!(actual == f_expected, "distinct values(list) = {:?} expected, found {:?}", f_expected, actual);
+    }
+    distinct_values(
+      vec![1.into(),2.into(),3.into(),2.into(),1.into(),], 
+      vec![1.into(),2.into(),3.into()]
+    );
+  }
 
   // Test of flatten(list)
 
