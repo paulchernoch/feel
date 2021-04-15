@@ -437,15 +437,25 @@ impl Builtins {
   /// functions expecting EITHER a single FeelValue::List as argument 
   /// OR a variable number of arguments in place of the list. 
   /// All elements of the list (if a single argument) or all the arguments (if two or more)
-  /// must be of the same type.
+  /// must be of the same type with an option to be Null.
   fn list_or_varargs_helper<C: ContextReader, F: FnOnce(&Vec<FeelValue>) -> FeelValue>(
-      parameters: FeelValue, _contexts: &C, fname: &str, expected_type: FeelType, xform: F) -> FeelValue {
+      parameters: FeelValue, _contexts: &C, fname: &str, expected_type: FeelType, allow_nulls: bool, xform: F) -> FeelValue {
     match Builtins::make_validator(fname, parameters)
       .arity(1..10000)
-      .expect_type(0_usize, expected_type, false)
+      .expect_type(0_usize, expected_type, allow_nulls)
       .expect_uniform_list()
       .validated() {
-      Ok(arguments) => xform(&arguments.args),
+      Ok(arguments) => xform(&arguments.flat_args()),
+      Err(_) => FeelValue::Null
+    }
+  }
+
+  fn heterogeneous_list_or_varargs_helper<C: ContextReader, F: FnOnce(&Vec<FeelValue>) -> FeelValue>(
+    parameters: FeelValue, _contexts: &C, fname: &str, xform: F) -> FeelValue {
+    match Builtins::make_validator(fname, parameters)
+      .arity(0..10000)
+      .validated() {
+      Ok(arguments) => xform(&arguments.flat_args()),
       Err(_) => FeelValue::Null
     }
   }
@@ -462,7 +472,7 @@ impl Builtins {
 
   /// min(list or varargs)
   pub fn min<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
-    Builtins::list_or_varargs_helper(parameters, contexts, "min", FeelType::Any,
+    Builtins::list_or_varargs_helper(parameters, contexts, "min", FeelType::Any, false,
       |list| {
         match list.iter().min() {
           Some(min) => min.clone(),
@@ -475,7 +485,7 @@ impl Builtins {
   /// max(list or varargs) obtains the maximum value (according to sort order) of a list of items
   /// assumed to be of the same type. If types vary, null is returned. 
   pub fn max<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
-    Builtins::list_or_varargs_helper(parameters, contexts, "max", FeelType::Any,
+    Builtins::list_or_varargs_helper(parameters, contexts, "max", FeelType::Any, false,
       |list| {
         match list.iter().max() {
           Some(max) => max.clone(),
@@ -490,7 +500,7 @@ impl Builtins {
     // TODO: sum can overflow, which panics. 
     //       When f128 is ready, cast to f128 before summing, then do a TryFrom/TryInto
     //       conversion and log an error on overflow. 
-    Builtins::list_or_varargs_helper(parameters, contexts, "sum", FeelType::Number,
+    Builtins::list_or_varargs_helper(parameters, contexts, "sum", FeelType::Number, false,
       |list| {
         let sum: f64 = list.iter().map(|fv| {
           let x: f64 = fv.try_into().unwrap();
@@ -507,7 +517,7 @@ impl Builtins {
     // TODO: sum can overflow, which panics. 
     //       When f128 is ready, cast to f128 before summing, then do a TryFrom/TryInto
     //       conversion and log an error on overflow. 
-    Builtins::list_or_varargs_helper(parameters, contexts, "mean", FeelType::Number,
+    Builtins::list_or_varargs_helper(parameters, contexts, "mean", FeelType::Number, false,
       |list| {
         // Validation excludes an empty list.
         let count: f64 = list.len() as f64;
@@ -520,21 +530,54 @@ impl Builtins {
     )
   }
 
-  /// all(list or varargs) returns true if all values are true, false if any are false, 
-  /// but null if any are not FeelValue::Boolean values.
+  /// all(list or varargs) returns true if list is empty or all values are true, 
+  /// false if any are false (even if some are null), 
+  /// but null otherwise.
   pub fn all<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
-    Builtins::list_or_varargs_helper(parameters, contexts, "all", FeelType::Boolean,
-      |list| FeelValue::Boolean(list.iter().all(|item| item.is_true()))
+    Builtins::heterogeneous_list_or_varargs_helper(parameters, contexts, "all",
+      |list| {
+        if list.len() == 0 {
+          FeelValue::Boolean(true)
+        }
+        else {
+          let mut true_count = 0_usize;
+          for item in list.iter() {
+            if item.is_false() { return FeelValue::Boolean(false); }
+            if item.is_true() { true_count += 1; }
+          }
+          if true_count == list.len() {
+            FeelValue::Boolean(true)
+          }
+          else {
+            FeelValue::Null
+          }
+        }
+      }
     )
   }
 
-
-  /// any(list or varargs) returns true if at least one value in the list is true,
-  /// false otherwise, but if any values are not FeelValue::Boolean, 
-  /// FeelValue::Nul is returned.
+  /// any(list or varargs) returns true if at least one value in the list is true (even if some are null),
+  /// false if list is empty or all items are false, otherwise null.
   pub fn any<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
-    Builtins::list_or_varargs_helper(parameters, contexts, "any", FeelType::Boolean,
-      |list| FeelValue::Boolean(list.iter().any(|item| item.is_true()))
+    Builtins::heterogeneous_list_or_varargs_helper(parameters, contexts, "any",
+      |list| {
+        if list.len() == 0 {
+          FeelValue::Boolean(false)
+        }
+        else {
+          let mut false_count = 0_usize;
+          for item in list.iter() {
+            if item.is_true() { return FeelValue::Boolean(true); }
+            if item.is_false() { false_count += 1; }
+          }
+          if false_count == list.len() {
+            FeelValue::Boolean(false)
+          }
+          else {
+            FeelValue::Null
+          }
+        }
+      }
     )
   }
 
@@ -598,7 +641,7 @@ impl Builtins {
   // product(list or varargs): Returns the product of the numbers.
   pub fn product<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
     let fname = "product";
-    Builtins::list_or_varargs_helper(parameters, contexts, fname, FeelType::Number,
+    Builtins::list_or_varargs_helper(parameters, contexts, fname, FeelType::Number, false,
       |list| {
         let product: f64 = list.iter().map(|fv| {
           let x: f64 = fv.try_into().unwrap();
@@ -625,7 +668,7 @@ impl Builtins {
     //       When f128 is ready, cast to f128 before summing, then do a TryFrom/TryInto
     //       conversion and log an error on overflow. 
     let fname = "stddev";
-    Builtins::list_or_varargs_helper(parameters, contexts, fname, FeelType::Number,
+    Builtins::list_or_varargs_helper(parameters, contexts, fname, FeelType::Number, false,
       |list| {
         if list.len() < 2 {
           ExecutionLog::log(&format!("{:?} can not be computed for a list with only {} points.", fname, list.len()));
@@ -671,7 +714,7 @@ impl Builtins {
     if !Builtins::any_arguments(&parameters) {
       return FeelValue::new_list(Vec::new());
     }
-    Builtins::list_or_varargs_helper(parameters, contexts, fname, FeelType::Number,
+    Builtins::list_or_varargs_helper(parameters, contexts, fname, FeelType::Number, true,
       |list| {
         FeelValue::new_list(mode_with_ties(list))
       }
@@ -1697,7 +1740,41 @@ mod tests {
 
   // Test of mean(list or varargs)
 
-  // Test of all(list or varargs)
+  /// Test of all(list or varargs)
+  #[test]
+  fn test_all() {
+    fn all(args: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let actual = Builtins::all(args, &ctx);
+      // ExecutionLog::print("all Error: ");
+      assert!(actual == f_expected, "all(list) = {:?} expected, found {:?}", f_expected, actual);
+    }
+    // all([false,null,true]) = false
+    all(
+      FeelValue::new_list_of_list(vec![false.into(), FeelValue::Null, true.into()]), 
+      false.into()
+    );
+    // all(true) = true
+    all(
+      FeelValue::new_list(vec![true.into()]), 
+      true.into()
+    );
+    // all([true]) = true
+    all(
+      FeelValue::new_list_of_list(vec![true.into()]), 
+      true.into()
+    );
+    // all([]) = true
+    all(
+      FeelValue::new_list_of_list(Vec::new()), 
+      true.into()
+    );
+    // all(0) = null
+    all(
+      FeelValue::new_list_of_list(vec![0.0.into()]), 
+      FeelValue::Null
+    ); 
+  }
 
   // Test of any(list or varargs)
 
@@ -1714,14 +1791,15 @@ mod tests {
   /// Test of reverse(list)
   #[test]
   fn test_reverse() {
-    fn reverse(list: Vec<FeelValue>, exp: Vec<FeelValue>) {
+    fn reverse(args: FeelValue, f_expected: FeelValue) {
       let ctx = Context::new();
-      let args = FeelValue::new_list(list);
-      let f_expected = FeelValue::new_list(exp);
       let actual = Builtins::reverse(args, &ctx);
       assert!(actual == f_expected, "reverse(list) = {:?} expected, found {:?}", f_expected, actual);
     }
-    reverse(vec![1.into(),2.into(),3.into()], vec![3.into(),2.into(),1.into()]);
+    reverse(
+      FeelValue::new_from_iterator(vec![1,2,3]), 
+      FeelValue::new_from_iterator(vec![3,2,1])
+    );
   }
 
   // Test of index of(list, match)

@@ -106,6 +106,18 @@ impl FeelValue {
     FeelValue::List(Rc::new(RefCell::new(items)))
   }
 
+  /// Used for creating parameter lists for builtins expecting a list. 
+  pub fn new_list_of_list(items: Vec<FeelValue>) -> Self {
+    FeelValue::new_list(vec![FeelValue::new_list(items)])
+  }
+
+  pub fn new_from_iterator<I>(iterable: I) -> Self 
+  where I: IntoIterator, 
+        I::Item: Into<FeelValue> {
+    let values: Vec<FeelValue> = iterable.into_iter().map(|item| item.into()).collect();
+    FeelValue::new_list(values)
+  }
+
   pub fn negate(&self) -> Self {
     let type_error = || -> FeelValue {
       ExecutionLog::log(&format!("Cannot negate {:?}", self.get_type()));
@@ -399,6 +411,7 @@ impl<S: Into<String> + Clone + Stringlike> From<&Vec<S>> for FeelValue {
     FeelValue::Name(v.into())
   }
 }
+      
 
 impl Hash for FeelValue {
   fn hash<H: Hasher>(&self, state: &mut H) {

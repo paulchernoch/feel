@@ -43,6 +43,21 @@ impl Arguments {
   pub fn any_nulls(&self) -> bool {
     self.args.iter().any(|i| i.is_null())
   }
+
+  /// If the args has one entry and it is a List, 
+  /// then return the contents of that List. This is for when a Builtin may 
+  /// be called with either many arguments or a singe List.
+  pub fn flat_args(self) -> Vec<FeelValue> {
+    if self.args.len() == 1 {
+      match &self.args[0] {
+        FeelValue::List(rr_list) => rr_list.borrow().iter().cloned().collect(),
+        _ => self.args
+      }
+    }
+    else {
+      self.args
+    }
+  }
 }
 
 impl Index<usize> for Arguments {
