@@ -1748,6 +1748,19 @@ mod tests {
   }
 
   // Test of max(list or varargs)
+  #[test]
+  fn test_max() {
+    fn max(args: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let actual = Builtins::max(args, &ctx);
+      assert!(actual == f_expected, "max(list) = {:?} expected, found {:?}", f_expected, actual);
+    }
+    max(FeelValue::new_list_of_list(vec![1.into(),2.into(),3.into()]), 3.into()); // max([1,2,3]) = 1
+    max(FeelValue::new_from_iterator(vec![1,2,3]), 3.into()); // max(1,2,3) = 1
+    max(FeelValue::new_list_of_list(vec![1.into()]), 1.into()); // max([1]) = 1
+    max(FeelValue::new_from_iterator(vec![1]), 1.into()); // max(1) = 1
+    max(FeelValue::new_list_of_list(vec![]), FeelValue::Null); // max([]) = null
+  }
 
   // Test of sum(list or varargs)
 
