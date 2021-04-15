@@ -4,12 +4,14 @@ use std::ops::Bound;
 use regex::Regex; // TODO: Should have a Regex LRU cache.
 use math::round;
 use std::collections::HashSet;
+use std::convert::{TryFrom,TryInto};
 use super::range::Range;
 use super::context::{Context,ContextReader};
 use super::feel_value::{FeelValue, FeelType};
 use super::execution_log::ExecutionLog;
 use super::arguments::{Arguments,Validity};
 use super::substring::Substring;
+use super::statistics::{sample_standard_deviation, mode_with_ties};
 
 pub enum RangeCase {
   PointRange,
@@ -431,6 +433,23 @@ impl Builtins {
     }
   }
 
+  /// Handles common validation and extraction of relevant data for 
+  /// functions expecting EITHER a single FeelValue::List as argument 
+  /// OR a variable number of arguments in place of the list. 
+  /// All elements of the list (if a single argument) or all the arguments (if two or more)
+  /// must be of the same type.
+  fn list_or_varargs_helper<C: ContextReader, F: FnOnce(&Vec<FeelValue>) -> FeelValue>(
+      parameters: FeelValue, _contexts: &C, fname: &str, expected_type: FeelType, xform: F) -> FeelValue {
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..10000)
+      .expect_type(0_usize, expected_type, false)
+      .expect_uniform_list()
+      .validated() {
+      Ok(arguments) => xform(&arguments.args),
+      Err(_) => FeelValue::Null
+    }
+  }
+
   // list contains(list, element): Does the list contain the element? Can even find nulls.
 
 
@@ -440,39 +459,98 @@ impl Builtins {
       |list| (list.len() as f64).into()
     )
   }
-  
 
-  // min(list or varargs)**
+  /// min(list or varargs)
+  pub fn min<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    Builtins::list_or_varargs_helper(parameters, contexts, "min", FeelType::Any,
+      |list| {
+        match list.iter().min() {
+          Some(min) => min.clone(),
+          None => unreachable!() // Validation will have ensured that the list is not empty.
+        }
+      }
+    )
+  }
+
+  /// max(list or varargs) obtains the maximum value (according to sort order) of a list of items
+  /// assumed to be of the same type. If types vary, null is returned. 
+  pub fn max<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    Builtins::list_or_varargs_helper(parameters, contexts, "max", FeelType::Any,
+      |list| {
+        match list.iter().max() {
+          Some(max) => max.clone(),
+          None => unreachable!() // Validation will have ensured that the list is not empty.
+        }
+      }
+    )
+  }
+
+  /// sum(list or varargs) sums a list of numbers but returns null for other types
+  pub fn sum<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    // TODO: sum can overflow, which panics. 
+    //       When f128 is ready, cast to f128 before summing, then do a TryFrom/TryInto
+    //       conversion and log an error on overflow. 
+    Builtins::list_or_varargs_helper(parameters, contexts, "sum", FeelType::Number,
+      |list| {
+        let sum: f64 = list.iter().map(|fv| {
+          let x: f64 = fv.try_into().unwrap();
+          x
+        }).sum();
+        FeelValue::Number(sum)
+      }
+    )
+  }
+
+  /// mean(list or varargs) computes the mean of a list of numbers but returns FeelValue::Null 
+  /// if any other types are in the list.
+  pub fn mean<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    // TODO: sum can overflow, which panics. 
+    //       When f128 is ready, cast to f128 before summing, then do a TryFrom/TryInto
+    //       conversion and log an error on overflow. 
+    Builtins::list_or_varargs_helper(parameters, contexts, "mean", FeelType::Number,
+      |list| {
+        // Validation excludes an empty list.
+        let count: f64 = list.len() as f64;
+        let sum: f64 = list.iter().map(|fv| {
+          let x: f64 = fv.try_into().unwrap();
+          x
+        }).sum();
+        FeelValue::Number(sum / count)
+      }
+    )
+  }
+
+  /// all(list or varargs) returns true if all values are true, false if any are false, 
+  /// but null if any are not FeelValue::Boolean values.
+  pub fn all<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    Builtins::list_or_varargs_helper(parameters, contexts, "all", FeelType::Boolean,
+      |list| FeelValue::Boolean(list.iter().all(|item| item.is_true()))
+    )
+  }
 
 
-  // max(list or varargs)**
+  /// any(list or varargs) returns true if at least one value in the list is true,
+  /// false otherwise, but if any values are not FeelValue::Boolean, 
+  /// FeelValue::Nul is returned.
+  pub fn any<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    Builtins::list_or_varargs_helper(parameters, contexts, "any", FeelType::Boolean,
+      |list| FeelValue::Boolean(list.iter().any(|item| item.is_true()))
+    )
+  }
+
+  // sublist(list, start position, length?)
 
 
-  // sum(list or varargs)**
+  // append(list, item...): Append one or more items to the list, returning a new list.
 
 
-  // mean(list or varargs)**
+  // concatenate(list...): Concatenate one or more lists to form a new list.
 
 
-  // all(list or varargs)**
+  // insert before(list, position, newItem)
 
 
-  // any(list or varargs)**
-
-
-  // sublist(list, start position, length?)**
-
-
-  // append(list, item...)**: Append one or more items to the list, returning a new list.
-
-
-  // concatenate(list...)**: Concatenate one or more lists to form a new list.
-
-
-  // insert before(list, position, newItem)**
-
-
-  // remove(list, position)**
+  // remove(list, position)
 
 
   /// reverse(list) creates a new list with the elements in reverse order
@@ -518,15 +596,87 @@ impl Builtins {
   }
 
   // product(list or varargs): Returns the product of the numbers.
-
+  pub fn product<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    let fname = "product";
+    Builtins::list_or_varargs_helper(parameters, contexts, fname, FeelType::Number,
+      |list| {
+        let product: f64 = list.iter().map(|fv| {
+          let x: f64 = fv.try_into().unwrap();
+          x
+        }).product();
+        if product.is_finite() {
+          FeelValue::Number(product)
+        }
+        else {
+          ExecutionLog::log(&format!("{:?} of list of {} numbers overflowed.", fname, list.len()));
+          FeelValue::Null
+        }
+      }
+    )
+  }
 
   // median(list or varargs)
 
 
-  // stddev(list or varargs)
+  // stddev(list or varargs) returns the sample standard deviation, or null
+  // if there are fewer than two items in the list.
+  pub fn stddev<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    // TODO: sum can overflow, which panics. 
+    //       When f128 is ready, cast to f128 before summing, then do a TryFrom/TryInto
+    //       conversion and log an error on overflow. 
+    let fname = "stddev";
+    Builtins::list_or_varargs_helper(parameters, contexts, fname, FeelType::Number,
+      |list| {
+        if list.len() < 2 {
+          ExecutionLog::log(&format!("{:?} can not be computed for a list with only {} points.", fname, list.len()));
+          return FeelValue::Null;
+        }
+        let points: Vec<f64> = list.iter().map(|val| f64::try_from(val).unwrap()).collect();
+        match sample_standard_deviation(&points) {
+          Some(sd) => FeelValue::Number(sd),
+          // TODO: Log error here
+          None => {
+            ExecutionLog::log(&format!("{:?} could not be computed, possibly due to overflow.", fname));
+            FeelValue::Null
+          }
+        }
+      }
+    )
+  }
 
+  /// Checks if there are any arguments in this parameter list. 
+  /// Returns false if this is an empty FeelValue::List or a List with a single element,
+  /// which itself is an empty List. This covers the two cases: variable argument list
+  /// and arguments given in a child list. 
+  fn any_arguments(ref_parameters: &FeelValue) -> bool {
+    match ref_parameters.list_length() {
+      Some(0_usize) => false,
+      Some(1_usize) => {
+        match ref_parameters {
+          FeelValue::List(list) => match list.borrow()[0].list_length() {
+            Some(0) => false,
+            _ => true
+          },
+          _ => true
+        }
+      },
+      _ => true
+    }
+  }
 
-  // mode(list or varargs)
+  // mode(list or varargs) returns the most common item or items in a list, or an empty list if there are no items
+  // in the supplied list.
+  pub fn mode<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    let fname = "mode";
+    if !Builtins::any_arguments(&parameters) {
+      return FeelValue::new_list(Vec::new());
+    }
+    Builtins::list_or_varargs_helper(parameters, contexts, fname, FeelType::Number,
+      |list| {
+        FeelValue::new_list(mode_with_ties(list))
+      }
+    )
+  }
   
   //// ////////////////////////////////////////////////
   ////                                             ////

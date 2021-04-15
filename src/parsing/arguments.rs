@@ -131,13 +131,14 @@ impl Validity {
   /// Check that the argument at the given zero-based position 
   /// has the expected type unless it is null and we permit a null 
   /// (for optional parameters).
+  /// If expected_type is FeelType::Any, it passes the test.
   pub fn expect_type(self, zero_based_argument: usize, expected_type: FeelType, allow_null: bool) -> Self {
     if !self.is_valid() {
       return self;
     }
     let actual_type = self.arguments()[zero_based_argument].get_type();
     let is_null = self.arguments()[zero_based_argument].is_null();
-    if actual_type != expected_type && !(is_null && allow_null)  {
+    if actual_type != expected_type && expected_type != FeelType::Any && !(is_null && allow_null)  {
       ExecutionLog::log(&format!(
         "Called {:?} with {:?} for argument {:?}, expected {:?}", 
         self.name(), actual_type, zero_based_argument + 1, expected_type

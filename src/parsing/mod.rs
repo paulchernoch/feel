@@ -15,6 +15,7 @@ pub mod parameter_binding;
 pub mod exclusive_range;
 pub mod exclusive_inclusive_range;
 pub mod substring;
+pub mod statistics;
 
 pub fn hello() {
   println!("Hello!");

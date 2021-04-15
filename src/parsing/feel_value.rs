@@ -1,12 +1,11 @@
 use std::fmt;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::convert::From;
+use std::convert::{From,TryFrom};
 use std::string::ToString;
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime };
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
-
 use super::qname::{QName, Stringlike};
 use super::context::{Context, ContextReader};
 use super::duration::Duration;
@@ -198,6 +197,14 @@ impl FeelValue {
     match self {
       FeelValue::Number(n) => n.is_finite(),
       _ => false
+    }
+  }
+
+  /// Gets the number of items in the FeelValue::List, or None if it is not a List. 
+  pub fn list_length(&self) -> Option<usize> {
+    match self {
+      FeelValue::List(list) => Some(list.borrow().len()),
+      _ => None
     }
   }
 
@@ -416,6 +423,16 @@ impl Hash for FeelValue {
   }
 }
 
+impl TryFrom<&FeelValue> for f64 {
+  type Error = ();
+
+  fn try_from(value: &FeelValue) -> Result<Self, Self::Error> {
+      match value {
+        FeelValue::Number(n) => Ok(*n),
+        _ => Err(())
+      }
+  }
+}
 
 /////////////// TESTS /////////////////
 
