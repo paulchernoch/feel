@@ -356,8 +356,14 @@ impl Validity {
     if !self.is_valid() {
       return self;
     }
+    if self.arguments().count() == 0 {
+      return self;
+    }
     match &self.arguments()[0] {
       FeelValue::List(list) => {
+        if list.borrow().len() == 0 {
+          return self;
+        }
         let first_type = list.borrow()[0_usize].get_type();
         let mismatch =  list.borrow().iter().any(|item| item.get_type() != first_type);
         if mismatch {

@@ -476,7 +476,7 @@ impl Builtins {
       |list| {
         match list.iter().min() {
           Some(min) => min.clone(),
-          None => unreachable!() // Validation will have ensured that the list is not empty.
+          None => FeelValue::Null 
         }
       }
     )
@@ -489,7 +489,7 @@ impl Builtins {
       |list| {
         match list.iter().max() {
           Some(max) => max.clone(),
-          None => unreachable!() // Validation will have ensured that the list is not empty.
+          None => FeelValue::Null
         }
       }
     )
@@ -1732,7 +1732,20 @@ mod tests {
     count(vec![1.into(), FeelValue::new_list(vec![2.into(),3.into()])], 2);
   }
 
-  // Test of min(list or varargs)
+  /// Test of min(list or varargs)
+  #[test]
+  fn test_min() {
+    fn min(args: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let actual = Builtins::min(args, &ctx);
+      assert!(actual == f_expected, "min(list) = {:?} expected, found {:?}", f_expected, actual);
+    }
+    min(FeelValue::new_list_of_list(vec![1.into(),2.into(),3.into()]), 1.into()); // min([1,2,3]) = 1
+    min(FeelValue::new_from_iterator(vec![1,2,3]), 1.into()); // min(1,2,3) = 1
+    min(FeelValue::new_list_of_list(vec![1.into()]), 1.into()); // min([1]) = 1
+    min(FeelValue::new_from_iterator(vec![1]), 1.into()); // min(1) = 1
+    min(FeelValue::new_list_of_list(vec![]), FeelValue::Null); // min([]) = null
+  }
 
   // Test of max(list or varargs)
 
