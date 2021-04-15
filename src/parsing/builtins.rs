@@ -1776,7 +1776,41 @@ mod tests {
     ); 
   }
 
-  // Test of any(list or varargs)
+  /// Test of any(list or varargs)
+  #[test]
+  fn test_any() {
+    fn any(args: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let actual = Builtins::any(args, &ctx);
+      // ExecutionLog::print("all Error: ");
+      assert!(actual == f_expected, "any(list) = {:?} expected, found {:?}", f_expected, actual);
+    }
+    // any([false,null,true]) = true
+    any(
+      FeelValue::new_list_of_list(vec![false.into(), FeelValue::Null, true.into()]), 
+      true.into()
+    );
+    // any(false) = false
+    any(
+      FeelValue::new_list(vec![false.into()]), 
+      false.into()
+    );
+    // any([false]) = false
+    any(
+      FeelValue::new_list_of_list(vec![false.into()]), 
+      false.into()
+    );
+    // any([]) = false
+    any(
+      FeelValue::new_list_of_list(Vec::new()), 
+      false.into()
+    );
+    // any(0) = null
+    any(
+      FeelValue::new_list_of_list(vec![0.0.into()]), 
+      FeelValue::Null
+    ); 
+  }
 
   // Test of sublist(list, start position, length?)
 
