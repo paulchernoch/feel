@@ -1713,6 +1713,8 @@ mod tests {
     split("a;b;c;;", ";", FeelValue::new_list(vec!["a".into(), "b".into(), "c".into(), "".into(), "".into()]));
   }
 
+  //// //////////////////////////////////////////////
+
   //// List function tests
   
   // Test of list contains(list, element)
@@ -1791,6 +1793,7 @@ mod tests {
     mean(FeelValue::new_from_iterator(vec![1]), 1.into());
     mean(FeelValue::new_list_of_list(vec![]), FeelValue::Null); 
   }
+
   /// Test of all(list or varargs)
   #[test]
   fn test_all() {
@@ -1927,6 +1930,18 @@ mod tests {
   }
 
   // Test of product(list or varargs)
+  #[test]
+  fn test_product() {
+    fn product(args: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let args_string = format!("{:?}", args);
+      let actual = Builtins::product(args, &ctx);
+      assert!(actual == f_expected, "product({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
+    }
+    product(FeelValue::new_list_of_list(vec![2.into(),3.into(),4.into()]), 24.into()); 
+    product(FeelValue::new_from_iterator(vec![2,3,4]), 24.into());
+    product(FeelValue::new_from_iterator(vec![1]), 1.into());
+  }
 
   // Test of median(list or varargs)
 
@@ -1934,6 +1949,7 @@ mod tests {
 
   // Test of mode(list or varargs)
   
+  //// /////////////////////////////////////////////////
 
   //// Numeric function tests
   
