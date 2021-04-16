@@ -207,8 +207,8 @@ Twenty-two list functions. Some of the functions can take either a list or a var
   - [ ] **sublist(list, start position, length?)**
   - [x] **append(list, item...)**: Append one or more items to the list, returning a new list.
   - [ ] **concatenate(list...)**: Concatenate one or more lists to form a new list.
-  - [ ] **insert before(list, position, newItem)**
-  - [ ] **remove(list, position)**
+  - [x] **insert before(list, position, newItem)**
+  - [x] **remove(list, position)**
   - [x] **reverse(list)**
   - [ ] **index of(list, match)**
   - [ ] **union(list...)**: concatenate with duplicate removal.

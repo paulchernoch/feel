@@ -664,7 +664,34 @@ impl Builtins {
   }
 
   // remove(list, position)
-
+  pub fn remove<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "remove";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..3)
+      .expect_type(0_usize, FeelType::List, false)
+      .expect_type(1_usize, FeelType::Number, false)
+      .position_in_range(0, 1)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        match (a,b) {
+          (FeelValue::List(rr_list), FeelValue::Number(pos)) => {
+            let mut list = rr_list.borrow().clone();
+            let mut position_one_based = *pos as isize;
+            if position_one_based < 0 {
+              position_one_based += 1_isize + list.len() as isize;
+            }
+            let position_zero_based = (position_one_based - 1) as usize;
+            list.remove(position_zero_based);
+            FeelValue::new_list(list)
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
   /// reverse(list) creates a new list with the elements in reverse order
   pub fn reverse<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
@@ -2003,11 +2030,34 @@ mod tests {
       FeelValue::new_from_iterator(vec![1,2,9,3,4])
     ); 
 
-    // insert before([1,3], 3, 2) = [2,1,3] (position too high)
+    // insert before([1,3], 3, 2) = null (position too high)
     insert_before(FeelValue::new_from_iterator(vec![1,3]), 3, 2.into(), FeelValue::Null);  
   }
 
   // Test of remove(list, position)
+  #[test]
+  fn test_remove() {
+    fn remove(list: FeelValue, position: i32, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let args = FeelValue::new_list(vec![list, position.into()]);
+      let args_string = format!("{:?}", args);
+      let actual = Builtins::remove(args, &ctx);
+      assert!(actual == f_expected, "remove({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
+    }
+    // remove([1,2,3], 2) = [1,3]
+    remove(FeelValue::new_from_iterator(vec![1,2,3]), 2, FeelValue::new_from_iterator(vec![1,3]));  
+
+    // remove([1,2,3,4], -1) = [1,2,3] (negative position)
+    remove(
+      FeelValue::new_from_iterator(vec![1,2,3,4]), 
+      -1,
+      FeelValue::new_from_iterator(vec![1,2,3])
+    ); 
+
+    // remove([1,2,3], 4) = null (position too high)
+    remove(FeelValue::new_from_iterator(vec![1,2,3]), 4, FeelValue::Null);  
+  }
+
 
   /// Test of reverse(list)
   #[test]
