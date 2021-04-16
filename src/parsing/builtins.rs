@@ -603,8 +603,30 @@ impl Builtins {
   // sublist(list, start position, length?)
 
 
-  // append(list, item...): Append one or more items to the list, returning a new list.
-
+  /// append(list, item...): Append one or more items to the list, returning a new list.
+  pub fn append<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "append";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..10000)
+      .expect_type(0_usize, FeelType::List, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::List(rr_list) => {
+            // Chain together the values from the first argument (a list)
+            // with all the other arguments, to form a longer list.
+            let contents: Vec<FeelValue> = 
+              rr_list.borrow().iter().cloned()
+              .chain(arguments.args.iter().skip(1).cloned()).collect();
+            FeelValue::new_list(contents)
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
   // concatenate(list...): Concatenate one or more lists to form a new list.
 
@@ -1900,7 +1922,33 @@ mod tests {
 
   // Test of sublist(list, start position, length?)
 
-  // Test of append(list, item...)
+  /// Test of append(list, item...)
+  #[test]
+  fn test_append() {
+    fn append(list: FeelValue, items: &mut Vec<FeelValue>, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let mut arg_vec: Vec<FeelValue> = Vec::new();
+      arg_vec.push(list);
+      arg_vec.append(items);
+      let args = FeelValue::new_list(arg_vec);
+      let args_string = format!("{:?}", args);
+      let actual = Builtins::append(args, &ctx);
+      assert!(actual == f_expected, "append({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
+    }
+    // append([1,2], 3) = [1,2,3]
+    append(
+      FeelValue::new_from_iterator(vec![1,2]), 
+      &mut vec![3.into()],
+      FeelValue::new_list(vec![1.into(), 2.into(), 3.into()])
+    );  
+    // append([1,2,3], 3, null, true) = [1,2,3,3,null,true] 
+    append(
+      FeelValue::new_from_iterator(vec![1,2,3]), 
+      &mut vec![3.into(),FeelValue::Null,true.into()],
+      FeelValue::new_list(vec![1.into(), 2.into(), 3.into(), 3.into(), FeelValue::Null, true.into()])
+    );
+  }
+
 
   // Test of concatenate(list...)
 
