@@ -600,7 +600,71 @@ impl Builtins {
     )
   }
 
-  // sublist(list, start position, length?)
+  fn expect_length_in_range(fname: &str, items_to_take: isize, list_length: isize, start_position_one_based: isize) -> bool {
+    if items_to_take < 1 {
+      ExecutionLog::log(&format!("{:?} cannot act upon a negative number of items from a list.", fname));
+      false
+    }
+    else if items_to_take > list_length - start_position_one_based + 1 {
+      ExecutionLog::log(&format!("{:?} cannot act upon more items than list contains.", fname));
+      false
+    }
+    else {
+      true
+    }
+  }
+
+  /// sublist(list, start position, length?) copies out a portion of the list, 
+  /// starting from the given one-based position, which if negative is relative to the end of the list.
+  /// If length is omitted, copy all items to the end of the list, otherwise the
+  /// given number of items. 
+  pub fn sublist<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "sublist";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..4)
+      .expect_type(0_usize, FeelType::List, false)
+      .position_in_range(0_usize, 1_usize)
+      .expect_integer(2_usize, true)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        let c = &arguments[2];
+        match (a,b,c) {
+          (FeelValue::List(rr_list), FeelValue::Number(pos), FeelValue::Null) => {
+            // third argument omitted; copy from position to the end of the list
+            let mut position_one_based = *pos as isize;
+            if position_one_based < 0 {
+              position_one_based += 1_isize + rr_list.borrow().len() as isize;
+            }
+            let position_zero_based = (position_one_based - 1) as usize;
+            let contents: Vec<FeelValue> = rr_list.borrow().iter().skip(position_zero_based).cloned().collect();
+            FeelValue::new_list(contents)
+          },
+          (FeelValue::List(rr_list), FeelValue::Number(pos), FeelValue::Number(len)) => {
+            // third argument omitted; copy from position to the end of the list
+            let mut position_one_based = *pos as isize;
+            let full_length = rr_list.borrow().len() as isize;
+            let length = *len as isize;
+            if position_one_based < 0 {
+              position_one_based += 1_isize + full_length;
+            }  
+            if ! Builtins::expect_length_in_range(fname, length, full_length, position_one_based) {
+              FeelValue::Null
+            }
+            else {
+              let position_zero_based = (position_one_based - 1) as usize;
+              let contents: Vec<FeelValue> = rr_list.borrow()
+                .iter().skip(position_zero_based).take(length as usize).cloned().collect();
+              FeelValue::new_list(contents)
+            }
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
 
   /// append(list, item...): Append one or more items to the list, returning a new list.
@@ -663,7 +727,8 @@ impl Builtins {
     }
   }
 
-  // remove(list, position)
+  // remove(list, position) removes one item from the list at the given one-based position,
+  // or if the position is negative, relative to the end of the list, with -1 being the last item. 
   pub fn remove<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "remove";
     match Builtins::make_validator(fname, parameters)
@@ -1977,6 +2042,25 @@ mod tests {
   }
 
   // Test of sublist(list, start position, length?)
+  #[test]
+  fn test_sublist() {
+    fn sublist(list: FeelValue, position: i32, length: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let args = FeelValue::new_list(vec![list, position.into(), length]);
+      let args_string = format!("{:?}", args);
+      let actual = Builtins::sublist(args, &ctx);
+      assert!(actual == f_expected, "sublist({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
+    }
+    // sublist([4,5,6], 1, 2) = [4,5]
+    sublist(FeelValue::new_from_iterator(vec![4,5,6]), 1, 2.into(), FeelValue::new_from_iterator(vec![4,5]));  
+
+    // sublist([4,5,6], 2) = [5,6]
+    sublist(FeelValue::new_from_iterator(vec![4,5,6]), 2, FeelValue::Null, FeelValue::new_from_iterator(vec![5,6])); 
+
+    // sublist([1,2,3,4,5], -3, 2) = [3,4]
+    sublist(FeelValue::new_from_iterator(vec![1,2,3,4,5]), -3, 2.into(), FeelValue::new_from_iterator(vec![3,4]));  
+  }
+
 
   /// Test of append(list, item...)
   #[test]
@@ -2034,7 +2118,7 @@ mod tests {
     insert_before(FeelValue::new_from_iterator(vec![1,3]), 3, 2.into(), FeelValue::Null);  
   }
 
-  // Test of remove(list, position)
+  /// Test of remove(list, position)
   #[test]
   fn test_remove() {
     fn remove(list: FeelValue, position: i32, f_expected: FeelValue) {
