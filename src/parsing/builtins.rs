@@ -460,8 +460,27 @@ impl Builtins {
     }
   }
 
-  // list contains(list, element): Does the list contain the element? Can even find nulls.
-
+  /// list contains(list, element): Does the list contain the element? Can even find nulls.
+  pub fn list_contains<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "list contains";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..3)
+      .expect_type(0_usize, FeelType::List, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        match (a, b) {
+          (FeelValue::List(rr_list), search_item) => {
+            let vec = rr_list.borrow();
+            FeelValue::Boolean(vec.iter().any(|item| item == search_item))
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
   /// count(list)**: return size of list, or zero if list is empty
   pub fn count<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
@@ -1717,7 +1736,20 @@ mod tests {
 
   //// List function tests
   
-  // Test of list contains(list, element)
+  /// Test of list contains(list, element)
+  #[test]
+  fn test_list_contains() {
+    fn list_contains(list: FeelValue, search_item: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let args = FeelValue::new_list(vec![list, search_item]);
+      let args_string = format!("{:?}", args);
+      let actual = Builtins::list_contains(args, &ctx);
+      assert!(actual == f_expected, "list contains({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
+    }
+    list_contains(FeelValue::new_from_iterator(vec![1,2,3]), 3.into(), FeelValue::Boolean(true));
+    list_contains(FeelValue::new_list(vec![1.into(),FeelValue::Null,3.into()]), FeelValue::Null, FeelValue::Boolean(true));
+    list_contains(FeelValue::new_from_iterator(vec![1,2,3]), 4.into(), FeelValue::Boolean(false));
+  }
 
   /// Test of count(list)
   #[test]
