@@ -198,12 +198,12 @@ Twenty-two list functions. Some of the functions can take either a list or a var
 
   - [ ] **list contains(list, element)**: Does the list contain the element? Can even find nulls.
   - [x] **count(list)**: return size of list, or zero if list is empty
-  - [ ] **min(list or varargs)**
-  - [ ] **max(list or varargs)**
-  - [ ] **sum(list or varargs)**
-  - [ ] **mean(list or varargs)**
-  - [ ] **all(list or varargs)**
-  - [ ] **any(list or varargs)**
+  - [x] **min(list or varargs)**
+  - [x] **max(list or varargs)**
+  - [x] **sum(list or varargs)**
+  - [x] **mean(list or varargs)**
+  - [x] **all(list or varargs)**
+  - [x] **any(list or varargs)**
   - [ ] **sublist(list, start position, length?)**
   - [ ] **append(list, item...)**: Append one or more items to the list, returning a new list.
   - [ ] **concatenate(list...)**: Concatenate one or more lists to form a new list.
@@ -214,10 +214,10 @@ Twenty-two list functions. Some of the functions can take either a list or a var
   - [ ] **union(list...)**: concatenate with duplicate removal.
   - [x] **distinct values(list)**: Duplicate removal.
   - [x] **flatten(list)**: Flatten nested lists.
-  - [ ] **product(list or varargs)**: Returns the product of the numbers.
+  - [x] **product(list or varargs)**: Returns the product of the numbers.
   - [ ] **median(list or varargs)**
-  - [ ] **stddev(list or varargs)**
-  - [ ] **mode(list or varargs)**
+  - [x] **stddev(list or varargs)**
+  - [x] **mode(list or varargs)**
 
 **Ranges**:
 

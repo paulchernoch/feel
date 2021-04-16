@@ -1959,7 +1959,28 @@ mod tests {
     stddev(FeelValue::new_from_iterator(vec![47]), FeelValue::Null);
   }
 
-  // Test of mode(list or varargs)
+  /// Test of mode(list or varargs)
+  #[test]
+  fn test_mode() {
+    fn mode(args: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let args_string = format!("{:?}", args);
+      let actual = Builtins::mode(args, &ctx);
+      assert!(actual == f_expected, "mode({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
+    }
+    mode(
+      FeelValue::new_from_iterator(vec![6,3,9,6,6]), 
+      FeelValue::new_from_iterator(vec![6])
+    );
+    mode(
+      FeelValue::new_from_iterator(vec![6,1,9,6,1]), 
+      FeelValue::new_from_iterator(vec![1,6])
+    );
+    mode(
+      FeelValue::new_list(vec![]), 
+      FeelValue::new_list(vec![])
+    );
+  }
   
   //// /////////////////////////////////////////////////
 
