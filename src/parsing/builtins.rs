@@ -1769,7 +1769,6 @@ mod tests {
       let ctx = Context::new();
       let args_string = format!("{:?}", args);
       let actual = Builtins::sum(args, &ctx);
-      ExecutionLog::print("sum Error: ");
       assert!(actual == f_expected, "sum({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
     }
     sum(FeelValue::new_list_of_list(vec![1.into(),2.into(),3.into()]), 6.into()); 
@@ -1778,8 +1777,20 @@ mod tests {
     sum(FeelValue::new_list_of_list(vec![]), FeelValue::Null); 
   }
 
-  // Test of mean(list or varargs)
-
+  /// Test of mean(list or varargs)
+  #[test]
+  fn test_mean() {
+    fn mean(args: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let args_string = format!("{:?}", args);
+      let actual = Builtins::mean(args, &ctx);
+      assert!(actual == f_expected, "mean({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
+    }
+    mean(FeelValue::new_list_of_list(vec![1.into(),2.into(),3.into()]), 2.into()); 
+    mean(FeelValue::new_from_iterator(vec![1,2,3]), 2.into());
+    mean(FeelValue::new_from_iterator(vec![1]), 1.into());
+    mean(FeelValue::new_list_of_list(vec![]), FeelValue::Null); 
+  }
   /// Test of all(list or varargs)
   #[test]
   fn test_all() {
