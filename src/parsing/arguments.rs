@@ -342,6 +342,50 @@ impl Validity {
     }
   }
 
+  /// Assume that the argument at the first zero-based position is a List
+  /// (from an expect_type constraint)
+  /// and verify that the argument at the second zero-based position is a
+  /// non-zero integer between 1 and Length (inclusive) or betweeen
+  /// -1 and -Length where Length is the number of elements in the List.
+  pub fn position_in_range(
+    self, 
+    zero_based_list_argument: usize, 
+    zero_based_position_argument: usize) -> Self {
+    if !self.is_valid() {
+      return self;
+    }
+    let list_length = self.arguments()[zero_based_list_argument].list_length();
+    let position = &self.arguments()[zero_based_position_argument];
+
+    if !position.is_integer() {
+      ExecutionLog::log(&format!(
+        "Called {:?} with a noninteger for argument {:?}", 
+        self.name(), zero_based_position_argument + 1
+      ));
+      self.and(false)
+    }
+    else {
+      match (list_length, position) {
+        (Some(len), FeelValue::Number(n)) => {
+          let length = len as isize;
+          let pos = *n as isize;
+          if length < pos || -length > pos || pos == 0_isize {
+            ExecutionLog::log(&format!(
+              "Called {:?} where argument {:?} is not a valid list position in the range [{}..{}] or [{}..{}]", 
+              self.name(), zero_based_position_argument + 1,
+              -length, -1, 1, length
+            ));
+            self.and(false)
+          }
+          else {
+            self
+          }
+        },
+        _ => unreachable!() // Should have already verified the argument types
+      }
+    }
+  }
+
   /// Check that the argument at the given zero-based position 
   /// has date information (i.e. is Date or DateAndTime).
   pub fn expect_date(self, zero_based_argument: usize) -> Self {

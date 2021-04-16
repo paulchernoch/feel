@@ -631,8 +631,37 @@ impl Builtins {
   // concatenate(list...): Concatenate one or more lists to form a new list.
 
 
-  // insert before(list, position, newItem)
-
+  /// insert before(list, position, newItem) inserts a single item before the item at the given
+  /// one-based position, but if the position is negative, it counts from the end of the list. 
+  pub fn insert_before<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "insert before";
+    match Builtins::make_validator(fname, parameters)
+      .arity(3..4)
+      .expect_type(0_usize, FeelType::List, false)
+      .expect_type(1_usize, FeelType::Number, false)
+      .position_in_range(0, 1)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        let c = &arguments[2];
+        match (a,b,c) {
+          (FeelValue::List(rr_list), FeelValue::Number(pos), item) => {
+            let mut list = rr_list.borrow().clone();
+            let mut position_one_based = *pos as isize;
+            if position_one_based < 0 {
+              position_one_based += list.len() as isize;
+            }
+            let position_zero_based = (position_one_based - 1) as usize;
+            list.insert(position_zero_based, item.clone());
+            FeelValue::new_list(list)
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
   // remove(list, position)
 
@@ -1952,7 +1981,31 @@ mod tests {
 
   // Test of concatenate(list...)
 
+
   // Test of insert before(list, position, newItem)
+  #[test]
+  fn test_insert_before() {
+    fn insert_before(list: FeelValue, position: i32, item: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let args = FeelValue::new_list(vec![list, position.into(), item]);
+      let args_string = format!("{:?}", args);
+      let actual = Builtins::insert_before(args, &ctx);
+      assert!(actual == f_expected, "insert before({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
+    }
+    // insert before([1,3], 1, 2) = [2,1,3]
+    insert_before(FeelValue::new_from_iterator(vec![1,3]), 1, 2.into(), FeelValue::new_from_iterator(vec![2,1,3]));  
+
+    // insert before([1,2,3,4], -2, 9) = [1,2,9,3,4] (negative position)
+    insert_before(
+      FeelValue::new_from_iterator(vec![1,2,3,4]), 
+      -1,
+      9.into(),
+      FeelValue::new_from_iterator(vec![1,2,9,3,4])
+    ); 
+
+    // insert before([1,3], 3, 2) = [2,1,3] (position too high)
+    insert_before(FeelValue::new_from_iterator(vec![1,3]), 3, 2.into(), FeelValue::Null);  
+  }
 
   // Test of remove(list, position)
 
