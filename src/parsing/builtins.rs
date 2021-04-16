@@ -1929,7 +1929,7 @@ mod tests {
     flatten(unflattened, flattened);
   }
 
-  // Test of product(list or varargs)
+  /// Test of product(list or varargs)
   #[test]
   fn test_product() {
     fn product(args: FeelValue, f_expected: FeelValue) {
@@ -1945,7 +1945,19 @@ mod tests {
 
   // Test of median(list or varargs)
 
-  // Test of stddev(list or varargs)
+  /// Test of stddev(list or varargs)
+  #[test]
+  fn test_stddev() {
+    fn stddev(args: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let args_string = format!("{:?}", args);
+      let actual = Builtins::stddev(args, &ctx);
+      assert!(actual == f_expected, "stddev({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
+    }
+    stddev(FeelValue::new_from_iterator(vec![2,4,7,5]), 2.081665999466133.into());
+    stddev(FeelValue::new_list_of_list(vec![47.into()]), FeelValue::Null); 
+    stddev(FeelValue::new_from_iterator(vec![47]), FeelValue::Null);
+  }
 
   // Test of mode(list or varargs)
   
