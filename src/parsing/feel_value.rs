@@ -220,6 +220,21 @@ impl FeelValue {
     }
   }
 
+  /// Is this a FeelValue::List with a single item that is itself a List?
+  pub fn is_list_of_list(&self) -> bool {
+    match self {
+      FeelValue::List(rr_list) => {
+        if rr_list.borrow().len() != 1 {
+          false
+        }
+        else {
+          rr_list.borrow()[0].get_type() == FeelType::List
+        }
+      },
+      _ => false
+    }
+  }
+
   /// True if the type has date information, i.e. is Date or DateAndTime.
   pub fn has_date(&self) -> bool {
     match self {

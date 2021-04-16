@@ -120,6 +120,16 @@ impl Validity {
     }
   }
 
+  pub fn has_list_as_sole_argument(&self) -> bool {
+    let args = self.arguments();
+    if args.as_ref().args.len() != 1 {
+      false
+    }
+    else {
+      args.as_ref().args[0].get_type() == FeelType::List
+    }
+  }
+
   pub fn and(self, passes: bool) -> Self {
     match (passes, &self.is_valid()) {
       (true, _) => self,
@@ -151,17 +161,49 @@ impl Validity {
     if !self.is_valid() {
       return self;
     }
-    let actual_type = self.arguments()[zero_based_argument].get_type();
-    let is_null = self.arguments()[zero_based_argument].is_null();
-    if actual_type != expected_type && expected_type != FeelType::Any && !(is_null && allow_null)  {
-      ExecutionLog::log(&format!(
-        "Called {:?} with {:?} for argument {:?}, expected {:?}", 
-        self.name(), actual_type, zero_based_argument + 1, expected_type
-      ));
-      self.and(false)
+    if zero_based_argument == 0 && self.has_list_as_sole_argument() && expected_type != FeelType::List {
+      // If a list with a single list argument, assume the type constraint is 
+      // to be applied to the first element of the inner list. 
+      let list = &self.arguments()[0];
+      match list.list_length() {
+        Some(len) if len >= 1 => {
+          match list {
+            FeelValue::List(rr_list) => {
+              let actual_type = rr_list.borrow()[0].get_type();
+              let is_null = actual_type == FeelType::Null;
+              if actual_type != expected_type && expected_type != FeelType::Any && !(is_null && allow_null)  {
+                ExecutionLog::log(&format!(
+                  "Called {:?} with {:?} for first argument, expected {:?}", 
+                  self.name(), actual_type, expected_type
+                ));
+                self.and(false)
+              }
+              else {
+                self
+              }
+            },
+            _ => unreachable!()
+          }
+        },
+        _ => {
+          ExecutionLog::log(&format!("Called {:?} with empty list, expected {:?}", self.name(), expected_type));
+          self.and(false)
+        }
+      }
     }
     else {
-      self
+      let actual_type = self.arguments()[zero_based_argument].get_type();
+      let is_null = self.arguments()[zero_based_argument].is_null();
+      if actual_type != expected_type && expected_type != FeelType::Any && !(is_null && allow_null)  {
+        ExecutionLog::log(&format!(
+          "Called {:?} with {:?} for argument {:?}, expected {:?}", 
+          self.name(), actual_type, zero_based_argument + 1, expected_type
+        ));
+        self.and(false)
+      }
+      else {
+        self
+      }
     }
   }
 

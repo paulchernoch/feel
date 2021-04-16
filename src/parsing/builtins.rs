@@ -1747,7 +1747,7 @@ mod tests {
     min(FeelValue::new_list_of_list(vec![]), FeelValue::Null); // min([]) = null
   }
 
-  // Test of max(list or varargs)
+  /// Test of max(list or varargs)
   #[test]
   fn test_max() {
     fn max(args: FeelValue, f_expected: FeelValue) {
@@ -1762,7 +1762,21 @@ mod tests {
     max(FeelValue::new_list_of_list(vec![]), FeelValue::Null); // max([]) = null
   }
 
-  // Test of sum(list or varargs)
+  /// Test of sum(list or varargs)
+  #[test]
+  fn test_sum() {
+    fn sum(args: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let args_string = format!("{:?}", args);
+      let actual = Builtins::sum(args, &ctx);
+      ExecutionLog::print("sum Error: ");
+      assert!(actual == f_expected, "sum({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
+    }
+    sum(FeelValue::new_list_of_list(vec![1.into(),2.into(),3.into()]), 6.into()); 
+    sum(FeelValue::new_from_iterator(vec![1,2,3]), 6.into());
+    sum(FeelValue::new_from_iterator(vec![1]), 1.into());
+    sum(FeelValue::new_list_of_list(vec![]), FeelValue::Null); 
+  }
 
   // Test of mean(list or varargs)
 
