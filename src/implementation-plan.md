@@ -206,7 +206,7 @@ Twenty-two list functions. Some of the functions can take either a list or a var
   - [x] **any(list or varargs)**
   - [x] **sublist(list, start position, length?)**
   - [x] **append(list, item...)**: Append one or more items to the list, returning a new list.
-  - [ ] **concatenate(list...)**: Concatenate one or more lists to form a new list.
+  - [x] **concatenate(list...)**: Concatenate one or more lists to form a new list.
   - [x] **insert before(list, position, newItem)**
   - [x] **remove(list, position)**
   - [x] **reverse(list)**

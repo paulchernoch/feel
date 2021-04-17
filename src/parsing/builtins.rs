@@ -692,8 +692,25 @@ impl Builtins {
     }
   }
 
-  // concatenate(list...): Concatenate one or more lists to form a new list.
-
+  /// concatenate(list...): Concatenate one or more lists to form a new list.
+  pub fn concatenate<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "concatenate";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..10000)
+      .expect_type(0_usize, FeelType::List, false)
+      .same_types()
+      .validated() {
+      Ok(arguments) => {
+        let mut contents: Vec<FeelValue> = Vec::new();
+        for arg in arguments.args.iter() {
+          let mut more = arg.item_or_contents();
+          contents.append(&mut more);
+        }
+        FeelValue::new_list(contents)
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
   /// insert before(list, position, newItem) inserts a single item before the item at the given
   /// one-based position, but if the position is negative, it counts from the end of the list. 
@@ -2090,10 +2107,28 @@ mod tests {
   }
 
 
-  // Test of concatenate(list...)
+  /// Test of concatenate(list...)
+  #[test]
+  fn test_concatenate() {
+    fn concatenate(list: FeelValue, items: &mut Vec<FeelValue>, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let mut arg_vec: Vec<FeelValue> = Vec::new();
+      arg_vec.push(list);
+      arg_vec.append(items);
+      let args = FeelValue::new_list(arg_vec);
+      let args_string = format!("{:?}", args);
+      let actual = Builtins::concatenate(args, &ctx);
+      assert!(actual == f_expected, "concatenate({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
+    }
+    // concatenate([1,2],[3]) = [1,2,3]
+    concatenate(
+      FeelValue::new_from_iterator(vec![1,2]), 
+      &mut vec![FeelValue::new_from_iterator(vec![3])],
+      FeelValue::new_from_iterator(vec![1,2,3])
+    );  
+  }
 
-
-  // Test of insert before(list, position, newItem)
+  /// Test of insert before(list, position, newItem)
   #[test]
   fn test_insert_before() {
     fn insert_before(list: FeelValue, position: i32, item: FeelValue, f_expected: FeelValue) {

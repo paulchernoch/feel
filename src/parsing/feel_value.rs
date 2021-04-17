@@ -275,6 +275,14 @@ impl FeelValue {
     }
   }
 
+  pub fn item_or_contents(&self) -> Vec<FeelValue> 
+  {
+    match self {
+      FeelValue::List(rr_list) => rr_list.borrow().iter().cloned().collect(),
+      _ => vec![self.clone()]
+    }
+  }
+
 }
 
 fn are_vecs_equal<T: PartialEq>(a: &Vec<T>, b: &Vec<T>) -> bool {
