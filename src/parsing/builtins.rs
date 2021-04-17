@@ -666,7 +666,6 @@ impl Builtins {
     }
   }
 
-
   /// append(list, item...): Append one or more items to the list, returning a new list.
   pub fn append<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "append";
@@ -782,8 +781,34 @@ impl Builtins {
     )
   }
 
-
-  // index of(list, match)
+  // index of(list, match) returns a list containing every one-based index into the list where match is found.
+  // If the match is not found, an empty list is returned. 
+  // The match may be null, allowing one to search for nulls. 
+  pub fn index_of<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "index of";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..3)
+      .expect_type(0_usize, FeelType::List, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        match (a,b) {
+          (FeelValue::List(rr_list), match_item) => {
+            let contents: Vec<FeelValue> = rr_list.borrow()
+              .iter()
+              .enumerate()
+              .filter(|(_,item)| *item == match_item)
+              .map(|(i, _)| FeelValue::Number((i + 1) as f64)) // Convert to one-based indexing for result
+              .collect();
+            FeelValue::new_list(contents)
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
 
   // union(list...): concatenate with duplicate removal.
@@ -2192,7 +2217,29 @@ mod tests {
     );
   }
 
-  // Test of index of(list, match)
+  /// Test of index of(list, match)
+  #[test]
+  fn test_index_of() {
+    fn index_of(list: FeelValue, match_item: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let args = FeelValue::new_list(vec![list, match_item]);
+      let args_string = format!("{:?}", args);
+      let actual = Builtins::index_of(args, &ctx);
+      assert!(actual == f_expected, "index of({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
+    }
+    // index of([1,2,3,2], 2) = [2,4]
+    index_of(
+      FeelValue::new_from_iterator(vec![1,2,3,2]), 
+      2.into(),
+      FeelValue::new_from_iterator(vec![2,4])
+    );      
+    // index of([1,2,3,null], null) = [4]
+    index_of(
+      FeelValue::new_list(vec![1.into(),2.into(),3.into(),FeelValue::Null]), 
+      FeelValue::Null,
+      FeelValue::new_from_iterator(vec![4])
+    );  
+  }
 
   // Test of union(list...)
 
