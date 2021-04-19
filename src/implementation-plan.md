@@ -210,8 +210,8 @@ Twenty-two list functions. Some of the functions can take either a list or a var
   - [x] **insert before(list, position, newItem)**
   - [x] **remove(list, position)**
   - [x] **reverse(list)**
-  - [ ] **index of(list, match)**
-  - [ ] **union(list...)**: concatenate with duplicate removal.
+  - [x] **index of(list, match)**
+  - [x] **union(list...)**: concatenate with duplicate removal.
   - [x] **distinct values(list)**: Duplicate removal.
   - [x] **flatten(list)**: Flatten nested lists.
   - [x] **product(list or varargs)**: Returns the product of the numbers.

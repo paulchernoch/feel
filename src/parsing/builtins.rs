@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::cell::Ref;
 use std::cmp::Ordering;
 use std::ops::Bound;
 use regex::Regex; // TODO: Should have a Regex LRU cache.
@@ -811,8 +812,39 @@ impl Builtins {
   }
 
 
-  // union(list...): concatenate with duplicate removal.
-
+  /// union(list...): concatenate one or more lists with duplicate removal.
+  pub fn union<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "union";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..10000)
+      .expect_type(0_usize, FeelType::List, false)
+      .same_types()
+      .validated() {
+      Ok(arguments) => {
+        let mut list_vecs: Vec<Ref<Vec<FeelValue>>> = Vec::new();
+        for arg in arguments.args.iter() {
+          match arg {
+            FeelValue::List(rr_list) => {
+              list_vecs.push(rr_list.borrow());
+              ()
+            },
+            _ => () // Validation already verified it is a List, so really unreachable. 
+          };
+        }
+        let mut deduped: Vec<FeelValue> = Vec::new();
+        let mut already_seen_set: HashSet<&FeelValue> = HashSet::new();
+        for rr_vec_b in list_vecs.iter() {
+          for item in rr_vec_b.iter() {
+            if already_seen_set.insert(&item) {
+              deduped.push(item.clone());
+            }
+          }          
+        }
+        FeelValue::new_list(deduped)
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
   /// distinct values(list): Duplicate removal that preserves order.
   pub fn distinct_values<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
@@ -2103,7 +2135,6 @@ mod tests {
     sublist(FeelValue::new_from_iterator(vec![1,2,3,4,5]), -3, 2.into(), FeelValue::new_from_iterator(vec![3,4]));  
   }
 
-
   /// Test of append(list, item...)
   #[test]
   fn test_append() {
@@ -2241,7 +2272,35 @@ mod tests {
     );  
   }
 
-  // Test of union(list...)
+  /// Test of union(list...)
+  #[test]
+  fn test_union() {
+    fn union(list: FeelValue, items: &mut Vec<FeelValue>, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let mut arg_vec: Vec<FeelValue> = Vec::new();
+      arg_vec.push(list);
+      arg_vec.append(items);
+      let args = FeelValue::new_list(arg_vec);
+      let args_string = format!("{:?}", args);
+      let actual = Builtins::union(args, &ctx);
+      assert!(actual == f_expected, "union({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
+    }
+    // union([1,2], [2,3]) = [1,2,3]
+    union(
+      FeelValue::new_from_iterator(vec![1,2]), 
+      &mut vec![FeelValue::new_from_iterator(vec![2,3])],
+      FeelValue::new_from_iterator(vec![1,2,3])
+    );  
+    // union([10,9,8,7], [5,6,7], [1,2,3,4,5]) = [10,9,8,7,5,6,1,2,3,4]
+    union(
+      FeelValue::new_from_iterator(vec![10,9,8,7]), 
+      &mut vec![
+        FeelValue::new_from_iterator(vec![5,6,7]),
+        FeelValue::new_from_iterator(vec![1,2,3,4,5])
+      ],
+      FeelValue::new_from_iterator(vec![10,9,8,7,5,6,1,2,3,4])
+    );  
+  }
 
   /// Test of distinct values(list)
   #[test]
