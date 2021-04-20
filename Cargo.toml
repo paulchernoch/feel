@@ -3,7 +3,7 @@ name = "feel"
 version = "0.1.0"
 authors = ["Paul Chernoch <paul.chernoch@yahoo.com>"]
 edition = "2018"
-description = "Domain Model and Notation Feel Language interpreter"
+description = "Domain Model and Notation v1.3 Feel Language interpreter"
 keywords = ["Domain Model and Notation", "DMN", "Feel", "Friendly Enough Expression Language"]
 
 [lib]
@@ -19,4 +19,5 @@ strum = "0.20.0"
 strum_macros = "0.20.0"
 libmath = "0.2"
 regex = "1.4"
+lazy_static = "1.4"
 
