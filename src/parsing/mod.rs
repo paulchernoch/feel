@@ -17,7 +17,7 @@ pub mod exclusive_inclusive_range;
 pub mod substring;
 pub mod statistics;
 pub mod golden_ratio;
-pub mod horserace;
+
 
 pub fn hello() {
   println!("Hello!");

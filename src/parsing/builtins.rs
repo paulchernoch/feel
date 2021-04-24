@@ -12,7 +12,8 @@ use super::feel_value::{FeelValue, FeelType};
 use super::execution_log::ExecutionLog;
 use super::arguments::{Arguments,Validity};
 use super::substring::Substring;
-use super::statistics::{sample_standard_deviation, mode_with_ties};
+use super::statistics::{sample_standard_deviation, mode_with_ties, MedianIndex};
+use super::statistics::median as stats_median;
 
 pub enum RangeCase {
   PointRange,
@@ -894,7 +895,37 @@ impl Builtins {
     )
   }
 
-  // median(list or varargs)
+
+  /// median(list or varargs) computes the median of a list of numbers, which is the average of the
+  /// two numbers in the middle if the length of the list is even, or the middle of the list
+  /// if its length is odd. If any elements are not numbers, null is returned.
+  pub fn median<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    let fname = "median";
+    Builtins::list_or_varargs_helper(parameters, contexts, fname, FeelType::Number, false,
+      |list| {
+        match stats_median(list) {
+          MedianIndex::Single(index) => {
+            list[index].clone()
+          },
+          MedianIndex::Dual(low_index, high_index) => {
+            match (&list[low_index], &list[high_index]) {
+              (FeelValue::Number(low_value), FeelValue::Number(high_value)) => {
+                FeelValue::Number((low_value + high_value) / 2.0)
+              },
+              _ => {
+                ExecutionLog::log(&format!("{:?} of list of {} numbers yielded something other than a number.", fname, list.len()));
+                FeelValue::Null
+              }
+            }
+          },
+          MedianIndex::None => {
+            ExecutionLog::log(&format!("{:?} of list of {} numbers failed.", fname, list.len()));
+            FeelValue::Null
+          }
+        }
+      }
+    )
+  }
 
 
   // stddev(list or varargs) returns the sample standard deviation, or null

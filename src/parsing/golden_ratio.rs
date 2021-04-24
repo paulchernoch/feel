@@ -37,13 +37,47 @@ pub struct GoldenSequence {
   next_position: u64,
 
   /// Most recent value yielded by the iterator. 
-  yielded: Option<u64>
+  yielded: Option<u64>,
+
+  /// Should the sequence repeat endlessly or stop after sequence_length items have been yielded?
+  repeat: bool
 }
 
 impl GoldenSequence {
-  /// Create a new GoldenSequence for the numbers 0 to len - 1. 
+  /// Create a new GoldenSequence for the numbers 0 to len - 1 that does not repeat. 
   pub fn new(len: u64) -> GoldenSequence {
-    // Find the smallest fibonacci number that is greater than or equal to len. 
+    GoldenSequence {
+      sequence_length: len, 
+      fibonacci: GoldenSequence::smallest_fibonacci(len),
+      index: 0,
+      next_position: 0,
+      yielded: None,
+      repeat: false
+    }
+  }
+
+  /// Create a new GoldenSequence for the numbers 0 to len - 1 that starts over after every number has been yielded
+  /// once. This sequence is infinite in length. 
+  pub fn new_infinite(len: u64) -> GoldenSequence {
+    GoldenSequence {
+      sequence_length: len, 
+      fibonacci: GoldenSequence::smallest_fibonacci(len),
+      index: 0,
+      next_position: 0,
+      yielded: None,
+      repeat: true
+    }
+  }
+
+  /// For an infinite sequence, this restarts the sequence. 
+  fn restart(&mut self) {
+    self.index = 0;
+    self.next_position = 0;
+    self.yielded = None;
+  }
+
+  /// Find the smallest fibonacci number that is greater than or equal to n. 
+  fn smallest_fibonacci(n: u64) -> u64 {
     // The sequence is only non-repeating if the arithmetic is performed modulo a
     // fibonacci number. We will just throw away numbers >= len when we iterate. 
     // The worst case is that 38.2% of the computed numbers must be discarded. 
@@ -53,18 +87,12 @@ impl GoldenSequence {
     //  and the previous one approaches Phi in the limit.)
     let mut fib_prev = 0_u64;
     let mut fib_curr = 1_u64;
-    while fib_curr < len {
+    while fib_curr < n {
       let temp = fib_prev + fib_curr;
       fib_prev = fib_curr;
       fib_curr = temp;
     }
-    GoldenSequence {
-      sequence_length: len, 
-      fibonacci: fib_curr,
-      index: 0,
-      next_position: 0,
-      yielded: None
-    }
+    fib_curr
   }
 
   /// Compute the nth number in the larger sequence of length fibonacci. 
@@ -76,11 +104,30 @@ impl GoldenSequence {
     //   2) Multiplying by fibonacci and flooring the value to get an integer
     //      in the range [0,fibonacci)
     (((*PHI * (n_mod_fibonacci + 1.0)) % 1.0) * (self.fibonacci as f64)).floor() as u64
+
+    // NOTE: We could replace the above by using ratios of integers and an integer ratio 
+    //       approximation for PHI if it becomes a performance issue. 
   }
 
   /// Most recently yielded value, which is None before the first call to next, and
   /// None after the iterator completes. 
   pub fn current(&self) -> Option<u64> {
+    self.yielded
+  }
+
+  fn advance(&mut self) -> Option<u64> {
+    // Warning: Assumes caller performs bounds check on self.index. 
+    for pos in self.next_position .. self.fibonacci {
+      let next_index = self.nth_item(pos);
+      // We discard numbers not in the range [0,sequence_length)
+      if next_index < self.sequence_length {
+        self.index += 1_u64;
+        self.next_position = pos + 1;
+        self.yielded = Some(next_index);
+        return self.yielded
+      }
+    }
+    self.yielded = None;
     self.yielded
   }
 }
@@ -89,26 +136,23 @@ impl Iterator for GoldenSequence {
   type Item = u64;
   
   /// Yield the next number in the low discrepancy, pseudo-random sequence.
-  /// Every number from zero to N - 1 will be yielded exactly once,
-  /// but in a pseudo-random order. 
+  ///   - For a nonrepeating sequence, every number from zero to N - 1 
+  ///     will be yielded exactly once, but in a pseudo-random order. 
+  ///   - For a repeating sequence, when the sequence finishes, it restarts
+  ///     and yields the values in the same order as before. 
   fn next(&mut self) -> Option<u64> {
-    if self.index >= self.sequence_length {
-      self.yielded = None;
-      self.yielded
-    }
-    else {
-      for pos in self.next_position .. self.fibonacci {
-        let next_index = self.nth_item(pos);
-        // We discard numbers not in the range [0,sequence_length)
-        if next_index < self.sequence_length {
-          self.index += 1_u64;
-          self.next_position = pos + 1;
-          self.yielded = Some(next_index);
-          return self.yielded
-        }
+    match (self.index >= self.sequence_length, self.repeat) {
+      (true, true) => { 
+        self.restart();
+        self.advance()
+      },
+      (true, false) => {
+        self.yielded = None;
+        self.yielded
+      },
+      (false, _) => {
+        self.advance()
       }
-      self.yielded = None;
-      self.yielded
     }
   }
 }
@@ -140,6 +184,17 @@ mod tests {
     let actual_seq: Vec<u64> = iter.collect();
     let expected_seq: Vec<u64> = vec![
       21,8,16,3,24,11,19,6,27,14,1,22,9,17,4,25,12,20,7,15,2,23,10,18,5,26,13,0
+    ];
+    assert!(actual_seq == expected_seq);
+  }
+
+  /// Test a repeatable sequence to make sure it repeats.
+  #[test]
+  fn test_repeat() {
+    let iter = GoldenSequence::new_infinite(13_u64);
+    let actual_seq: Vec<u64> = iter.take(26).collect();
+    let expected_seq: Vec<u64> = vec![
+      8, 3, 11, 6, 1, 9, 4, 12, 7, 2, 10, 5, 0, 8, 3, 11, 6, 1, 9, 4, 12, 7, 2, 10, 5, 0
     ];
     assert!(actual_seq == expected_seq);
   }

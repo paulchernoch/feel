@@ -1,5 +1,7 @@
 use std::hash::Hash;
 use std::collections::HashMap;
+use std::cmp::{Ord,Ordering};
+use pdqselect::{select, select_by};
 
 /*
 
@@ -189,12 +191,118 @@ where T: Hash + Eq + Ord + Clone, {
   return mode_result;
 }
 
+/// Result for the median function, which holds the index or idices into the data where
+/// the median value or values may be found.
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum MedianIndex {
+  /// The population has an odd number of values, hence a single median.
+  Single(usize),
+  /// The population has an even number of values, hence a double median.
+  Dual(usize,usize),
+  /// The population is empty, hence has no median.
+  None
+}
+
+/// Find the median of a collection, which may be one or two values,
+/// depending on whether the collection has an even or odd number of elements. 
+/// The input array is partially sorted as a result. 
+/// The median value or values will end up in the middle of the array. 
+pub fn median_mut<T>(v: &mut [T]) -> MedianIndex
+where T: Ord {
+  match (v.len(), v.len() % 2 == 0) {
+    (0, _) => MedianIndex::None,
+    (1, _) => MedianIndex::Single(0),
+    (2, _) => if v[0].cmp(&v[1]) == Ordering::Greater {
+      v.swap(0,1);
+      MedianIndex::Dual(0,1)
+    }
+    else {
+      MedianIndex::Dual(0,1)
+    },
+    (_, true) => {
+      // Length is even, so there are two median values.
+      let k = (v.len() / 2) - 1;
+      select(v, k);
+      // The select method does a partial sort. 
+      // If the low median has duplicate values, 
+      // it is highly likely that select will have already
+      // shifted one of those duplicates into the high median's position. 
+      // Othewise, do a second search, this time over the upper half of the list. 
+      if v[k].cmp(&v[k+1]) != Ordering::Equal {
+        let index_of_min: usize = v[k+1..]
+          .iter()
+          .enumerate()
+          .filter(|(_, item)| (*item).cmp(&v[k]) != Ordering::Less)
+          .min_by(|(_, a), (_, b)| a.cmp(b))
+          .map(|(index, _)| index).unwrap();
+        v.swap(k+1, index_of_min);
+      }
+      MedianIndex::Dual(k, k+1)
+    },
+    (_, false) => {
+      // Length is odd, so there is a single median value.
+      let k = v.len() / 2;
+      select(v, k);
+      MedianIndex::Single(k)
+    }
+  }
+}
+
+pub fn median<T>(v: &[T]) -> MedianIndex 
+where T: Ord {
+  let population = v.len();
+  match (population, population % 2 == 0) {
+    (0, _) => MedianIndex::None,
+    (1, _) => MedianIndex::Single(0),
+    (2, _) => match v[0].cmp(&v[1]) {
+        Ordering::Greater => MedianIndex::Dual(1,0),
+        _ => MedianIndex::Dual(0,1)
+    },
+    (_, true) => {
+      // Length is even, so there are two median values.
+      let mut indices: Vec<usize> = (0..population).collect();
+      let sorter = |a: &usize,b: &usize| v[*a].cmp(&v[*b]);
+
+      let k = (population / 2) - 1;
+      select_by(&mut indices, k, sorter);
+      let i_low_median = indices[k];
+      let mut i_high_median = indices[k+1];
+
+      // The select method does a partial sort. 
+      // If the low median has duplicate values, 
+      // it is highly likely that select will have already
+      // shifted one of those duplicates into the high median's position. 
+      // Othewise, do a second search, this time over the upper half of the list. 
+      if v[i_low_median].cmp(&v[i_high_median]) != Ordering::Equal {
+        let found = indices[k+1..]
+          .iter()
+          .copied()
+          .filter(|i| v[*i].cmp(&v[i_low_median]) != Ordering::Less)
+          .min_by(|a: &usize, b: &usize| v[*a].cmp(&v[*b]))
+          .unwrap();
+        i_high_median = found;
+      }
+      MedianIndex::Dual(i_low_median, i_high_median)
+    },
+    (_, false) => {
+      // Length is odd, so only a single median. 
+      let mut indices: Vec<usize> = (0..population).collect();
+      let sorter = |a: &usize,b: &usize| v[*a].cmp(&v[*b]);
+      let k = population / 2;
+      select_by(&mut indices, k, sorter);
+      MedianIndex::Single(indices[k])
+    }
+  }
+}
+
 
 #[cfg(test)]
 mod tests {
   use super::sample_standard_deviation;
   use super::mode;
   use super::mode_with_ties;
+  use super::{median_mut, median};
+  use super::MedianIndex;
 
   #[test]
   fn test_sample_standard_deviation() {
@@ -230,6 +338,44 @@ mod tests {
     let expected: Vec<&str> = Vec::new();
     // println!("actual   = {:?}\nexpected = {:?}", actual, expected);
     assert_eq!(actual, expected);
+  }
+
+  #[test]
+  fn test_median_mut(){
+    let mut data: Vec<i32> = vec![20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1];
+    let actual_median = median_mut(&mut data);
+    // Values get sorted into place, so their positions changed. 
+    assert_eq!(MedianIndex::Dual(9,10), actual_median);
+    assert_eq!(data[9], 10);
+  }
+
+  #[test]
+  fn test_median_even_length(){
+    let data: Vec<i32> = vec![2,7,10,4,9,12,15,13,1,20,19,3,5,6,8,11,14,16,17,18];
+    let actual_median = median(&data);
+    // Values do not get sorted into place, so their positions do not change. 
+    assert_eq!(MedianIndex::Dual(2,15), actual_median);
+    match actual_median {
+      MedianIndex::Dual(low, high) => {
+        assert_eq!(data[low], 10);
+        assert_eq!(data[high], 11)
+      },
+      _ => { assert!(false); }
+    }
+  }
+
+  #[test]
+  fn test_median_odd_length(){
+    let data: Vec<i32> = vec![2,7,10,4,9,12,15,13,1,19,3,5,6,8,11,14,16,17,18];
+    let actual_median = median(&data);
+    // Values do not get sorted into place, so their positions do not change. 
+    assert_eq!(MedianIndex::Single(2), actual_median);
+    match actual_median {
+      MedianIndex::Single(low) => {
+        assert_eq!(data[low], 10);
+      },
+      _ => { assert!(false); }
+    }
   }
 }
 
