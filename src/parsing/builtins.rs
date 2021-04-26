@@ -2382,7 +2382,28 @@ mod tests {
     product(FeelValue::new_from_iterator(vec![1]), 1.into());
   }
 
-  // Test of median(list or varargs)
+  /// Test of median(list or varargs)
+  #[test]
+  fn test_median() {
+    fn median(args: FeelValue, f_expected: FeelValue) {
+      let ctx = Context::new();
+      let args_string = format!("{:?}", args);
+      let actual = Builtins::median(args, &ctx);
+      assert!(actual == f_expected, "median({:?}) = {:?} expected, found {:?}", args_string, f_expected, actual);
+    }
+    median(
+      FeelValue::new_from_iterator(vec![8,2,5,3,4]), 
+      4.into()
+    );
+    median(
+      FeelValue::new_list_of_list(vec![6.into(), 1.into(), 2.into(), 3.into()]),
+      2.5.into()
+    );
+    median(
+      FeelValue::new_list(vec![]), 
+      FeelValue::Null
+    );
+  }
 
   /// Test of stddev(list or varargs)
   #[test]
