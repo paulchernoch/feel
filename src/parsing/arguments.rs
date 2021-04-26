@@ -342,6 +342,25 @@ impl Validity {
     }
   }
 
+  /// Check that the argument at the given zero-based position is a String or Name,
+  /// the only two variants permitted to represent the key of a Context.
+  pub fn expect_key(self, zero_based_argument: usize) -> Self {
+    if !self.is_valid() {
+      return self;
+    }
+    match self.arguments()[zero_based_argument].get_type() {
+      FeelType::String => self,
+      FeelType::Name => self,
+      _ => {
+        ExecutionLog::log(&format!(
+          "Called {:?} with a key that is neither a String nor a QName for argument {:?}", 
+          self.name(), zero_based_argument + 1
+        ));
+        self.and(false)
+      }
+    }
+  }
+
   /// Assume that the argument at the first zero-based position is a List
   /// (from an expect_type constraint)
   /// and verify that the argument at the second zero-based position is a

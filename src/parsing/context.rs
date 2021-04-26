@@ -101,7 +101,7 @@ mod tests {
     let previous = ctx.insert("key", FeelValue::Number(1.0));
     assert_eq!(previous, Option::None, "insert of new key should return None");
 
-    assert!(ctx.contains_key("key"), "contains_key on key that is present")
+    assert!(ctx.contains_key("key"), "contains_key on key that is present");
   }
 
 }

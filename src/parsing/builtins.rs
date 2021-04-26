@@ -1747,6 +1747,45 @@ impl Builtins {
 
   //// ///////////// END Range functions /////////////////
 
+  //// ////////////////////////////////////////////////
+  ////                                             ////
+  ////               Context functions             ////
+  ////                                             ////
+  //// ////////////////////////////////////////////////
+
+  /// Get value from a Context by key.
+  /// For the key, a String or Name will be accepted.
+  pub fn get_value<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "get value";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..3)
+      .expect_type(0_usize, FeelType::Context, false)
+      .expect_key(1_usize)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        let optional_result = match (a, b) {
+          (FeelValue::Context(arg_ctx), FeelValue::String(key_as_string)) => {
+            arg_ctx.get(key_as_string.clone())
+          },
+          (FeelValue::Context(arg_ctx), FeelValue::Name(key_as_qname)) => {
+            arg_ctx.get(key_as_qname.clone())
+          },
+          _ => unreachable!()
+        };
+        match optional_result {
+          Some(value) => value,
+          None => { 
+            ExecutionLog::log(&format!("Called {} on a context missing the supplied key {:?}", fname, b));
+            FeelValue::Null
+          }
+        }   
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
 }
 
 
@@ -1755,6 +1794,7 @@ impl Builtins {
 
 #[cfg(test)]
 mod tests {
+  use std::rc::Rc;
   use super::super::feel_value::{FeelValue};
   use super::super::context::{Context};
   use std::ops::{RangeBounds, Bound};
@@ -2947,5 +2987,33 @@ mod tests {
       let (b_is_lower_bound, b) = parse_bound(b_pattern);
       let actual = Builtins::compare_bounds(&a, a_is_lower_bound, &b, b_is_lower_bound);
       assert!(expect == actual, "Comparison {:?} vs {:?} of {:?} with {:?} got {:?} but expected {:?}", a_pattern, b_pattern, a, b, actual, expect);
+    }
+
+    //// Context function Tests
+    
+    #[test]
+    fn test_context_get_value() {
+      let ctx = Context::new();
+      let arg_ctx = Context::new();
+      let expected_value: FeelValue = "value1".into();
+
+      let _previous_value = arg_ctx.insert("key1", expected_value.clone());
+      let parameters = FeelValue::new_list(
+        vec![FeelValue::Context(Rc::new(arg_ctx)), "key1".into()]
+      );
+      let actual_value = Builtins::get_value(parameters, &ctx);
+      assert_eq!(actual_value, expected_value);
+    }
+
+    #[test]
+    fn test_context_get_value_missing() {
+      let ctx = Context::new();
+      let arg_ctx = Context::new();
+      let expected_value = FeelValue::Null;
+      let parameters = FeelValue::new_list(
+        vec![FeelValue::Context(Rc::new(arg_ctx)), "unexistent-key".into()]
+      );
+      let actual_value = Builtins::get_value(parameters, &ctx);
+      assert_eq!(actual_value, expected_value);
     }
 }

@@ -29,7 +29,7 @@
     - [ ] 1 Date and time
     - [ ] 4 Temporal
     - [ ] 2 Duration
-    - [ ] 22 List
+    - [x] 22 List
     - [x] 14 Range
     - [ ] 2 Context
     - [ ] 1 Sort
@@ -215,7 +215,7 @@ Twenty-two list functions. Some of the functions can take either a list or a var
   - [x] **distinct values(list)**: Duplicate removal.
   - [x] **flatten(list)**: Flatten nested lists.
   - [x] **product(list or varargs)**: Returns the product of the numbers.
-  - [ ] **median(list or varargs)**
+  - [x] **median(list or varargs)**
   - [x] **stddev(list or varargs)**
   - [x] **mode(list or varargs)**
 
@@ -251,7 +251,7 @@ The spec calls the points "scalars". That certainly means numbers, but we will t
 
 **Contexts**
 
-  - [ ] **get value(context, key)**
+  - [x] **get value(context, key)**
   - [ ] **get entries(context)** -> List
 
 **Sort**
