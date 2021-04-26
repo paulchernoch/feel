@@ -1786,6 +1786,27 @@ impl Builtins {
     }
   }
 
+  /// Convert a Context to a List of Contexts, one per each key-value pair in the 
+  /// original Contet. Each resulting context has two keys: "key" and "value".
+  pub fn get_entries<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "get entries";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..2)
+      .expect_type(0_usize, FeelType::Context, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::Context(arg_ctx) => {
+            (*arg_ctx).get_entries()
+          },
+          _ => unreachable!()
+        }
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
 }
 
 
@@ -3016,4 +3037,32 @@ mod tests {
       let actual_value = Builtins::get_value(parameters, &ctx);
       assert_eq!(actual_value, expected_value);
     }
+
+    #[test]
+    fn test_context_get_entries() {
+      let ctx = Context::new();
+      let arg_ctx = Context::new();
+      let key1 = FeelValue::Name("key1".into());
+      let value1: FeelValue = "value1".into();
+      let key2 = FeelValue::Name("key2".into());
+      let value2: FeelValue = "value2".into();
+
+      let _ = arg_ctx.insert("key1", value1.clone());
+      let _ = arg_ctx.insert("key2", value2.clone());
+      let parameters = FeelValue::Context(Rc::new(arg_ctx));
+      let actual_value = Builtins::get_entries(parameters, &ctx);
+
+      let expected_ctx_1 = Context::new();
+      expected_ctx_1.insert("key", key1.clone());
+      expected_ctx_1.insert("value", value1.clone());
+      let expected_ctx_2 = Context::new();
+      expected_ctx_2.insert("key", key2.clone());
+      expected_ctx_2.insert("value", value2.clone());
+      let expected = FeelValue::new_list(vec![
+        FeelValue::Context(Rc::new(expected_ctx_1)),
+        FeelValue::Context(Rc::new(expected_ctx_2))
+      ]);
+      assert_eq!(expected, actual_value);
+    }
+    
 }

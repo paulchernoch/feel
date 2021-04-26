@@ -31,7 +31,7 @@
     - [ ] 2 Duration
     - [x] 22 List
     - [x] 14 Range
-    - [ ] 2 Context
+    - [x] 2 Context
     - [ ] 1 Sort
     - [ ] 2 Operators
  - [ ] 29 Special Properties of six data types
@@ -252,7 +252,7 @@ The spec calls the points "scalars". That certainly means numbers, but we will t
 **Contexts**
 
   - [x] **get value(context, key)**
-  - [ ] **get entries(context)** -> List
+  - [x] **get entries(context)** -> List
 
 **Sort**
 

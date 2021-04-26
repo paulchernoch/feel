@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::hash::Hash;
 use std::collections::HashMap;
 use std::fmt::{Debug,Display,Formatter,Result};
@@ -28,6 +29,25 @@ impl Context {
     Context { 
       contents: RefCell::new(HashMap::new())
     }
+  }
+
+  fn new_from_pair(k: QName, v: FeelValue) -> Self {
+    let ctx = Self::new();
+    ctx.insert("key", FeelValue::Name(k));
+    ctx.insert("value", v);
+    ctx
+  }
+
+  /// Generate a list of Contexts where each has two keys, "key" and "value",
+  /// one context for each key-value pair in this context. 
+  /// If this context is empty, an empty list will be constructed. 
+  pub fn get_entries(&self) -> FeelValue {
+    let pairs: Vec<FeelValue> = self.contents
+      .borrow()
+      .iter()
+      .map(|(k,v)| FeelValue::Context(Rc::new(Self::new_from_pair(k.clone(), v.clone()))))
+      .collect();
+    FeelValue::new_list(pairs)
   }
 }
 
