@@ -263,7 +263,7 @@ The spec calls the points "scalars". That certainly means numbers, but we will t
 Feel has operators not supported by Rust, so they will be implemented as 
 FeelFunctions.
 
-  - [ ] **power(number, exponent)** -> `Number`
+  - [x] **power(number, exponent)** -> `Number`
   - [ ] **instance of(value, type)** -> `Boolean`
 
 

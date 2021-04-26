@@ -1137,7 +1137,40 @@ impl Builtins {
           (FeelValue::Number(dividend), FeelValue::Number(divisor)) => {
             // For negative values, the FEEL semantics for modulo are NOT the same as Rust's % operator! 
             let remainder = *dividend - *divisor * (*dividend / *divisor).floor();
-            FeelValue::Number(remainder)
+            Builtins::validate_number(remainder, format!("{:?}({:?})", fname, remainder))
+          },
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
+  /// power(base,exponent) performs exponentiation.
+  /// This is not a standard DMN 1.3 built-in function. 
+  /// It shall be used, however, to implement the exponentiation operator,
+  /// which Rust lacks but Feel possesses. 
+  pub fn power<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "power";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..3)
+      .no_nulls()
+      .expect_type(0_usize, FeelType::Number, false)
+      .expect_type(1_usize, FeelType::Number, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        // Integer exponentiation with powi is advertised as faster than floats with powf,
+        // so we distinguish between the cases. 
+        match (a, b) {
+            (FeelValue::Number(base), FeelValue::Number(exponent)) if b.is_integer() => {
+            let result = base.powi(*exponent as i32);
+            Builtins::validate_number(result, format!("{:?}({:?})", fname, result))
+          },
+          (FeelValue::Number(base), FeelValue::Number(exponent)) => {
+            let result = base.powf(*exponent);
+            Builtins::validate_number(result, format!("{:?}({:?})", fname, result))
           },
           _ => unreachable!()
         }        
@@ -2507,10 +2540,12 @@ mod tests {
 
   //// Numeric function tests
   
-  /// Test if two Numbers are approximately equal, differing by no more than delta.
+  /// Test if two Numbers are approximately equal, differing by no more than delta,
+  /// or if they are both Null.
   fn are_near(a: &FeelValue, b: &FeelValue, delta: f64) -> bool {
     match (a, b) {
       (FeelValue::Number(x), FeelValue::Number(y)) => x.is_finite() && y.is_finite() && (x - y).abs() <= delta,
+      (FeelValue::Null, FeelValue::Null) => true,
       _ => false
     }
   }
@@ -2564,7 +2599,7 @@ mod tests {
     assert!(positive_duration == Builtins::abs(negative_duration, &ctx), "case 4");
   }
 
-  // Tests of modulo builtin function from the spec
+  /// Tests of modulo builtin function from the spec
   #[test]
   fn test_modulo() {
     fn mod_case(a: f64, b: f64, expected: f64, case_number: u32) -> () {
@@ -2586,6 +2621,30 @@ mod tests {
     mod_case(10.1_f64, -4.5_f64, -3.4_f64, 7);
     mod_case(-10.1_f64, -4.5_f64, -1.1_f64, 8);
   }
+
+    /// Tests of power builtin function (not a standard function, but used to 
+    /// implement the exponentiation operator)
+    #[test]
+    fn test_power() {
+      fn power_case(a: f64, b: f64, expected: f64, case_number: u32) -> () {
+        let ctx = Context::new();
+        let a_value: FeelValue = a.into();
+        let b_value: FeelValue = b.into();
+        let exp: FeelValue = 
+          if expected.is_finite() { expected.into() } 
+          else { FeelValue::Null };
+        let args = FeelValue::new_list(vec![a_value, b_value]);
+        let actual = Builtins::power(args, &ctx);
+        let message = format!("expected power({},{}) = {}, actual = {:?} [case {}]", a, b, exp, actual, case_number);
+        assert!(are_near(&actual, &exp, 0.00000000001_f64), "{}", message);
+      }
+      // Integer exponents handled separately from floats, so have examples of each. 
+      power_case(2.0_f64, 10.0_f64, 1024.0_f64, 1);
+      power_case(144.0_f64, 0.5_f64, 12.0_f64, 2);
+      power_case(10.0_f64, 400.0_f64, std::f64::NAN, 3);
+      power_case(-10.0_f64, 0.5_f64, std::f64::NAN, 3);
+
+    }
 
 
   /// Tests of sqrt builtin function from the spec, plus more
