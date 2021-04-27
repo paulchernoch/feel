@@ -6,6 +6,9 @@ use regex::Regex; // TODO: Should have a Regex LRU cache.
 use math::round;
 use std::collections::HashSet;
 use std::convert::{TryFrom,TryInto};
+// use chrono::naive::IsoWeek;
+use chrono::{Datelike, NaiveDate, NaiveDateTime};
+use chrono::format::{Item, Fixed};
 use super::range::Range;
 use super::context::{Context,ContextReader};
 use super::feel_value::{FeelValue, FeelType};
@@ -1831,6 +1834,8 @@ impl Builtins {
         let a = &arguments[0];
         match a {
           FeelValue::Context(arg_ctx) => {
+            // Sorting of the keys is not required by the specification. 
+            // If we do not sort the enrtries by key, it makes it harder to write unit tests. 
             (*arg_ctx).get_entries_sorted()
           },
           _ => unreachable!()
@@ -1840,9 +1845,90 @@ impl Builtins {
     }
   }
 
-}
+
+  //// ////////////////////////////////////////////////
+  ////                                             ////
+  ////      Date, Time & Duration functions        ////
+  ////                                             ////
+  //// ////////////////////////////////////////////////
+
+  fn date_or_datetime_helper<C, F, G>(fname: &str, parameters: FeelValue, _contexts: &C, date_xform: F, date_time_xform: G) -> FeelValue 
+  where 
+    C: ContextReader, 
+    F: FnOnce(&NaiveDate) -> FeelValue,
+    G: FnOnce(&NaiveDateTime) -> FeelValue
+    {
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..=1)
+      .no_nulls()
+      .expect_date(0_usize)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::DateAndTime(date_time) => date_time_xform(date_time),
+          FeelValue::Date(date) => date_xform(date),
+          _ => unreachable!()
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
+  /// day of year(date or date and time) - one-based Gregorian number of the day within the year
+  pub fn day_of_year<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    Builtins::date_or_datetime_helper(
+      &"day of year", 
+      parameters, 
+      _contexts, 
+      |date| date.ordinal().into(),
+      |date_time| date_time.ordinal().into()
+    )
+  }
+
+  const DAY_OF_WEEK_ITEMS: &'static [Item<'static>] = &[Item::Fixed(Fixed::LongWeekdayName)];
+
+  /// day of week(date or date and time) - day of the week according to the Gregorian calendar enumeration: 
+  /// “Monday”, “Tuesday”, “Wednesday”, “Thursday”, “Friday”, “Saturday”, "Sunday".
+  pub fn day_of_week<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    Builtins::date_or_datetime_helper(
+      &"day of week", 
+      parameters, 
+      _contexts, 
+      |date| date.format_with_items(Builtins::DAY_OF_WEEK_ITEMS.iter().cloned()).to_string().into(),
+      |date_time| date_time.format_with_items(Builtins::DAY_OF_WEEK_ITEMS.iter().cloned()).to_string().into()
+    )
+  }
+
+  const MONTH_OF_YEAR_ITEMS: &'static [Item<'static>] = &[Item::Fixed(Fixed::LongMonthName)];
+
+  /// month of year(date or date and time) - month of the year according to the Gregorian calendar enumeration:
+  /// “January”, “February”, “March”, “April”, “May”, “June”, 
+  /// “July”, “August”, “September”, “October”, “November”, “December”
+  pub fn month_of_year<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    Builtins::date_or_datetime_helper(
+      &"month of year", 
+      parameters, 
+      _contexts, 
+      |date| date.format_with_items(Builtins::MONTH_OF_YEAR_ITEMS.iter().cloned()).to_string().into(),
+      |date_time| date_time.format_with_items(Builtins::MONTH_OF_YEAR_ITEMS.iter().cloned()).to_string().into()
+    )
+  }
 
 
+  /// week of year(date or date and time) - Gregorian number of the week within the year, 
+  /// according to ISO 8601
+  pub fn week_of_year<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    Builtins::date_or_datetime_helper(
+      &"week of year", 
+      parameters, 
+      _contexts, 
+      |date| date.iso_week().week().into(),
+      |date_time| date_time.iso_week().week().into()
+    )
+  }
+
+} // End of Builtins
 
 /////////////// TESTS /////////////////
 
