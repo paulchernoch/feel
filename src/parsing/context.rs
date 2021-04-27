@@ -49,6 +49,21 @@ impl Context {
       .collect();
     FeelValue::new_list(pairs)
   }
+
+  /// Generate a sorted list of Contexts where each has two keys, "key" and "value",
+  /// one context for each key-value pair in this context. 
+  /// If this context is empty, an empty list will be constructed. 
+  /// Sorting is by the key.
+  pub fn get_entries_sorted(&self) -> FeelValue {
+    let key_key: QName = "key".into();
+    let mut pairs: Vec<FeelValue> = self.contents
+      .borrow()
+      .iter()
+      .map(|(k,v)| FeelValue::Context(Rc::new(Self::new_from_pair(k.clone(), v.clone()))))
+      .collect();
+    pairs.sort_by(|a, b| a.try_get(&key_key).unwrap().cmp(&b.try_get(&key_key).unwrap()));
+    FeelValue::new_list(pairs)
+  }
 }
 
 pub trait ContextReader {
@@ -76,14 +91,14 @@ impl ContextReader for Context {
   }
 }
 
-fn are_hashmaps_equal<K: Debug + Eq + Hash, V: Eq>(left_map: &HashMap<K, V>, right_map: &HashMap<K, V>) -> bool {
+fn are_hashmaps_equal<K: Debug + Eq + Hash, V: Eq + Debug>(left_map: &HashMap<K, V>, right_map: &HashMap<K, V>) -> bool {
   for (k, left_v) in left_map.iter() {
       let matching = match right_map.get(k) {
         Some(right_v) => left_v == right_v,
         None => false
       };
       if !matching {
-        return false
+         return false
       }
   }
   true

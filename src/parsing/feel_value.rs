@@ -255,6 +255,15 @@ impl FeelValue {
     }
   }
 
+  /// Try to treat the value as a Context and retrieve the value of the given key. 
+  /// If not a FeelValue::Context or the key is not in it, return None.
+  pub fn try_get(&self, key: &QName) -> Option<FeelValue> {
+    match self {
+      FeelValue::Context(ctx) => ctx.clone().get(key.clone()),
+      _ => None
+    }
+  }
+
   /// Flatten a hierarchy of FeelValues where most FeelValues are leaves, but FeelValue::List's are
   /// considered branches. 
   ///   - Use depth-first ordering during the tree walk. 

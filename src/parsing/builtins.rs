@@ -73,7 +73,7 @@ impl Builtins {
   pub fn not<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "not";
     match Builtins::make_validator(fname, parameters)
-      .arity(1..2)
+      .arity(1..=1)
       .no_nulls()
       .expect_type(0_usize, FeelType::Boolean, false)
       .validated() {
@@ -96,7 +96,7 @@ impl Builtins {
   
   fn string_transform<C: ContextReader, F: FnOnce(&String) -> FeelValue>(parameters: FeelValue, _contexts: &C, fname: &str, xform: F) -> FeelValue {
     match Builtins::make_validator(fname, parameters)
-      .arity(1..2)
+      .arity(1..=1)
       .no_nulls()
       .expect_type(0_usize, FeelType::String, false)
       .validated() {
@@ -114,7 +114,7 @@ impl Builtins {
   /// Helper function for performing a tailored search of a string for a match.
   fn string_match<C: ContextReader, F: FnOnce(&String, &String) -> FeelValue>(parameters: FeelValue, _contexts: &C, fname: &str, matcher: F) -> FeelValue {
     match Builtins::make_validator(fname, parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .no_nulls()
       .expect_type(0_usize, FeelType::String, false)
       .expect_type(1_usize, FeelType::String, false)
@@ -150,7 +150,7 @@ impl Builtins {
   pub fn substring<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "substring";
     match Builtins::make_validator(fname, parameters)
-      .arity(2..4)
+      .arity(2..=3)
       .expect_type(0_usize, FeelType::String, false)
       .expect_integer(1_usize, false)
       .expect_integer(2_usize, true) // Optional length parameter, so can be Null
@@ -341,7 +341,7 @@ impl Builtins {
   pub fn matches<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "matches";
     match Builtins::make_validator(fname, parameters)
-      .arity(2..4)
+      .arity(2..=3)
       .expect_type(0_usize, FeelType::String, false)
       .expect_type(1_usize, FeelType::String, false)
       .expect_type(2_usize, FeelType::String, true) // flags are Optional
@@ -419,7 +419,7 @@ impl Builtins {
   /// and are not expected to handle varargs as an implicit list.
   fn list_helper<C: ContextReader, F: FnOnce(&Vec<FeelValue>) -> FeelValue>(parameters: FeelValue, _contexts: &C, fname: &str, xform: F) -> FeelValue {
     match Builtins::make_list_validator(fname, parameters)
-      .arity(1..2)
+      .arity(1..=1)
       .expect_type(0_usize, FeelType::List, false)
       .validated() {
       Ok(arguments) => {
@@ -466,7 +466,7 @@ impl Builtins {
   pub fn list_contains<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "list contains";
     match Builtins::make_validator(fname, parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .expect_type(0_usize, FeelType::List, false)
       .validated() {
       Ok(arguments) => {
@@ -623,7 +623,7 @@ impl Builtins {
   pub fn sublist<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "sublist";
     match Builtins::make_validator(fname, parameters)
-      .arity(2..4)
+      .arity(2..=3)
       .expect_type(0_usize, FeelType::List, false)
       .position_in_range(0_usize, 1_usize)
       .expect_integer(2_usize, true)
@@ -750,7 +750,7 @@ impl Builtins {
   pub fn remove<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "remove";
     match Builtins::make_validator(fname, parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .expect_type(0_usize, FeelType::List, false)
       .expect_type(1_usize, FeelType::Number, false)
       .position_in_range(0, 1)
@@ -789,7 +789,7 @@ impl Builtins {
   pub fn index_of<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "index of";
     match Builtins::make_validator(fname, parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .expect_type(0_usize, FeelType::List, false)
       .validated() {
       Ok(arguments) => {
@@ -1015,7 +1015,7 @@ impl Builtins {
   pub fn decimal<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "decimal";
     match Builtins::make_validator(fname, parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .no_nulls()
       .expect_type(0_usize, FeelType::Number, false)
       .expect_integer(1_usize, false)
@@ -1049,7 +1049,7 @@ impl Builtins {
   pub fn floor<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "floor";
     match Builtins::make_validator(fname, parameters)
-      .arity(1..2)
+      .arity(1..=1)
       .no_nulls()
       .expect_type(0_usize, FeelType::Number, false)
       .validated() {
@@ -1068,7 +1068,7 @@ impl Builtins {
   pub fn ceiling<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "ceiling";
     match Builtins::make_validator(fname, parameters)
-      .arity(1..2)
+      .arity(1..=1)
       .no_nulls()
       .expect_type(0_usize, FeelType::Number, false)
       .validated() {
@@ -1087,7 +1087,7 @@ impl Builtins {
   pub fn abs<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "abs";
     match Builtins::make_validator(fname, parameters)
-      .arity(1..2)
+      .arity(1..=1)
       .no_nulls()
       .validated() {
       Ok(arguments) => {
@@ -1121,7 +1121,7 @@ impl Builtins {
   pub fn modulo<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "modulo";
     match Builtins::make_validator(fname, parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .no_nulls()
       .expect_type(0_usize, FeelType::Number, false)
       .expect_type(1_usize, FeelType::Number, false)
@@ -1153,7 +1153,7 @@ impl Builtins {
   pub fn power<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "power";
     match Builtins::make_validator(fname, parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .no_nulls()
       .expect_type(0_usize, FeelType::Number, false)
       .expect_type(1_usize, FeelType::Number, false)
@@ -1184,7 +1184,7 @@ impl Builtins {
   pub fn sqrt<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "sqrt";
     match Builtins::make_validator(fname, parameters)
-      .arity(1..2)
+      .arity(1..=1)
       .no_nulls()
       .expect_type(0_usize, FeelType::Number, false)
       .validated() {
@@ -1216,7 +1216,7 @@ impl Builtins {
   pub fn log<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "log";
     match Builtins::make_validator(fname, parameters)
-      .arity(1..2)
+      .arity(1..=1)
       .no_nulls()
       .expect_type(0_usize, FeelType::Number, false)
       .validated() {
@@ -1248,7 +1248,7 @@ impl Builtins {
   pub fn exp<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "exp";
     match Builtins::make_validator(fname, parameters)
-      .arity(1..2)
+      .arity(1..=1)
       .no_nulls()
       .expect_type(0_usize, FeelType::Number, false)
       .validated() {
@@ -1268,7 +1268,7 @@ impl Builtins {
   /// anything that is not a Number. 
   pub fn even<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     match Builtins::make_validator("even", parameters)
-      .arity(1..2)
+      .arity(1..=1)
       .no_nulls()
       .expect_type(0_usize, FeelType::Number, false)
       .validated() {
@@ -1291,7 +1291,7 @@ impl Builtins {
   /// anything that is not a Number. 
   pub fn odd<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     match Builtins::make_validator("odd", parameters)
-      .arity(1..2)
+      .arity(1..=1)
       .no_nulls()
       .expect_type(0_usize, FeelType::Number, false)
       .validated() {
@@ -1339,7 +1339,7 @@ impl Builtins {
 
   fn before_helper<C: ContextReader>(function_name: &str, parameters: FeelValue, contexts: &C) -> FeelValue {
     match Builtins::make_validator(function_name, parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .no_nulls()
       .point_or_range(true, true, true, true)
       .validated() {
@@ -1448,7 +1448,7 @@ impl Builtins {
 
   fn meets_helper<C: ContextReader>(function_name: &str, parameters: FeelValue, contexts: &C) -> FeelValue {
     match Builtins::make_validator(function_name, parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .no_nulls()
       .point_or_range(false, true, false, true)
       .validated() {
@@ -1482,7 +1482,7 @@ impl Builtins {
   /// check if first range overlaps the seconds
   pub fn overlaps<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
     match Builtins::make_validator("overlaps", parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .no_nulls()
       .point_or_range(false, true, false, true)
       .validated() {
@@ -1528,7 +1528,7 @@ impl Builtins {
   /// the second and may not go past the end of the second.
   pub fn overlaps_before<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
     match Builtins::make_validator("overlaps before", parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .no_nulls()
       .point_or_range(false, true, false, true)
       .validated() {
@@ -1559,7 +1559,7 @@ impl Builtins {
   /// the second and may not go before the start of the second.
   pub fn overlaps_after<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
     match Builtins::make_validator("overlaps after", parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .no_nulls()
       .point_or_range(false, true, false, true)
       .validated() {
@@ -1586,7 +1586,7 @@ impl Builtins {
 
   fn finishes_helper<C: ContextReader>(function_name: &str, parameters: FeelValue, contexts: &C) -> FeelValue {
     match Builtins::make_validator(function_name, parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .no_nulls()
       .point_or_range(true, true, false, true)
       .validated() {
@@ -1638,7 +1638,7 @@ impl Builtins {
 
   fn includes_helper<C: ContextReader>(function_name: &str, parameters: FeelValue, contexts: &C) -> FeelValue {
     match Builtins::make_validator(function_name, parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .no_nulls()
       .point_or_range(false, true, true, true)
       .validated() {
@@ -1703,7 +1703,7 @@ impl Builtins {
 
   fn starts_helper<C: ContextReader>(function_name: &str, parameters: FeelValue, contexts: &C) -> FeelValue {
     match Builtins::make_validator(function_name, parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .no_nulls()
       .point_or_range(true, true, false, true)
       .validated() {
@@ -1756,7 +1756,7 @@ impl Builtins {
   /// The ranges coincide, hence are equal.
   pub fn coincides<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
     match Builtins::make_validator("coincides", parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .no_nulls()
       .point_or_range(true, true, true, true)
       .same_types() // Only permit point-point or range-range
@@ -1791,7 +1791,7 @@ impl Builtins {
   pub fn get_value<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "get value";
     match Builtins::make_validator(fname, parameters)
-      .arity(2..3)
+      .arity(2..=2)
       .expect_type(0_usize, FeelType::Context, false)
       .expect_key(1_usize)
       .validated() {
@@ -1824,14 +1824,14 @@ impl Builtins {
   pub fn get_entries<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "get entries";
     match Builtins::make_validator(fname, parameters)
-      .arity(1..2)
+      .arity(1..=1)
       .expect_type(0_usize, FeelType::Context, false)
       .validated() {
       Ok(arguments) => {
         let a = &arguments[0];
         match a {
           FeelValue::Context(arg_ctx) => {
-            (*arg_ctx).get_entries()
+            (*arg_ctx).get_entries_sorted()
           },
           _ => unreachable!()
         }

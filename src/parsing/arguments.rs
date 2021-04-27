@@ -1,8 +1,9 @@
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::fmt::Debug;
 use std::convert::From;
 use std::ops::Index;
-use std::ops::Range as OpsRange;
+use std::ops::RangeBounds;
 use super::range::Range;
 use super::feel_value::{FeelValue, FeelType};
 use super::execution_log::ExecutionLog;
@@ -139,7 +140,7 @@ impl Validity {
   }
 
   /// Check that the expected number of arguments were supplied.
-  pub fn arity(self, r: OpsRange<usize>) -> Self {
+  pub fn arity<R: RangeBounds<usize> + Debug>(self, r: R) -> Self {
     if !self.is_valid() {
       return self;
     }
