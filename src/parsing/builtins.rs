@@ -1852,6 +1852,14 @@ impl Builtins {
   ////                                             ////
   //// ////////////////////////////////////////////////
 
+  /// Performs common validation of arguments and can handle either the NaiveDate from a FeelValue::Date 
+  /// or NaiveDateTime from a FeelValue::DateAndTime.
+  /// 
+  ///  fname ............ Name of Builtin function (for logging errors)
+  ///  parameters ....... Expected to be a single date or time
+  ///  _contents ........ Ignored
+  ///  date_xform ....... Function that accepts a NaiveDate and performs the relevant calculation
+  ///  date_time_xform .. Function that accepts a NaiveDateTime and performs the relevant calculation
   fn date_or_datetime_helper<C, F, G>(fname: &str, parameters: FeelValue, _contexts: &C, date_xform: F, date_time_xform: G) -> FeelValue 
   where 
     C: ContextReader, 
@@ -1940,6 +1948,7 @@ mod tests {
   use std::ops::{RangeBounds, Bound};
   use std::cmp::Ordering;
   use std::str::FromStr;
+  use chrono::{NaiveDate, NaiveDateTime};
   use super::super::range::Range;
   use super::Builtins;
   use super::super::exclusive_inclusive_range::ExclusiveInclusiveRange;
@@ -3209,5 +3218,40 @@ mod tests {
       ]);
       assert_eq!(expected, actual_value);
     }
+
+    //// Date, Time & Duration function tests
     
+    // day of year(date or date and time)
+    #[test]
+    fn test_day_of_year_for_date() {
+      let ctx = Context::new();
+      let date = FeelValue::Date(NaiveDate::from_ymd(2019, 9, 17));
+      // day of year( date(2019, 9, 17) ) = 260
+      match Builtins::day_of_year(date, &ctx) {
+        FeelValue::Number(n) => { assert!(n as i32 == 260, "Wrong number"); },
+        _ => { assert!(false, "Wrong type"); }
+      };
+    }
+
+    #[test]
+    fn test_day_of_year_for_datetime() {
+      let ctx = Context::new();
+      let datetime = FeelValue::DateAndTime(NaiveDate::from_ymd(2019, 9, 17).and_hms(23, 56, 4));
+      // day of year( date(2019, 9, 17) ) = 260
+      match Builtins::day_of_year(datetime, &ctx) {
+        FeelValue::Number(n) => { assert!(n as i32 == 260, "Wrong number"); },
+        _ => { assert!(false, "Wrong type"); }
+      };
+    }
+
+    // day of week(date or date and time)
+
+
+    // month of year(date or date and time)
+
+
+    // week of year(date or date and time)
+
+
+
 }

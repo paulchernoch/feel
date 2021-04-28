@@ -2,8 +2,14 @@
 
 ## Grammar Recognizer
 
- - [ ] Add support for Duration literals like @"PT5H"
- - [ ] Add support for any other literals new to DMN 1.3 (Dates? Times?)
+Add grammar rules for new features not supported by the Javascript PEG Grammar 
+that was the basis of this project.
+
+ - [ ] Duration literals like @"PT5H"
+ - [ ] Date literals
+ - [ ] Time Literals
+ - [ ] Datetime literals
+ - [ ] Other things I missed
 
 ## FeelValue
 
@@ -26,7 +32,7 @@
     - [x] 1 Boolean
     - [x] 12 String
     - [ ] 6 Date and Time conversion
-    - [ ] 1 Date and time
+    - [ ] 2 Date and time
     - [ ] 4 Temporal
     - [ ] 2 Duration
     - [x] 22 List
@@ -177,12 +183,13 @@ appropriate semantics.
 **Date and time functions**
 
   - [ ] **is(value1, value2)**
+  - [ ] **is_not(value1, value2)**
 
 **Temporal Built-in functions**
 
 Four temporal functions (in addition to the conversion functions).
 
-  - [ ] **day of year(date or date and time)**
+  - [x] **day of year(date or date and time)**
   - [ ] **day of week(date or date and time)**
   - [ ] **month of year(date or date and time)**
   - [ ] **week of year(date or date and time)**
