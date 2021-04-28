@@ -1948,7 +1948,7 @@ mod tests {
   use std::ops::{RangeBounds, Bound};
   use std::cmp::Ordering;
   use std::str::FromStr;
-  use chrono::{NaiveDate, NaiveDateTime};
+  use chrono::{NaiveDate};
   use super::super::range::Range;
   use super::Builtins;
   use super::super::exclusive_inclusive_range::ExclusiveInclusiveRange;
@@ -3271,8 +3271,29 @@ mod tests {
       };
     }
 
-    // month of year(date or date and time)
+    /// month of year(date or date and time) for a FeelValue::Date
+    #[test]
+    fn test_month_of_year_for_date() {
+      let ctx = Context::new();
+      let date = FeelValue::Date(NaiveDate::from_ymd(2019, 9, 17));
+      // month of year( date(2019, 9, 17) ) = "September""
+      match Builtins::month_of_year(date, &ctx) {
+        FeelValue::String(s) => { assert!(s == "September".to_string(), "Wrong month name"); }
+        _ => { assert!(false, "Wrong type"); }
+      };
+    }
 
+    /// month of year(date or date and time) for a FeelValue::DateAndTime
+    #[test]
+    fn test_month_of_year_for_datetime() {
+      let ctx = Context::new();
+      let date = FeelValue::DateAndTime(NaiveDate::from_ymd(2019, 9, 17).and_hms(23, 56, 4));
+      // month of year( date(2019, 9, 17) ) = "September""
+      match Builtins::month_of_year(date, &ctx) {
+        FeelValue::String(s) => { assert!(s == "September".to_string(), "Wrong month name"); }
+        _ => { assert!(false, "Wrong type"); }
+      };
+    }
 
     // week of year(date or date and time)
 
