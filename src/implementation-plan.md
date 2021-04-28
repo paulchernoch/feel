@@ -26,14 +26,14 @@ that was the basis of this project.
  - [x] FeelFunction added to FeelValue
  - [x] Execution Log
  - [x] Arguments & validation
- - [ ] **80** Built-in functions / operators:
+ - [ ] **82** Built-in functions / operators:
     - [ ] 3 Miscellaneous conversion
     - [x] 10 Numeric
     - [x] 1 Boolean
     - [x] 12 String
     - [ ] 6 Date and Time conversion
-    - [ ] 2 Date and time
-    - [ ] 4 Temporal
+    - [x] 3 Identity and Equality
+    - [x] 4 Temporal
     - [ ] 2 Duration
     - [x] 22 List
     - [x] 14 Range
@@ -180,19 +180,20 @@ appropriate semantics.
   - [ ] **time(from)**: Convert into a _time_ from a _string_ or a _date and time_
   - [ ] **time(hour, minute, second, offset?)**: Convert into a _time_ from parts, where offset is optional.
 
-**Date and time functions**
+**Equality and Identity functions**
 
-  - [ ] **is(value1, value2)**
-  - [ ] **is_not(value1, value2)**
+  - [x] **is(value1, value2)**
+  - [x] **is_not(value1, value2)**
+  - [x] **equals(value1, value2)** Not a Builtin in the spec, but used to implement = operator
 
 **Temporal Built-in functions**
 
 Four temporal functions (in addition to the conversion functions).
 
   - [x] **day of year(date or date and time)**
-  - [ ] **day of week(date or date and time)**
-  - [ ] **month of year(date or date and time)**
-  - [ ] **week of year(date or date and time)**
+  - [x] **day of week(date or date and time)**
+  - [x] **month of year(date or date and time)**
+  - [x] **week of year(date or date and time)**
 
 **Durations**:
 

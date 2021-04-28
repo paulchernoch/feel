@@ -1936,9 +1936,93 @@ impl Builtins {
     )
   }
 
+  //// ////////////////////////////////////////////////
+  ////                                             ////
+  ////        Equality & Identity functions        ////
+  ////                                             ////
+  //// ////////////////////////////////////////////////
+
+  /// is(a,b) checks if two values are of the same type and equal but never returns null
+  /// (unless the wrong number of arguments are supplied).  
+  /// If they are of different types, false is returned, not null. 
+  /// If both values are null, true is returned. 
+  /// If both values share the same type and are equal, true is returned. 
+  /// 
+  /// This function is different from equals, which will return null if values of different types are compared. 
+  pub fn is<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "is";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..=2)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        if a.get_type() != b.get_type() { false.into() }
+        else { (a == b).into() }
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+  
+  /// is not(a,b) checks if two values are of the different types or unequal but never returns null 
+  /// (unless the wrong number of arguments are supplied). 
+  /// If they are of different types, true is returned, not null. 
+  /// If both values are null, false is returned. 
+  /// If both values share the same type yet are not equal, true is returned. 
+  /// If both values share the same type and are equal, false is returned. 
+  pub fn is_not<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "is not";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..=2)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        if a.get_type() != b.get_type() { true.into() }
+        else { (a != b).into() }
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
+  /// equals(a,b) checks if two values are of the same type and equal, but can return null. 
+  /// If they are of different types, null is returned. 
+  /// If both values are null, true is returned. 
+  /// If both values share the same type and are equal, true is returned. 
+  /// If one value is null and the other is not null, false is returned. 
+  /// This function is different from equals, which will return null if values of different types are compared. 
+  /// 
+  /// Note: DMN Feel 1.3 does not have an equals builtin function. 
+  ///       This function will be used to implement the = operator. 
+  pub fn equals<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "equals";
+    // TODO: What if Lists contain different types of elements? 
+    //       Not sure what the DMN Feel semantics are supposed to be. Should it return false or Null?
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..=2)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        match (a, b, a.get_type() == b.get_type()) {
+          (FeelValue::Null, FeelValue::Null, _) => true.into(),
+          (FeelValue::Null, _, _) => false.into(),
+          (_, FeelValue::Null, _) => false.into(),
+          (_, _, false) => FeelValue::Null,
+          _ => (a == b).into()
+        }
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
 } // End of Builtins
 
-/////////////// TESTS /////////////////
+///////////////////////////////////////
+////                               ////
+/////           TESTS              ////
+////                               ////
+///////////////////////////////////////
 
 #[cfg(test)]
 mod tests {
@@ -3329,6 +3413,54 @@ mod tests {
       week_of_year_test_case(2005, 1, 1, true, 53);
       week_of_year_test_case(2005, 1, 3, true, 1);
       week_of_year_test_case(2005, 1, 9, true, 1);
+    }
+
+    //// Equality and identity function tests
+    
+    fn identity_test_case<F>(a: FeelValue, b: FeelValue, f: F, expected: FeelValue) 
+    where F: FnOnce(FeelValue) -> FeelValue {
+      let args = FeelValue::new_list(vec![a,b]);
+      let actual = f(args);
+      assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_is() {
+      let call_builtin = |args| Builtins::is(args, &Context::new());
+      identity_test_case(FeelValue::Null, FeelValue::Null, call_builtin, true.into());
+      identity_test_case(FeelValue::Null, 42.into(), call_builtin, false.into());
+      identity_test_case("hello".into(), FeelValue::Null, call_builtin, false.into());
+      identity_test_case(true.into(), false.into(), call_builtin, false.into());
+      identity_test_case(true.into(), true.into(), call_builtin, true.into());
+      identity_test_case(42.into(), 42.into(), call_builtin, true.into());
+      identity_test_case("hello".into(), "hello".into(), call_builtin, true.into());
+      identity_test_case("42".into(), 42.into(), call_builtin, false.into());
+    }
+
+    #[test]
+    fn test_is_not() {
+      let call_builtin = |args| Builtins::is_not(args, &Context::new());
+      identity_test_case(FeelValue::Null, FeelValue::Null, call_builtin, false.into());
+      identity_test_case(FeelValue::Null, 42.into(), call_builtin, true.into());
+      identity_test_case("hello".into(), FeelValue::Null, call_builtin, true.into());
+      identity_test_case(true.into(), false.into(), call_builtin, true.into());
+      identity_test_case(true.into(), true.into(), call_builtin, false.into());
+      identity_test_case(42.into(), 42.into(), call_builtin, false.into());
+      identity_test_case("hello".into(), "hello".into(), call_builtin, false.into());
+      identity_test_case("42".into(), 42.into(), call_builtin, true.into());
+    }
+
+    #[test]
+    fn test_equals() {
+      let call_builtin = |args| Builtins::equals(args, &Context::new());
+      identity_test_case(FeelValue::Null, FeelValue::Null, call_builtin, true.into());
+      identity_test_case(FeelValue::Null, 42.into(), call_builtin, false.into());
+      identity_test_case("hello".into(), FeelValue::Null, call_builtin, false.into());
+      identity_test_case(true.into(), false.into(), call_builtin, false.into());
+      identity_test_case(true.into(), true.into(), call_builtin, true.into());
+      identity_test_case(42.into(), 42.into(), call_builtin, true.into());
+      identity_test_case("hello".into(), "hello".into(), call_builtin, true.into());
+      identity_test_case("42".into(), 42.into(), call_builtin, FeelValue::Null);
     }
 
 }
