@@ -1845,7 +1845,6 @@ impl Builtins {
     }
   }
 
-
   //// ////////////////////////////////////////////////
   ////                                             ////
   ////      Date, Time & Duration functions        ////
@@ -2015,6 +2014,65 @@ impl Builtins {
       Err(_) => FeelValue::Null
     }
   }
+
+  //// ////////////////////////////////////////////////
+  ////                                             ////
+  ////           Conversion functions              ////
+  ////                                             ////
+  //// ////////////////////////////////////////////////
+  
+  /// number(from, grouping separator, decimal separator) will convert a string into a number and properly interpret
+  /// the grouping separator (which is comma in America but a period or space in some other countries) and decimal separator
+  /// (which is a period in America but a comma in some other countries) 
+  pub fn number<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "number";
+    match Builtins::make_validator(fname, parameters)
+      .arity(3..=3)
+      .expect_type(0_usize, FeelType::String, false)
+      .expect_type(1_usize, FeelType::String, false)
+      .expect_type(2_usize, FeelType::String, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        let c = &arguments[2];
+        match (a, b, c) {
+          (FeelValue::String(number_string), FeelValue::String(grouping_separator), FeelValue::String(decimal_separator)) => {
+            let standardized = number_string.replace(grouping_separator, "").replace(decimal_separator, ".");
+            let result: Result<f64,_> = standardized.parse();
+            match result {
+              Ok(n) => n.into(),
+              _ => {
+                ExecutionLog::log(&format!(
+                  "{:?} builtin function could not convert {:?} into a number using {:?} for grouping and {:?} as the decimal separator. String after replacement: {:?}", 
+                  fname, number_string, grouping_separator, decimal_separator, standardized
+                ));
+                FeelValue::Null
+              }
+            }
+          },
+          _ => unreachable!()
+        }
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
+  /// type(item) gets the type name for the item. 
+  /// Since "type" is a Rust reserved word, this function is named "type_name" but will be called in Feel as "type(item)". 
+  pub fn type_name<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "type";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..=1)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        a.get_type().feel_type().into()
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
 
 } // End of Builtins
 
@@ -3461,6 +3519,42 @@ mod tests {
       identity_test_case(42.into(), 42.into(), call_builtin, true.into());
       identity_test_case("hello".into(), "hello".into(), call_builtin, true.into());
       identity_test_case("42".into(), 42.into(), call_builtin, FeelValue::Null);
+    }
+
+    //// Conversion function tests
+    
+    fn number_conversion_test_case(s: &str, group_separator: &str, decimal_separator: &str, expected: FeelValue, case: usize) {
+      let ctx = Context::new();
+      let args = FeelValue::new_list(vec![s.into(), group_separator.into(), decimal_separator.into()]);
+      let actual = Builtins::number(args, &ctx);
+      assert!(actual == expected, "case {} for number('{}','{}','{}')", case, s, group_separator, decimal_separator);
+    }
+
+    /// String to number conversion
+    #[test]
+    fn test_number() {
+      number_conversion_test_case("1 000,0", " ", ",", 1000.into(), 1);
+      number_conversion_test_case("1,000.0", ",", ".", 1000.into(), 2);
+      number_conversion_test_case("12.34", ",", ".", 12.34.into(), 3);
+      number_conversion_test_case("123,456.789", ",", ".", 123456.789.into(), 4);
+      number_conversion_test_case("123.456,789", ".", ",", 123456.789.into(), 5);
+      number_conversion_test_case("123 456 789.0", " ", ",", 123456789.into(), 6);
+      number_conversion_test_case("123,456,789.0", " ", ".", FeelValue::Null, 7);
+      number_conversion_test_case("-123,456,789.0", ",", ".", (-123456789.0).into(), 8);
+    }
+
+    fn type_name_test_case(value: FeelValue, expected: &str) {
+      assert_eq!(Builtins::type_name(value, &Context::new()), expected.into());
+    }
+
+    /// Get the type name
+    #[test]
+    fn test_type_name() {
+      type_name_test_case(2.5.into(), "number");
+      type_name_test_case(true.into(), "boolean");
+      type_name_test_case("Hello".into(), "string");
+      type_name_test_case(FeelValue::Null, "null");
+      type_name_test_case(FeelValue::new_list_of_list(vec![1.into()]), "list");
     }
 
 }

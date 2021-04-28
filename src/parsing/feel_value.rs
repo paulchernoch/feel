@@ -48,6 +48,29 @@ pub enum FeelType {
   Any
 }
 
+impl FeelType {
+  /// Get the standard name for the Feel type as used in the Specification. 
+  pub fn feel_type(&self) -> &str {
+    match self {
+      FeelType::Number => "number",
+      FeelType::String => "string",
+      FeelType::Name => "name", // TODO: Not sure what string should be returned for this. 
+      FeelType::Boolean => "boolean",
+      FeelType::Date => "date",
+      FeelType::Time => "time",
+      FeelType::DateAndTime => "date and time",
+      FeelType::YearMonthDuration => "years and months duration",
+      FeelType::DayTimeDuration => "days and time duration",
+      FeelType::Range => "range",
+      FeelType::List => "list",
+      FeelType::Context => "context",
+      FeelType::Function => "function",
+      FeelType::Null => "null",
+      FeelType::Any => "any"
+    }
+  }
+}
+
 #[derive(Clone)]
 /// Any value permitted as input into a Feel language expression or as the result of such an expression.
 pub enum FeelValue {

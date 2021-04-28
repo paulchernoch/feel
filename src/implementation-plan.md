@@ -125,11 +125,11 @@ defined in the spec. I count seventy-eight built-ins and two operators that must
 
 **Any**:
 
-Three miscellaneous functions.
+Three miscellaneous conversion functions.
 
   - [ ] **type(anything)**: Get the name of the data type of the object
   - [ ] **string(value)**: Convert to a string any value other than null
-  - [ ] **number(from, grouping separator, decimal separator)**: Convert into a number a string which has a thousands separator and a decimal character specified.
+  - [x] **number(from, grouping separator, decimal separator)**: Convert into a number a string which has a thousands separator and a decimal character specified.
 
 **Numbers**:
 
