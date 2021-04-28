@@ -3295,8 +3295,40 @@ mod tests {
       };
     }
 
-    // week of year(date or date and time)
+    fn week_of_year_test_case(year: i32, month: u32, day: u32, use_date_time: bool, expected_week: u32) {
+      let ctx = Context::new();
+      let d = if use_date_time {
+        FeelValue::DateAndTime(NaiveDate::from_ymd(year, month, day).and_hms(23, 56, 4))
+      }
+      else {
+        FeelValue::Date(NaiveDate::from_ymd(year, month, day))
+      };
+      match Builtins::week_of_year(d, &ctx) {
+        FeelValue::Number(n) => { assert!(n as u32 == expected_week, "Wrong number"); },
+        _ => { assert!(false, "Wrong type"); }
+      };
+    }
 
+    /// week of year(date or date and time) tested for a FeelValue::Date
+    #[test]
+    fn test_week_of_year_for_date() {
+      week_of_year_test_case(2019, 9, 17, false, 38);
+      week_of_year_test_case(2003, 12, 29, false, 1);
+      week_of_year_test_case(2004, 1, 4, false, 1);
+      week_of_year_test_case(2005, 1, 1, false, 53);
+      week_of_year_test_case(2005, 1, 3, false, 1);
+      week_of_year_test_case(2005, 1, 9, false, 1);
+    }
 
+    /// week of year(date or date and time) tested for a FeelValue::DateAndTime
+    #[test]
+    fn test_week_of_year_for_datetime() {
+      week_of_year_test_case(2019, 9, 17, true, 38);
+      week_of_year_test_case(2003, 12, 29, true, 1);
+      week_of_year_test_case(2004, 1, 4, true, 1);
+      week_of_year_test_case(2005, 1, 1, true, 53);
+      week_of_year_test_case(2005, 1, 3, true, 1);
+      week_of_year_test_case(2005, 1, 9, true, 1);
+    }
 
 }
