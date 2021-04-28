@@ -3221,7 +3221,7 @@ mod tests {
 
     //// Date, Time & Duration function tests
     
-    // day of year(date or date and time)
+    /// day of year(date or date and time) tested for a FeelValue::Date
     #[test]
     fn test_day_of_year_for_date() {
       let ctx = Context::new();
@@ -3233,6 +3233,7 @@ mod tests {
       };
     }
 
+    /// day of year(date or date and time) tested for a FeelValue::DateAndTime
     #[test]
     fn test_day_of_year_for_datetime() {
       let ctx = Context::new();
@@ -3246,6 +3247,29 @@ mod tests {
 
     // day of week(date or date and time)
 
+    /// day of week(date or date and time) tested for a FeelValue::Date
+    #[test]
+    fn test_day_of_week_for_date() {
+      let ctx = Context::new();
+      let date = FeelValue::Date(NaiveDate::from_ymd(2019, 9, 17));
+      // day of week( date(2019, 9, 17) ) = "Tuesday"
+      match Builtins::day_of_week(date, &ctx) {
+        FeelValue::String(s) => { assert!(s == "Tuesday".to_string(), "Wrong day name"); },
+        _ => { assert!(false, "Wrong type"); }
+      };
+    }
+
+    /// day of week(date or date and time) tested for a FeelValue::DateAndTime
+    #[test]
+    fn test_day_of_week_for_datetime() {
+      let ctx = Context::new();
+      let datetime = FeelValue::DateAndTime(NaiveDate::from_ymd(2019, 9, 17).and_hms(23, 56, 4));
+      // day of week( date(2019, 9, 17) ) = "Tuesday"
+      match Builtins::day_of_week(datetime, &ctx) {
+        FeelValue::String(s) => { assert!(s == "Tuesday".to_string(), "Wrong day name"); },
+        _ => { assert!(false, "Wrong type"); }
+      };
+    }
 
     // month of year(date or date and time)
 
