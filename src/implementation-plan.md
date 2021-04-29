@@ -170,11 +170,11 @@ Twelve string functions.
 **Date, Time and Date and Time Conversion functions**:
 
 Note that the `date` function and others have different use cases with different types and numbers of arguments. We will make a single builtin function for
-each named buuiltin that interprets the data types and chooses the
+each named builtin that interprets the data types and chooses the
 appropriate semantics.
 
-  - [ ] **date(from)**: Convert into a date from a _string_ or a _date and time_
-  - [ ] **date(year, month, day)**: Convert into a date from its parts
+  - [x] **date(from)**: Convert into a date from a _string_ or a _date and time_
+  - [x] **date(year, month, day)**: Convert into a date from its parts
   - [ ] **date and time(from)**: Convert into a _date and time_ from a _string_
   - [ ] **date and time(date, time)**: Convert into a _date and time_ from its parts
   - [ ] **time(from)**: Convert into a _time_ from a _string_ or a _date and time_

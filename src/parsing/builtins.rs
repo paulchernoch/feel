@@ -1,14 +1,13 @@
 use std::rc::Rc;
 use std::cell::Ref;
 use std::cmp::Ordering;
-use std::ops::Bound;
+use std::ops::{Bound, RangeInclusive};
 use regex::Regex; // TODO: Should have a Regex LRU cache.
 use math::round;
 use std::collections::HashSet;
 use std::convert::{TryFrom,TryInto};
-// use chrono::naive::IsoWeek;
 use chrono::{Datelike, NaiveDate, NaiveDateTime};
-use chrono::format::{Item, Fixed};
+use chrono::format::{Item, Fixed, ParseResult};
 use super::range::Range;
 use super::context::{Context,ContextReader};
 use super::feel_value::{FeelValue, FeelType};
@@ -2015,6 +2014,131 @@ impl Builtins {
     }
   }
 
+  //// ////////////////////////////////////////////////////////
+  ////                                                     ////
+  ////  Date, Time and Date and Time Conversion functions  ////
+  ////                                                     ////
+  //// ////////////////////////////////////////////////////////
+
+
+  // Note that the `date` function and others have different use cases with different types and numbers of arguments. 
+  // We will make a single builtin function for each named builtin that interprets the data types and chooses the
+  // appropriate semantics.
+
+  fn validate_date_parts(year: f64, month: f64, day: f64) -> Result<(i32,u32,u32),()> {
+    const MAX_YEAR: f64 = 262143.0;
+    const MIN_YEAR: f64 = -262145.0;
+    let year_range: RangeInclusive<f64> = MIN_YEAR..=MAX_YEAR;
+    let mut valid = true;
+    if !year_range.contains(&year) {
+      ExecutionLog::log(&format!("year for date ({}) is not in range.", year));
+      valid = false;
+    }
+    let month_range: RangeInclusive<f64> = 1.0..=12.0;
+    if !month_range.contains(&month) {
+      ExecutionLog::log(&format!("month for date ({}) is not in range.", month));
+      valid = false;
+    }
+    let day_range: RangeInclusive<f64> = 1.0..=31.0;
+    if !day_range.contains(&day) {
+      ExecutionLog::log(&format!("day for date ({}) is not in range.", day));
+      valid = false;
+    }
+    if !valid { return Err(()); }
+    
+    let i_year = year as i32;
+    let i_month = month as u32;
+    let i_day = day as u32;
+
+    if i_year as f64 != year {
+      ExecutionLog::log(&format!("year for date ({}) is not a whole number.", year));
+      valid = false;
+    }
+    if i_month as f64 != month {
+      ExecutionLog::log(&format!("month for date ({}) is not a whole number.", month));
+      valid = false;
+    }
+    if i_day as f64 != day {
+      ExecutionLog::log(&format!("day for date ({}) is not a whole number.", day));
+      valid = false;
+    }
+    if !valid { return Err(()); }
+    Result::Ok((i_year, i_month, i_day))
+  }
+
+
+  // date - create a FeelValue::Date in one of three ways: 
+  //     date(from): Convert into a date from a FeelValue::String
+  //     date(from): Convert into a date from a FeelValue::DateAndTime
+  //     date(year, month, day): Convert into a date from its parts (numbers)
+  pub fn date<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "date";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..=3)
+      .no_nulls()
+      .same_types()
+      .validated() {
+      Ok(arguments) => {
+        // Note: if called with only one argument, b and c will end up as null, not causing a panic. 
+        let a = &arguments[0];
+        let b = &arguments[1];
+        let c = &arguments[2];
+        match (a, b, c) {
+          (FeelValue::String(date_string), FeelValue::Null, FeelValue::Null) => {
+            // DMN Spec shows dates in yyyy-mm-dd format.
+            match NaiveDate::parse_from_str(date_string, "%Y-%m-%d") {
+              ParseResult::Ok(date) => FeelValue::Date(date),
+              ParseResult::Err(_) => {
+                ExecutionLog::log(&format!(
+                  "{:?} builtin function called with unparseable string, expecting yyyy-mm-dd format.", fname
+                ));
+                FeelValue::Null
+              }
+            }
+          },
+          (FeelValue::DateAndTime(dt), FeelValue::Null, FeelValue::Null) => FeelValue::Date(dt.date()),
+          (FeelValue::Number(year), FeelValue::Number(month), FeelValue::Number(day)) => {
+            match Builtins::validate_date_parts(*year, *month, *day) {
+              Ok((y,m,d)) => {
+                match NaiveDate::from_ymd_opt(y, m, d) {
+                  Some(date) => FeelValue::Date(date),
+                  None => {
+                    ExecutionLog::log(&format!(
+                      "{:?} builtin function called with values out of range.", fname
+                    ));
+                    FeelValue::Null
+                  }
+                }
+              },
+              Err(_) => FeelValue::Null
+            }
+          },
+          _ => { 
+            ExecutionLog::log(&format!(
+              "{:?} builtin function called with wrong type of arguments.", fname
+            ));
+            FeelValue::Null
+          }
+        }
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
+
+  // date and time - create a FeelValue::DateAndTime in one of two ways: 
+  //     date and time(from)**: Convert into a _date and time_ from a _string_
+  //     date and time(date, time): Convert into a _date and time_ from its parts
+
+
+
+  // time - create a FeelValue::Time in one of three ways: 
+  //     time(from)**: Convert into a _time_ from a _string_
+  //     time(from)**: Convert into a _time_ from a _date and time_
+  //     time(hour, minute, second, offset?): Convert into a _time_ from parts, where offset is optional.
+
+
+
   //// ////////////////////////////////////////////////
   ////                                             ////
   ////           Conversion functions              ////
@@ -2148,7 +2272,7 @@ mod tests {
   use std::ops::{RangeBounds, Bound};
   use std::cmp::Ordering;
   use std::str::FromStr;
-  use chrono::{NaiveDate};
+  use chrono::{NaiveDate,NaiveDateTime};
   use super::super::range::Range;
   use super::Builtins;
   use super::super::exclusive_inclusive_range::ExclusiveInclusiveRange;
@@ -3529,6 +3653,34 @@ mod tests {
       week_of_year_test_case(2005, 1, 1, true, 53);
       week_of_year_test_case(2005, 1, 3, true, 1);
       week_of_year_test_case(2005, 1, 9, true, 1);
+    }
+
+    //// Creation of Date, Time, and Date and Time value tests
+    
+    #[test]
+    fn test_date_from_string() {
+      assert_eq!(
+        FeelValue::Date(NaiveDate::from_ymd(1985, 4, 28)), 
+        Builtins::date("1985-04-28".into(), &Context::new())
+      );
+    }
+
+    #[test]
+    fn test_date_from_ymd() {
+      assert_eq!(
+        FeelValue::Date(NaiveDate::from_ymd(1985, 4, 28)), 
+        Builtins::date(FeelValue::new_list(vec![1985.into(), 4.into(), 28.into()]) , &Context::new())
+      );
+    }
+      
+    #[test]
+    fn test_date_from_datetime() {
+      assert_eq!(
+        FeelValue::Date(NaiveDate::from_ymd(1985, 4, 28)), 
+        Builtins::date(
+          FeelValue::DateAndTime(NaiveDateTime::parse_from_str("1985-04-28 23:56:04", "%Y-%m-%d %H:%M:%S").unwrap()), 
+          &Context::new())
+      );
     }
 
     //// Equality and identity function tests
