@@ -135,7 +135,7 @@ impl Range {
       (Bound::Excluded(b), _) => b.get_type(),
       (_, Bound::Included(b)) => b.get_type(),
       (_, Bound::Excluded(b)) => b.get_type(),
-      _ => FeelType::Null // Should never happen
+      _ => FeelType::Null // Very Unlikely 
     }
   }
 

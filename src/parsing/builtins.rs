@@ -2073,6 +2073,50 @@ impl Builtins {
     }
   }
 
+  //// ////////////////////////////////////////////////
+  ////                                             ////
+  ////           Instance of Operator              ////
+  ////                                             ////
+  //// ////////////////////////////////////////////////
+  
+  /// instance of(value, type) is the basis of the instance of operator.
+  /// The first argument may be anything. 
+  /// The second argument may be either a FeelValue::String indicating the type 
+  /// or FeelValue::Null. If Null, then it is a check of whether the first argument is a Null. 
+  /// Two comparisons may be made, one against the exact type and one aginst the type that is
+  /// one rung up the type ladder for the value. 
+  /// For example, if the value is a list<number>, both of these would be true: 
+  ///      value instance of "list<number>"
+  ///      value instance of "list<Any>"
+  pub fn instance_of<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    let fname = "instance of";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..=2)
+      .expect_type(1_usize, FeelType::String, true)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        match b {
+          FeelValue::Null => a.is_null().into(),
+          FeelValue::String(type_string) => {
+            let exact_type = a.get_ladder_type(false, contexts);
+            if type_string == &exact_type { true.into() }
+            else {
+              let general_type = a.get_ladder_type(true, contexts);
+              (type_string == &general_type).into()
+            }
+          },
+          _ => {
+            ExecutionLog::log(&format!("Called {}(value, type) using a type {:?} that is neither a string nor null", fname, b));
+            FeelValue::Null
+          }
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
 
 } // End of Builtins
 
@@ -3553,7 +3597,7 @@ mod tests {
       type_name_test_case(2.5.into(), "number");
       type_name_test_case(true.into(), "boolean");
       type_name_test_case("Hello".into(), "string");
-      type_name_test_case(FeelValue::Null, "null");
+      type_name_test_case(FeelValue::Null, "Null");
       type_name_test_case(FeelValue::new_list_of_list(vec![1.into()]), "list");
     }
 

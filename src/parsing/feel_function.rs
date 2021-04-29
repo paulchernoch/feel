@@ -6,8 +6,9 @@ use std::string::ToString;
 use std::ops::Deref;
 use std::cmp::{Ord, PartialOrd, Ordering};
 use std::fmt::{Debug,Display,Formatter,Result};
-use super::feel_value::FeelValue;
+use super::feel_value::{FeelValue, FeelType};
 use super::nested_context::NestedContext;
+use super::context::{ContextReader};
 use super::qname::QName;
 
 /// Functions may be builtin or user defined.
@@ -30,32 +31,61 @@ pub struct FeelFunction {
   pub function_type: FunctionType,
   /// The function name, being a QName, can have spaces in it!
   name_container: RefCell<QName>,
-  function_container: Rc<dyn Fn(&FeelValue, &mut NestedContext) -> FeelValue>
+  function_container: Rc<dyn Fn(&FeelValue, &mut NestedContext) -> FeelValue>,
+  ladder_type: String
 }
 
 impl FeelFunction {
   /// Create a builtin FeelFunction, required to have a name.
-  pub fn new_builtin<Q: Into<QName>>(name: Q, func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) -> Self {
+  /// The ladder_type should be of the form "(T1, T2, ...) -> Treturn". 
+  /// It describes the parameter types and return type. 
+  pub fn new_builtin<Q: Into<QName>>(name: Q, ladder_type: String, func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) -> Self {
     FeelFunction {
       function_type: FunctionType::Builtin,
       name_container: RefCell::new(name.into()),
-      function_container: Rc::new(func)
+      function_container: Rc::new(func),
+      ladder_type: ladder_type
     }
   }
 
   /// Create an anonymous (unnamed) user defined FeelFunction.
   /// Its name may be set after creation via set_name.
-  pub fn new_user(func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) -> Self {
+  pub fn new_user(ladder_type: String, func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) -> Self {
     FeelFunction {
       function_type: FunctionType::User,
       name_container: RefCell::new(ANONYMOUS.into()),
-      function_container: Rc::new(func)
+      function_container: Rc::new(func),
+      ladder_type: ladder_type
     }
   }
 
   /// Get a clone of the function name.
   pub fn get_name(&self) -> QName {
     self.name_container.borrow().clone()
+  }
+
+  pub fn get_ladder_type(&self) -> String {
+    self.ladder_type.clone()
+  }
+
+  /// Compose the ladder type string for a Function given sample values for the parameters and a sample return value. 
+  pub fn make_ladder_type_from_examples<C: ContextReader>(actual_parameters: &Vec<FeelValue>, return_value: &FeelValue, contexts: &C) -> String {
+    let mut ladder_parameters = String::new();
+    for (i, value) in actual_parameters.iter().enumerate() {
+      if i > 0 { ladder_parameters += ", "; }
+      ladder_parameters += &value.get_ladder_type(false, contexts);
+    }
+    format!("({}) -> {}", ladder_parameters, return_value.get_ladder_type(false, contexts))
+  }
+
+  /// Compose the ladder type string for a Function given FeelTypes for the parameters and return value. 
+  pub fn make_ladder_type_from_types(actual_parameters: &Vec<FeelType>, return_type: FeelType) -> String {
+    let mut ladder_parameters = String::new();
+    for (i, t) in actual_parameters.iter().enumerate() {
+      if i > 0 { ladder_parameters += ", "; }
+      ladder_parameters += t.feel_type();
+    }
+    format!("({}) -> {}", ladder_parameters, return_type.feel_type())
   }
 
   /// Set the function name. 
@@ -145,7 +175,7 @@ mod tests {
     let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue {
       value.clone()
     };
-    let ff = FeelFunction::new_user(f);
+    let ff = FeelFunction::new_user("DUMMY".to_string(), f);
     ff
   }
 

@@ -65,8 +65,8 @@ impl FeelType {
       FeelType::List => "list",
       FeelType::Context => "context",
       FeelType::Function => "function",
-      FeelType::Null => "null",
-      FeelType::Any => "any"
+      FeelType::Null => "Null", // The Spec capitalizes Null for some reason.
+      FeelType::Any => "Any"
     }
   }
 }
@@ -122,6 +122,72 @@ impl FeelValue {
       FeelValue::Context(_) => FeelType::Context,
       FeelValue::Function(_) => FeelType::Function,
       FeelValue::Null => FeelType::Null
+    }
+  }
+
+  /// Every value in Feel has a type string that can be used as the righthand argument of the "instance of" operator.
+  /// Some values have parameterized types: list, range, function and context.
+  /// For parameterized types, the type is inferred by the contents. 
+  ///   - For lists, if the list is empty or has at least two elements that differ in type, the ladder type is "list<Any>". 
+  ///     Otherwise, the ladder type will be list<T> where T is the type of its elements, such as "list<number>". 
+  ///   - For ranges, the low or high limit (whichever is not missing) determines the parameter, such as "range<date>". 
+  ///   - For functions, the types of the inputs and output determine the form, like "(number, number) -> number". 
+  ///   - For contexts, the names of the keys and the types of their values determine the form. 
+  ///     {"name": "Peter", age: 30} has the form context<”age”: number, “name”:string>". 
+  ///     It appears that the keys are sorted to make a canonical type name. 
+  /// 
+  /// The contexts parameter is only needed by Ranges that refer to a limit indirectly by name instead of value. 
+  /// If climb is true, get a more general type. For example, if the ladder type is list<number>, 
+  /// if you climb the ladder, the next type is list<Any>. 
+  /// 
+  /// This method is the basis of the instance of operator.
+  pub fn get_ladder_type<C: ContextReader>(&self, climb: bool, contexts: &C) -> String {
+    let bare_type = self.get_type().feel_type().to_string();
+    match self {
+      FeelValue::Range(range) => {
+        let parameter = 
+          if climb { FeelType::Any.feel_type().to_string() } 
+          else {range.get_bounds_type(contexts).feel_type().to_string() };
+        format!("{}<{}>", bare_type, parameter)
+      },
+      FeelValue::List(rr_list) => {
+        let parameter = 
+          if climb { FeelType::Any.feel_type().to_string() } 
+          else {
+            match rr_list.borrow().len() {
+              0 => FeelType::Any.feel_type().to_string(),
+              1 => rr_list.borrow()[0].get_ladder_type(false, contexts),
+              _ => {
+                let first_ladder_type = rr_list.borrow()[0].get_ladder_type(false, contexts).to_string();
+                let uniform = rr_list.borrow().iter().skip(1).all(|item| first_ladder_type == item.get_ladder_type(false, contexts).to_string());
+                if uniform { first_ladder_type }
+                else { FeelType::Any.feel_type().to_string() }
+              }
+            }
+          };
+          format!("{}<{}>", bare_type, parameter)
+      },
+      FeelValue::Context(c) => {
+        let mut parameters = String::new();
+        let key_key: QName = "key".into();
+        let value_key: QName = "value".into();
+        
+        for (i, pair_context) in c.get_entries_sorted_as_vec().iter().enumerate() {
+          match (pair_context.try_get(&key_key), pair_context.try_get(&value_key)) {
+            (Some(k), Some(v)) => {
+              if i > 0 { parameters += ", "; }
+              let value_type = 
+                if climb { FeelType::Any.feel_type().to_string() } 
+                else { v.get_ladder_type(false, contexts) };
+              parameters += &format!("\"{}\": {}", k, value_type);
+            },
+            _ => unreachable!()
+          }
+        }
+        format!("{}<{}>", bare_type, parameters)
+      },
+      FeelValue::Function(f) => f.get_ladder_type(),
+      _ => bare_type
     }
   }
 

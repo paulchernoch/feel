@@ -50,11 +50,19 @@ impl Context {
     FeelValue::new_list(pairs)
   }
 
-  /// Generate a sorted list of Contexts where each has two keys, "key" and "value",
+  /// Generate a FeelValue::List holding a sorted list of Contexts where each has two keys, "key" and "value",
   /// one context for each key-value pair in this context. 
   /// If this context is empty, an empty list will be constructed. 
   /// Sorting is by the key.
   pub fn get_entries_sorted(&self) -> FeelValue {
+    FeelValue::new_list(self.get_entries_sorted_as_vec())
+  }
+
+  /// Generate a Vec holding a sorted list of Contexts where each has two keys, "key" and "value",
+  /// one context for each key-value pair in this context. 
+  /// If this context is empty, an empty list will be constructed. 
+  /// Sorting is by the key.
+  pub fn get_entries_sorted_as_vec(&self) -> Vec<FeelValue> {
     let key_key: QName = "key".into();
     let mut pairs: Vec<FeelValue> = self.contents
       .borrow()
@@ -62,7 +70,7 @@ impl Context {
       .map(|(k,v)| FeelValue::Context(Rc::new(Self::new_from_pair(k.clone(), v.clone()))))
       .collect();
     pairs.sort_by(|a, b| a.try_get(&key_key).unwrap().cmp(&b.try_get(&key_key).unwrap()));
-    FeelValue::new_list(pairs)
+    pairs
   }
 }
 
