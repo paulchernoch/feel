@@ -27,7 +27,7 @@ that was the basis of this project.
  - [x] Execution Log
  - [x] Arguments & validation
  - [ ] **82** Built-in functions / operators:
-    - [ ] 3 Miscellaneous conversion
+    - [2] 3 Miscellaneous conversion
     - [x] 10 Numeric
     - [x] 1 Boolean
     - [x] 12 String
@@ -39,7 +39,7 @@ that was the basis of this project.
     - [x] 14 Range
     - [x] 2 Context
     - [ ] 1 Sort
-    - [ ] 2 Operators
+    - [x] 2 Operators
  - [ ] 29 Special Properties of six data types
  - [ ] User Defined Functions
     - [x] ParameterBinding 
@@ -272,7 +272,7 @@ Feel has operators not supported by Rust, so they will be implemented as
 FeelFunctions.
 
   - [x] **power(number, exponent)** -> `Number`
-  - [ ] **instance of(value, type)** -> `Boolean`
+  - [x] **instance of(value, type)** -> `Boolean`
 
 
 

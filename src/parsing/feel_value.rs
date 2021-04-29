@@ -125,6 +125,10 @@ impl FeelValue {
     }
   }
 
+  pub fn normalize_ladder_type(t: &String) -> String {
+    t.replace(" ", "")
+  }
+
   /// Every value in Feel has a type string that can be used as the righthand argument of the "instance of" operator.
   /// Some values have parameterized types: list, range, function and context.
   /// For parameterized types, the type is inferred by the contents. 

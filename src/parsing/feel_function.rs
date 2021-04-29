@@ -75,7 +75,7 @@ impl FeelFunction {
       if i > 0 { ladder_parameters += ", "; }
       ladder_parameters += &value.get_ladder_type(false, contexts);
     }
-    format!("({}) -> {}", ladder_parameters, return_value.get_ladder_type(false, contexts))
+    format!("function<{}> -> {}", ladder_parameters, return_value.get_ladder_type(false, contexts))
   }
 
   /// Compose the ladder type string for a Function given FeelTypes for the parameters and return value. 
@@ -85,7 +85,7 @@ impl FeelFunction {
       if i > 0 { ladder_parameters += ", "; }
       ladder_parameters += t.feel_type();
     }
-    format!("({}) -> {}", ladder_parameters, return_type.feel_type())
+    format!("function<{}> -> {}", ladder_parameters, return_type.feel_type())
   }
 
   /// Set the function name. 

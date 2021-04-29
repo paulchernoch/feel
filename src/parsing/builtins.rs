@@ -2081,13 +2081,15 @@ impl Builtins {
   
   /// instance of(value, type) is the basis of the instance of operator.
   /// The first argument may be anything. 
-  /// The second argument may be either a FeelValue::String indicating the type 
+  /// The second argument may be a FeelValue::String or FeelValue::Name indicating the type 
   /// or FeelValue::Null. If Null, then it is a check of whether the first argument is a Null. 
   /// Two comparisons may be made, one against the exact type and one aginst the type that is
   /// one rung up the type ladder for the value. 
   /// For example, if the value is a list<number>, both of these would be true: 
   ///      value instance of "list<number>"
   ///      value instance of "list<Any>"
+  /// 
+  /// The type String must conform to the values returned by FeelValue::get_ladder_type. 
   pub fn instance_of<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
     let fname = "instance of";
     match Builtins::make_validator(fname, parameters)
@@ -2100,11 +2102,23 @@ impl Builtins {
         match b {
           FeelValue::Null => a.is_null().into(),
           FeelValue::String(type_string) => {
-            let exact_type = a.get_ladder_type(false, contexts);
-            if type_string == &exact_type { true.into() }
+            let norm_type_string = FeelValue::normalize_ladder_type(type_string);
+            let exact_type = FeelValue::normalize_ladder_type(&a.get_ladder_type(false, contexts));
+            if norm_type_string == FeelType::Any.feel_type() { true.into() }
+            else if norm_type_string == exact_type { true.into() }
             else {
-              let general_type = a.get_ladder_type(true, contexts);
-              (type_string == &general_type).into()
+              let general_type = FeelValue::normalize_ladder_type(&a.get_ladder_type(true, contexts));
+              (norm_type_string == general_type).into()
+            }
+          },
+          FeelValue::Name(qname) => {
+            let norm_type_string = FeelValue::normalize_ladder_type(&qname.to_string());
+            let exact_type = FeelValue::normalize_ladder_type(&a.get_ladder_type(false, contexts));
+            if norm_type_string == FeelType::Any.feel_type() { true.into() }
+            else if norm_type_string == exact_type { true.into() }
+            else {
+              let general_type = FeelValue::normalize_ladder_type(&a.get_ladder_type(true, contexts));
+              (norm_type_string == general_type).into()
             }
           },
           _ => {
@@ -3601,4 +3615,30 @@ mod tests {
       type_name_test_case(FeelValue::new_list_of_list(vec![1.into()]), "list");
     }
 
+    //// Instance of tests
+     
+    fn instance_of_test_case(value: FeelValue, type_string: &str, expected: FeelValue) {
+      let ctx = Context::new();
+      let type_arg: FeelValue = type_string.into();
+      let args = FeelValue::new_list(vec![value, type_arg]);
+      let actual = Builtins::instance_of(args, &ctx);
+      assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_instance_of() {
+      instance_of_test_case(true.into(), "boolean", true.into()); 
+      instance_of_test_case(5.into(), "number", true.into()); 
+      instance_of_test_case(5.into(), "string", false.into()); 
+      instance_of_test_case("Hello".into(), "string", true.into()); 
+      instance_of_test_case(FeelValue::new_list(vec![1.into(), 2.into()]), "list<number>", true.into()); 
+      instance_of_test_case(FeelValue::new_list(vec![1.into(), 2.into()]), "list<Any>", true.into()); 
+
+      fn make_rng<R: RangeBounds<f64>>(a: R) -> FeelValue {
+        let range: Range = a.into();
+        FeelValue::Range(range)
+      }
+      instance_of_test_case(make_rng(1.0..5.0), "range<number>", true.into()); 
+
+    }
 }
