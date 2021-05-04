@@ -13,6 +13,21 @@ use super::range::Range;
 use super::feel_function::FeelFunction;
 use super::execution_log::ExecutionLog;
 
+use lazy_static::lazy_static;
+use regex::Regex;
+
+lazy_static! {
+    static ref TIME_PATTERN: Regex = Regex::new(
+      r#"(?x)
+      ^
+      (?P<h>\d\d)              # Hours
+      :(?P<m>\d\d)             # Minutes
+      :(?P<s>\d\d)             # Seconds
+      (?:[zZ]|[@ ](?P<tz>.+))? # Optional Timezone
+      $"#
+    ).unwrap();
+}
+
 #[derive(PartialEq, Debug, Eq, Clone, Copy, ToString, IntoStaticStr)]
 /// Indicates the Type of a Feel language value but does not contain the actual value.
 pub enum FeelType {
@@ -209,6 +224,31 @@ impl FeelValue {
         I::Item: Into<FeelValue> {
     let values: Vec<FeelValue> = iterable.into_iter().map(|item| item.into()).collect();
     FeelValue::new_list(values)
+  }
+
+  /// Parse a string into a FeelValue::Time, returning None on failure. 
+  /// Recognizes but discards the timezone. 
+  pub fn new_time(time_string: &str) -> Option<Self> {
+    // TODO: Incorporate Time zones into Times and Dates. 
+    match TIME_PATTERN.captures(time_string) {
+      Some(caps) => {
+        match (caps.name("h"), caps.name("m"), caps.name("s"), caps.name("tz")) {
+          (Some(hours), Some(minutes), Some(seconds), _) => {
+            let h: u32 = hours.as_str().parse().unwrap();
+            let m: u32 = minutes.as_str().parse().unwrap();
+            let s: u32 = seconds.as_str().parse().unwrap();
+            if h < 24 && m < 60 && s < 60 {
+              Some(FeelValue::Time(NaiveTime::from_hms(h,m,s)))
+            }
+            else {
+              None
+            }
+          },
+          _ => None,
+        }
+      },
+      None => None
+    }
   }
 
   pub fn negate(&self) -> Self {
@@ -576,6 +616,7 @@ impl TryFrom<&FeelValue> for f64 {
 
 #[cfg(test)]
 mod tests {
+  use chrono::naive::NaiveTime;
   use super::{FeelValue};
   use super::super::qname::{QName};
   use std::assert_ne;
@@ -643,6 +684,18 @@ mod tests {
     let y: FeelValue = 7.7.into();
     assert!(x.is_integer(), "Verify an integral value");
     assert!(!y.is_integer(), "Verify a non-integral value");
+  }
+
+  #[test]
+  fn test_new_time() {
+    assert_eq!(
+      FeelValue::Time(NaiveTime::from_hms(12, 34, 56)), 
+      FeelValue::new_time("12:34:56z").unwrap()
+    );
+    assert_eq!(
+      FeelValue::Time(NaiveTime::from_hms(2, 1, 0)), 
+      FeelValue::new_time("02:01:00@Etc/EDT").unwrap()
+    );
   }
 
 }

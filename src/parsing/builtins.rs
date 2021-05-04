@@ -2,11 +2,12 @@ use std::rc::Rc;
 use std::cell::Ref;
 use std::cmp::Ordering;
 use std::ops::{Bound, RangeInclusive};
+use std::ops::Range as OpsRange;
 use regex::Regex; // TODO: Should have a Regex LRU cache.
 use math::round;
 use std::collections::HashSet;
 use std::convert::{TryFrom,TryInto};
-use chrono::{Datelike, NaiveDate, NaiveDateTime};
+use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime};
 use chrono::format::{Item, Fixed, ParseResult};
 use super::range::Range;
 use super::context::{Context,ContextReader};
@@ -2132,16 +2133,108 @@ impl Builtins {
 
 
 
+  fn validate_time_parts(hours: f64, minutes: f64, seconds: f64) -> Result<(u32,u32,u32),()> {
+    let range_60: OpsRange<f64> = 0.0..60.0;
+    let range_24: OpsRange<f64> = 0.0..24.0;
+    let mut valid = true;
+    if !range_24.contains(&hours) {
+      ExecutionLog::log(&format!("hours for time ({}) not in range.", hours));
+      valid = false;
+    }
+    if !range_60.contains(&minutes) {
+      ExecutionLog::log(&format!("minutes for time ({}) not in range.", minutes));
+      valid = false;
+    }
+    if !range_60.contains(&seconds) {
+      ExecutionLog::log(&format!("seconds for time ({}) not in range.", seconds));
+      valid = false;
+    }
+    if !valid { return Err(()); }
+    
+    let i_hours = hours as u32;
+    let i_minutes = minutes as u32;
+    let i_seconds = seconds as u32;
+
+    if i_hours as f64 != hours {
+      ExecutionLog::log(&format!("hours for time ({}) is not a whole number.", hours));
+      valid = false;
+    }
+    if i_minutes as f64 != minutes {
+      ExecutionLog::log(&format!("minutes for time ({}) is not a whole number.", minutes));
+      valid = false;
+    }
+    if i_seconds as f64 != seconds {
+      ExecutionLog::log(&format!("seconds for time ({}) is not a whole number.", seconds));
+      valid = false;
+    }
+    if !valid { return Err(()); }
+    Result::Ok((i_hours, i_minutes, i_seconds))
+  }
+
   // time - create a FeelValue::Time in one of three ways: 
-  //     time(from)**: Convert into a _time_ from a _string_
-  //     time(from)**: Convert into a _time_ from a _date and time_
-  //     time(hour, minute, second, offset?): Convert into a _time_ from parts, where offset is optional.
+  //     time(from): Convert into a time from a string
+  //     time(from): Convert into a time from a date and time
+  //     time(hour, minute, second, offset?): Convert into a time from parts, where offset is optional.
+  pub fn time<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "time";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..=4)
+      .validated() {
+      Ok(arguments) => {
+        // Note: if called with only one argument, b and c will end up as null, not causing a panic. 
+        let a = &arguments[0];
+        let b = &arguments[1];
+        let c = &arguments[2];
+        let d = &arguments[3];
+        match (a, b, c, d) {
+          // Convert a string to a FeelValue::Time
+          (FeelValue::String(time_string), FeelValue::Null, FeelValue::Null, FeelValue::Null) => {
+            match FeelValue::new_time(time_string) {
+              Some(time) => time,
+              None => {
+                ExecutionLog::log(&format!(
+                  "{:?} builtin function called with unparseable string {:?}, expecting either hh:mm:ssZ or hh:mm:ss@<time-zone>.", fname, time_string
+                ));
+                FeelValue::Null
+              }
+            }
+          },
+
+          // Convert a DateAndTime to a FeelValue::Time 
+          (FeelValue::DateAndTime(dt), FeelValue::Null, FeelValue::Null, FeelValue::Null) => FeelValue::Time(dt.time()),
+
+          // Convert numerical values for hours, minut4s and seconds into a FeelValue::Time 
+          (FeelValue::Number(hour), FeelValue::Number(minute), FeelValue::Number(second), FeelValue::Null) => {
+            match Builtins::validate_time_parts(*hour, *minute, *second) {
+              Ok((h, m, s)) => FeelValue::Time(NaiveTime::from_hms(h, m, s)),
+              Err(_) => FeelValue::Null
+            }
+          },
+
+          // Convert numerical values into a FeelValue::Time then add a duration to it.
+          (FeelValue::Number(hour), FeelValue::Number(minute), FeelValue::Number(second), FeelValue::DayTimeDuration(_)) => {
+            match Builtins::validate_time_parts(*hour, *minute, *second) {
+              Ok((h, m, s)) => &FeelValue::Time(NaiveTime::from_hms(h, m, s)) + d,
+              Err(_) => FeelValue::Null
+            }
+          },
+          _ => { 
+            ExecutionLog::log(&format!(
+              "{:?} builtin function called with wrong type of arguments.", fname
+            ));
+            FeelValue::Null
+          }
+        }
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
 
 
   //// ////////////////////////////////////////////////
   ////                                             ////
-  ////           Conversion functions              ////
+  ////     Other Conversion functions              ////
   ////                                             ////
   //// ////////////////////////////////////////////////
   
@@ -2272,7 +2365,7 @@ mod tests {
   use std::ops::{RangeBounds, Bound};
   use std::cmp::Ordering;
   use std::str::FromStr;
-  use chrono::{NaiveDate,NaiveDateTime};
+  use chrono::{NaiveDate,NaiveDateTime,NaiveTime};
   use super::super::range::Range;
   use super::Builtins;
   use super::super::exclusive_inclusive_range::ExclusiveInclusiveRange;
@@ -3680,6 +3773,35 @@ mod tests {
         Builtins::date(
           FeelValue::DateAndTime(NaiveDateTime::parse_from_str("1985-04-28 23:56:04", "%Y-%m-%d %H:%M:%S").unwrap()), 
           &Context::new())
+      );
+    }
+
+    #[test]
+    fn test_time_from_string() {
+      assert_eq!(
+        FeelValue::Time(NaiveTime::from_hms(12, 34, 56)), 
+        Builtins::time("12:34:56z".into(), &Context::new())
+      );
+
+      assert_eq!(
+        FeelValue::Time(NaiveTime::from_hms(12, 34, 56)), 
+        Builtins::time("12:34:56@EDT".into(), &Context::new())
+      );
+    }
+
+    #[test]
+    fn test_time_from_hms() {
+      assert_eq!(
+        FeelValue::Time(NaiveTime::from_hms(12, 34, 56)), 
+        Builtins::time(FeelValue::new_list(vec![12.into(), 34.into(), 56.into()]), &Context::new())
+      );
+    }
+
+    #[test]
+    fn test_time_from_datetime() {
+      assert_eq!(
+        FeelValue::Time(NaiveTime::from_hms(12, 34, 56)), 
+        Builtins::time(FeelValue::DateAndTime(NaiveDate::from_ymd(1985, 4, 28).and_hms(12,34,56)), &Context::new())
       );
     }
 

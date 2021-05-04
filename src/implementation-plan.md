@@ -31,7 +31,7 @@ that was the basis of this project.
     - [x] 10 Numeric
     - [x] 1 Boolean
     - [x] 12 String
-    - [ ] 6 Date and Time conversion
+    - [4] 6 Date and Time conversion
     - [x] 3 Identity and Equality
     - [x] 4 Temporal
     - [ ] 2 Duration
@@ -177,8 +177,8 @@ appropriate semantics.
   - [x] **date(year, month, day)**: Convert into a date from its parts
   - [ ] **date and time(from)**: Convert into a _date and time_ from a _string_
   - [ ] **date and time(date, time)**: Convert into a _date and time_ from its parts
-  - [ ] **time(from)**: Convert into a _time_ from a _string_ or a _date and time_
-  - [ ] **time(hour, minute, second, offset?)**: Convert into a _time_ from parts, where offset is optional.
+  - [x] **time(from)**: Convert into a _time_ from a _string_ or a _date and time_
+  - [x] **time(hour, minute, second, offset?)**: Convert into a _time_ from parts, where offset is optional.
 
 **Equality and Identity functions**
 
