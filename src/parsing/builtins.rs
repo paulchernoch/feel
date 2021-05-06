@@ -3831,12 +3831,23 @@ mod tests {
 
     //// Duration tests
     
-    /// Test creating year and month duration as well as day time duration 
+    /// Test creating a day time duration 
     #[test]
-    fn test_duration() {
-      // TODO - write test
+    fn test_duration_day_time() {
+      let day_time_string = "P2DT20H14M";
+      let expected_day_time = FeelValue::new_duration(day_time_string).unwrap();
+      let actual_day_time = Builtins::duration(day_time_string.into(), &Context::new());
+      assert_eq!(actual_day_time, expected_day_time);
     }
     
+    /// Test creating a year and month duration 
+    #[test]
+    fn test_duration_year_month() {
+      let year_month_string = "P1Y4M";
+      let expected_year_month = FeelValue::new_duration(year_month_string).unwrap();
+      let actual_year_month = Builtins::duration(year_month_string.into(), &Context::new());
+      assert_eq!(actual_year_month, expected_year_month);
+    }
 
     //// Creation of Date, Time, and Date and Time value tests
     

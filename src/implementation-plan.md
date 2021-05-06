@@ -197,7 +197,7 @@ Four temporal functions (in addition to the conversion functions).
 
 **Durations**:
 
-  - [ ] **duration(duration_string)** -> `Any`: Convert to either a _days and time_ or _years and months_ duration a _string_.
+  - [x] **duration(duration_string)** -> `Any`: Convert to either a _days and time_ or _years and months_ duration a _string_.
   - [ ] **years and months duration(from, to)** -> `YearsAndMonthsDuration`: Convert to a _years and months duration_ the difference between `from` and `to`, both of which must be of the matching types, either _date_ or _date and time_.
 
 **Lists**:
