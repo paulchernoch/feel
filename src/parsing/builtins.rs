@@ -2328,6 +2328,26 @@ impl Builtins {
     }
   }
 
+  /// Convert a value into a string, except null which remains null.
+  /// Attempting to convert a null to a string will not be logged as an error. 
+  pub fn string<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "string";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..=1)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        match a {
+          FeelValue::Null => FeelValue::Null,
+          FeelValue::String(_) => a.clone(),
+          _ => FeelValue::String(format!("{}", a))
+        }
+        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
+
   //// ////////////////////////////////////////////////
   ////                                             ////
   ////           Instance of Operator              ////
@@ -3944,6 +3964,17 @@ mod tests {
       type_name_test_case("Hello".into(), "string");
       type_name_test_case(FeelValue::Null, "Null");
       type_name_test_case(FeelValue::new_list_of_list(vec![1.into()]), "list");
+    }
+
+    #[test]
+    fn test_string() {
+      let ctx = Context::new();
+      assert_eq!(FeelValue::Null, Builtins::string(FeelValue::Null, &ctx));
+      assert_eq!(FeelValue::from("Hello World"), Builtins::string("Hello World".into(), &ctx));
+      assert_eq!(FeelValue::from("true"), Builtins::string(true.into(), &ctx));
+      assert_eq!(FeelValue::from("5.3"), Builtins::string(5.3.into(), &ctx));
+      assert_eq!(FeelValue::from("16:30:00"), Builtins::string(FeelValue::new_time("16:30:00").unwrap(), &ctx));
+      assert_eq!(FeelValue::from("1926-07-07"), Builtins::string(FeelValue::Date(NaiveDate::from_ymd(1926, 7, 7)), &ctx));
     }
 
     //// Instance of tests

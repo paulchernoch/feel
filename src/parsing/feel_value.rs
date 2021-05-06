@@ -540,16 +540,17 @@ impl fmt::Debug for FeelValue {
   }
 }
 
+/// Implement Display for FeelValue so as to conform to the string(value) builtin function in the DMN Feel Spec. 
 impl fmt::Display for FeelValue {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       FeelValue::Number(n) => write!(f, "{}", n),
-      FeelValue::String(s) => write!(f, "'{}'", s),
-      FeelValue::Name(q) => write!(f, "'{}'", q),
+      FeelValue::String(s) => write!(f, "{}", s),
+      FeelValue::Name(q) => write!(f, "{}", q),
       FeelValue::Boolean(b) => write!(f, "{}", b),
-      FeelValue::Date(d) => write!(f, "{}", d),
-      FeelValue::Time(t) => write!(f, "{}", t),
-      FeelValue::DateAndTime(dt) => write!(f, "{}", dt),
+      FeelValue::Date(d) => write!(f, "{}", d.format("%Y-%m-%d")), // yyyy-mm-dd format
+      FeelValue::Time(t) => write!(f, "{}", t.format("%H:%M:%S")), // hh:mm:ss format, in 24-hour time
+      FeelValue::DateAndTime(dt) => write!(f, "{}", dt.format("%Y-%m-%dT%H:%M:%Sz")),
       FeelValue::YearMonthDuration(ymd) => write!(f, "{}", ymd),
       FeelValue::DayTimeDuration(dtd) => write!(f, "{}", dtd),
       FeelValue::Range(range) => write!(f, "{}", range),
@@ -564,7 +565,9 @@ impl fmt::Display for FeelValue {
         write!(f, "[{}]", combined)
       },
       FeelValue::Context(c) => write!(f, "{}", c),
+      // TODO: Format the Function as its source code form. 
       FeelValue::Function(func) => write!(f, "{}", func),
+      // NOTE: Builtins::string(FeelValue::Null) will reutrn a null, not this string. 
       FeelValue::Null => write!(f, "{}", "null")
     }
   }

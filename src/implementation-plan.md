@@ -27,7 +27,7 @@ that was the basis of this project.
  - [x] Execution Log
  - [x] Arguments & validation
  - [ ] **82** Built-in functions / operators:
-    - [2] 3 Miscellaneous conversion
+    - [x] 3 Miscellaneous conversion
     - [x] 10 Numeric
     - [x] 1 Boolean
     - [x] 12 String
@@ -128,7 +128,7 @@ defined in the spec. I count seventy-eight built-ins and two operators that must
 Three miscellaneous conversion functions.
 
   - [x] **type(anything)**: Get the name of the data type of the object
-  - [ ] **string(value)**: Convert to a string any value other than null
+  - [x] **string(value)**: Convert to a string any value other than null
   - [x] **number(from, grouping separator, decimal separator)**: Convert into a number a string which has a thousands separator and a decimal character specified.
 
 **Numbers**:
