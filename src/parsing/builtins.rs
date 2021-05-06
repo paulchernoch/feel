@@ -1954,9 +1954,23 @@ impl Builtins {
    
   // years and months duration(from, to) -> YearsAndMonthsDuration: Convert to a years and months duration 
   // the difference between from and to, both of which must be of the matching types, either date or date and time.
-
-
-
+  pub fn years_and_months_duration<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "years and months duration";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..=2)
+      .expect_date(0_usize)
+      .expect_uniform_list()
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        // TODO: It is not clear from the spec whether the result is forced to be a positive value. 
+        // The example given in the spec shows the second date being the later date, thus "b - a"  is done and not "a - b". 
+        b - a
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
   //// ////////////////////////////////////////////////
   ////                                             ////
@@ -3847,6 +3861,17 @@ mod tests {
       let expected_year_month = FeelValue::new_duration(year_month_string).unwrap();
       let actual_year_month = Builtins::duration(year_month_string.into(), &Context::new());
       assert_eq!(actual_year_month, expected_year_month);
+    }
+
+    #[test]
+    fn test_years_and_months_duration() {
+      // Test case from spec: 
+      //    years and months duration (date("2011-12-22"), date("2013-08-24") ) = duration("P1Y8M")
+      let expected_duration = FeelValue::new_duration("P1Y8M").unwrap();
+      let date1 = FeelValue::Date(NaiveDate::from_ymd(2011, 12, 22));
+      let date2 = FeelValue::Date(NaiveDate::from_ymd(2013, 8, 24));
+      let actual_duration = Builtins::years_and_months_duration(FeelValue::new_list(vec![date1, date2]), &Context::new());
+      assert_eq!(actual_duration, expected_duration);
     }
 
     //// Creation of Date, Time, and Date and Time value tests

@@ -75,7 +75,7 @@ impl<'a, 'b> ops::Sub<&'b FeelValue> for &'a FeelValue {
         FeelValue::YearMonthDuration(delta)
       },
       (FeelValue::DateAndTime(dt1), FeelValue::DateAndTime(dt2)) => {
-        let delta = Duration::datetime_difference(*dt1, *dt2).as_day_time(DAYS_PER_MONTH as f32);
+        let delta = Duration::datetime_difference(*dt1, *dt2).as_year_month(DAYS_PER_MONTH as f32);
         FeelValue::YearMonthDuration(delta)
       },
       (FeelValue::Time(t1), FeelValue::Time(t2)) => {
