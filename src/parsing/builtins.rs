@@ -2128,9 +2128,47 @@ impl Builtins {
 
 
   // date and time - create a FeelValue::DateAndTime in one of two ways: 
-  //     date and time(from)**: Convert into a _date and time_ from a _string_
-  //     date and time(date, time): Convert into a _date and time_ from its parts
-
+  //     date and time(from):       Convert into a FeelValue::DateAndTime from a string
+  //     date and time(date, time): Convert into a FeelValue::DateAndTime from two parts: 
+  //                                something with a date (a date or date and time) and a time.
+  //                                If the first argument is a DateAndTime, ignore the time portion
+  //                                and get the time from the second argument. 
+  pub fn date_and_time<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "date";
+    match Builtins::make_validator(fname, parameters)
+      .arity(1..=2)
+      .expect_type(1_usize, FeelType::Time, true)
+      .no_nulls()
+      .validated() {
+      Ok(arguments) => {
+        // Note: if called with only one argument, b and c will end up as null, not causing a panic. 
+        let a = &arguments[0];
+        let b = &arguments[1];
+        match (a, b) {
+          (FeelValue::String(dt_string), FeelValue::Null) => {
+            match FeelValue::new_date_and_time(dt_string) {
+              Some(date_and_time) => date_and_time,
+              None => {
+                ExecutionLog::log(&format!(
+                  "{:?} builtin function called with unparseable string, expecting yyyy-mm-ddThh:mm:ss format, with optional @timezone suffix.", fname
+                ));
+                FeelValue::Null
+              }
+            }
+          },
+          (FeelValue::Date(date), FeelValue::Time(time)) => FeelValue::DateAndTime(date.and_time(*time)),
+          (FeelValue::DateAndTime(date_and_time), FeelValue::Time(time)) => FeelValue::DateAndTime(date_and_time.date().and_time(*time)),
+          _ => { 
+            ExecutionLog::log(&format!(
+              "{:?} builtin function called with wrong type or number of arguments.", fname
+            ));
+            FeelValue::Null
+          }
+        }
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
 
   fn validate_time_parts(hours: f64, minutes: f64, seconds: f64) -> Result<(u32,u32,u32),()> {
@@ -2171,10 +2209,10 @@ impl Builtins {
     Result::Ok((i_hours, i_minutes, i_seconds))
   }
 
-  // time - create a FeelValue::Time in one of three ways: 
-  //     time(from): Convert into a time from a string
-  //     time(from): Convert into a time from a date and time
-  //     time(hour, minute, second, offset?): Convert into a time from parts, where offset is optional.
+  /// time - create a FeelValue::Time in one of three ways: 
+  ///     time(from): Convert into a time from a string
+  ///     time(from): Convert into a time from a date and time
+  ///     time(hour, minute, second, offset?): Convert into a time from parts, where offset is optional.
   pub fn time<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     let fname = "time";
     match Builtins::make_validator(fname, parameters)
@@ -2220,7 +2258,7 @@ impl Builtins {
           },
           _ => { 
             ExecutionLog::log(&format!(
-              "{:?} builtin function called with wrong type of arguments.", fname
+              "{:?} builtin function called with wrong number or type of arguments.", fname
             ));
             FeelValue::Null
           }
@@ -3805,6 +3843,25 @@ mod tests {
       );
     }
 
+    #[test]
+    fn test_date_and_time_from_string() {
+      let expected_dt = FeelValue::DateAndTime(NaiveDate::from_ymd(2021, 5, 4).and_hms(12, 34, 56));
+      assert_eq!(
+        expected_dt, 
+        Builtins::date_and_time("2021-05-04T12:34:56".into(), &Context::new())
+      );
+    }
+
+    #[test]
+    fn test_date_and_time_from_parts() {
+      let dt = FeelValue::DateAndTime(NaiveDate::from_ymd(2021, 5, 4).and_hms(12, 34, 56));
+      let t = FeelValue::Time(NaiveTime::from_hms(5, 20, 15));
+      let expected_dt = FeelValue::DateAndTime(NaiveDate::from_ymd(2021, 5, 4).and_hms(5, 20, 15));
+      assert_eq!(
+        expected_dt, 
+        Builtins::date_and_time(FeelValue::new_list(vec![dt, t]), &Context::new())
+      );
+    }
     //// Equality and identity function tests
     
     fn identity_test_case<F>(a: FeelValue, b: FeelValue, f: F, expected: FeelValue) 

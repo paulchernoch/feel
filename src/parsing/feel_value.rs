@@ -16,16 +16,33 @@ use super::execution_log::ExecutionLog;
 use lazy_static::lazy_static;
 use regex::Regex;
 
+// TIME_PATTERN: Regular expression that matches times with optional timezone suffix. 
 lazy_static! {
     static ref TIME_PATTERN: Regex = Regex::new(
       r#"(?x)
       ^
-      (?P<h>\d\d)              # Hours
-      :(?P<m>\d\d)             # Minutes
-      :(?P<s>\d\d)             # Seconds
+      (?P<h>[01]\d|2[0-3])     # Hours
+      :(?P<m>[0-5]\d)          # Minutes
+      :(?P<s>[0-5]\d)          # Seconds
       (?:[zZ]|[@ ](?P<tz>.+))? # Optional Timezone
       $"#
     ).unwrap();
+}
+
+// DATETIME_PATTERN: Regular expression that matches date and time values with optional timezone suffix. 
+lazy_static! {
+  static ref DATETIME_PATTERN: Regex = Regex::new(
+    r#"(?x)
+    ^
+    (?P<year>-?\d\d\d\d)          # Year
+    -(?P<month>0[1-9]|1[012])     # Month
+    -(?P<day>0[1-9]|[12]\d|3[01]) # Day
+    T(?P<h>[01]\d|2[0-3])         # Hours
+    :(?P<m>[0-5]\d)               # Minutes
+    :(?P<s>[0-5]\d)               # Seconds
+    (?:[zZ]|[@ ](?P<tz>.+))?      # Optional Timezone
+    $"#
+  ).unwrap();
 }
 
 #[derive(PartialEq, Debug, Eq, Clone, Copy, ToString, IntoStaticStr)]
@@ -237,11 +254,35 @@ impl FeelValue {
             let h: u32 = hours.as_str().parse().unwrap();
             let m: u32 = minutes.as_str().parse().unwrap();
             let s: u32 = seconds.as_str().parse().unwrap();
-            if h < 24 && m < 60 && s < 60 {
-              Some(FeelValue::Time(NaiveTime::from_hms(h,m,s)))
-            }
-            else {
-              None
+            // The Regex pattern was crafted so that only valid ranges for the h,m,s values would be recognized.
+            Some(FeelValue::Time(NaiveTime::from_hms(h,m,s)))
+          },
+          _ => None,
+        }
+      },
+      None => None
+    }
+  }
+
+  /// Parse a string into a FeelValue::DateAndTime, returning None on failure. 
+  /// Recognizes but discards the timezone. 
+  pub fn new_date_and_time(time_string: &str) -> Option<Self> {
+    // TODO: Incorporate Time zones into Times and Dates. 
+    match DATETIME_PATTERN.captures(time_string) {
+      Some(caps) => {
+        match (caps.name("year"), caps.name("month"), caps.name("day"), caps.name("h"), caps.name("m"), caps.name("s"), caps.name("tz")) {
+          (Some(yr), Some(mo), Some(dy), Some(hours), Some(minutes), Some(seconds), _) => {
+            let year: i32 = yr.as_str().parse().unwrap();
+            let month: u32 = mo.as_str().parse().unwrap();
+            let day: u32 = dy.as_str().parse().unwrap();
+            let h: u32 = hours.as_str().parse().unwrap();
+            let m: u32 = minutes.as_str().parse().unwrap();
+            let s: u32 = seconds.as_str().parse().unwrap();
+            // The Regex pattern was crafted so that only valid ranges for the h,m,s values would be recognized.
+            // The month is guaranteed, too, but the day could be invalid for that month. 
+            match NaiveDate::from_ymd_opt(year, month, day) {
+              Some(date) => Some(FeelValue::DateAndTime(date.and_hms(h,m,s))),
+              None => None
             }
           },
           _ => None,
@@ -616,7 +657,7 @@ impl TryFrom<&FeelValue> for f64 {
 
 #[cfg(test)]
 mod tests {
-  use chrono::naive::NaiveTime;
+  use chrono::naive::{NaiveDate,NaiveTime};
   use super::{FeelValue};
   use super::super::qname::{QName};
   use std::assert_ne;
@@ -695,6 +736,15 @@ mod tests {
     assert_eq!(
       FeelValue::Time(NaiveTime::from_hms(2, 1, 0)), 
       FeelValue::new_time("02:01:00@Etc/EDT").unwrap()
+    );
+  }
+
+  #[test]
+  fn test_new_date_and_time() {
+    let expected_dt = FeelValue::DateAndTime(NaiveDate::from_ymd(2021, 5, 4).and_hms(12, 34, 56));
+    assert_eq!(
+      FeelValue::new_date_and_time("2021-05-04T12:34:56z").unwrap(), 
+      expected_dt
     );
   }
 
