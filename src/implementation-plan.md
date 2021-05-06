@@ -127,24 +127,24 @@ defined in the spec. I count seventy-eight built-ins and two operators that must
 
 Three miscellaneous conversion functions.
 
-  - [x] **type(anything)**: Get the name of the data type of the object
-  - [x] **string(value)**: Convert to a string any value other than null
-  - [x] **number(from, grouping separator, decimal separator)**: Convert into a number a string which has a thousands separator and a decimal character specified.
+  - [x] **type(anything)** -> `String`: Get the name of the data type of the object
+  - [x] **string(value)** -> `String`: Convert to a string any value other than null
+  - [x] **number(from, grouping separator, decimal separator)** -> `Number`: Convert into a number a string which has a thousands separator and a decimal character specified.
 
 **Numbers**:
 
 Ten numeric functions.
 
-  - [x] **decimal(number, places)**
-  - [x] **floor(number)**
-  - [x] **ceiling(number)**
-  - [x] **abs(number)**
-  - [x] **modulo(dividend,divisor)**
-  - [x] **sqrt(number)**
-  - [x] **log(number)**
-  - [x] **exp(number)**
-  - [x] **odd(number)**
-  - [x] **even(number)**
+  - [x] **decimal(number, places)** -> `Number`
+  - [x] **floor(number)** -> `Number`
+  - [x] **ceiling(number)** -> `Number`
+  - [x] **abs(number)** -> `Number`
+  - [x] **modulo(dividend,divisor)** -> `Number`
+  - [x] **sqrt(number)** -> `Number`
+  - [x] **log(number)** -> `Number`
+  - [x] **exp(number)** -> `Number`
+  - [x] **odd(number)** -> `Boolean`
+  - [x] **even(number)** -> `Boolean`
 
 **Booleans**:
 
@@ -154,18 +154,18 @@ Ten numeric functions.
 
 Twelve string functions.
 
-  - [x] **substring(string, start position, length?)**: Return a portion of the input string, where start position may be negative to count from the end of the string and length is optional, meaning to include all remaining characters.
-  - [x] **string length(string)**: return the number of characters in the string
-  - [x] **upper case(string)**
-  - [x] **lower case(string)**
-  - [x] **substring before(string, match)**: Return all the string that comes before the match, or an empty string if no match.
-  - [x] **substring after(string, match)**: Return all the string that comes after the match, or an empty string if no match.
-  - [x] **replace(input, pattern, replacement, flags?)**: Regular expression pattern matching and replacement with optional flags.
-  - [x] **contains(string, match)**: Does the string contain the match?
-  - [x] **starts with(string, match)**: Does the string start with the match?
-  - [x] **ends with(string, match)**: Does the string end with the match?
-  - [x] **matches(input, pattern, flags?)**: Does the input match the regexp pattern?
-  - [x] **split(string, delimiter)**: Splits the string into a list of substrings, breaking at each occurrence of the delimiter pattern.
+  - [x] **substring(string, start position, length?)** -> `String`: Return a portion of the input string, where start position may be negative to count from the end of the string and length is optional, meaning to include all remaining characters.
+  - [x] **string length(string)** -> `Number`: return the number of characters in the string
+  - [x] **upper case(string)** -> `String`
+  - [x] **lower case(string)** -> `String`
+  - [x] **substring before(string, match)** -> `String`: Return all the string that comes before the match, or an empty string if no match.
+  - [x] **substring after(string, match)** -> `String`: Return all the string that comes after the match, or an empty string if no match.
+  - [x] **replace(input, pattern, replacement, flags?)** -> `String`: Regular expression pattern matching and replacement with optional flags.
+  - [x] **contains(string, match)** -> `Boolean`: Does the string contain the match?
+  - [x] **starts with(string, match)** -> `Boolean`: Does the string start with the match?
+  - [x] **ends with(string, match)** -> `Boolean`: Does the string end with the match?
+  - [x] **matches(input, pattern, flags?)** -> `Boolean`: Does the input match the regexp pattern?
+  - [x] **split(string, delimiter)** -> `List`: Splits the string into a list of substrings, breaking at each occurrence of the delimiter pattern.
 
 **Date, Time and Date and Time Conversion functions**:
 
@@ -173,59 +173,59 @@ Note that the `date` function and others have different use cases with different
 each named builtin that interprets the data types and chooses the
 appropriate semantics.
 
-  - [x] **date(from)**: Convert into a date from a _string_ or a _date and time_
-  - [x] **date(year, month, day)**: Convert into a date from its parts
-  - [x] **date and time(from)**: Convert into a _date and time_ from a _string_
-  - [x] **date and time(date, time)**: Convert into a _date and time_ from its parts
-  - [x] **time(from)**: Convert into a _time_ from a _string_ or a _date and time_
-  - [x] **time(hour, minute, second, offset?)**: Convert into a _time_ from parts, where offset is optional.
+  - [x] **date(from)** -> `Date`: Convert into a date from a _string_ or a _date and time_
+  - [x] **date(year, month, day)** -> `Date`: Convert into a date from its parts
+  - [x] **date and time(from)** -> `DateAndTime`: Convert into a _date and time_ from a _string_
+  - [x] **date and time(date, time)** -> `DateAndTime`: Convert into a _date and time_ from its parts
+  - [x] **time(from)** -> `Time`: Convert into a _time_ from a _string_ or a _date and time_
+  - [x] **time(hour, minute, second, offset?)** -> `Time`: Convert into a _time_ from parts, where offset is optional.
 
 **Equality and Identity functions**
 
-  - [x] **is(value1, value2)**
-  - [x] **is_not(value1, value2)**
-  - [x] **equals(value1, value2)** Not a Builtin in the spec, but used to implement = operator
+  - [x] **is(value1, value2)** -> `Boolean`
+  - [x] **is_not(value1, value2)** -> `Boolean`
+  - [x] **equals(value1, value2)** -> `Boolean`: Not a Builtin in the spec, but used to implement = operator
 
 **Temporal Built-in functions**
 
 Four temporal functions (in addition to the conversion functions).
 
-  - [x] **day of year(date or date and time)**
-  - [x] **day of week(date or date and time)**
-  - [x] **month of year(date or date and time)**
-  - [x] **week of year(date or date and time)**
+  - [x] **day of year(date or date and time)** -> `Number`
+  - [x] **day of week(date or date and time)** -> `String`
+  - [x] **month of year(date or date and time)** -> `String`
+  - [x] **week of year(date or date and time)** -> `Number`
 
 **Durations**:
 
-  - [ ] **duration(duration_string)**: Convert to either a _days and time_ or _years and months_ duration a _string_.
-  - [ ] **years and months duration(from, to)**: Convert to a _years and months duration_ the difference between `from` and `to`, both of which must be of the matching types, either _date_ or _date and time_.
+  - [ ] **duration(duration_string)** -> `Any`: Convert to either a _days and time_ or _years and months_ duration a _string_.
+  - [ ] **years and months duration(from, to)** -> `YearsAndMonthsDuration`: Convert to a _years and months duration_ the difference between `from` and `to`, both of which must be of the matching types, either _date_ or _date and time_.
 
 **Lists**:
 
 Twenty-two list functions. Some of the functions can take either a list or a variable number of arguments (all numbers) that will be treated as if it were a list. These functions will be noted as (list or varargs).
 
-  - [x] **list contains(list, element)**: Does the list contain the element? Can even find nulls.
-  - [x] **count(list)**: return size of list, or zero if list is empty
-  - [x] **min(list or varargs)**
-  - [x] **max(list or varargs)**
-  - [x] **sum(list or varargs)**
-  - [x] **mean(list or varargs)**
-  - [x] **all(list or varargs)**
-  - [x] **any(list or varargs)**
-  - [x] **sublist(list, start position, length?)**
-  - [x] **append(list, item...)**: Append one or more items to the list, returning a new list.
-  - [x] **concatenate(list...)**: Concatenate one or more lists to form a new list.
-  - [x] **insert before(list, position, newItem)**
-  - [x] **remove(list, position)**
-  - [x] **reverse(list)**
-  - [x] **index of(list, match)**
-  - [x] **union(list...)**: concatenate with duplicate removal.
-  - [x] **distinct values(list)**: Duplicate removal.
-  - [x] **flatten(list)**: Flatten nested lists.
-  - [x] **product(list or varargs)**: Returns the product of the numbers.
-  - [x] **median(list or varargs)**
-  - [x] **stddev(list or varargs)**
-  - [x] **mode(list or varargs)**
+  - [x] **list contains(list, element)** -> `Boolean`: Does the list contain the element? Can even find nulls.
+  - [x] **count(list)** -> `Number`: return size of list, or zero if list is empty
+  - [x] **min(list or varargs)** -> `Any`
+  - [x] **max(list or varargs)** -> `Any`
+  - [x] **sum(list or varargs)** -> `Number`
+  - [x] **mean(list or varargs)** -> `Number`
+  - [x] **all(list or varargs)** -> `Boolean`
+  - [x] **any(list or varargs)** -> `Boolean`
+  - [x] **sublist(list, start position, length?)** -> `List`
+  - [x] **append(list, item...)** -> `List`: Append one or more items to the list, returning a new list.
+  - [x] **concatenate(list...)** -> `List`: Concatenate one or more lists to form a new list.
+  - [x] **insert before(list, position, newItem)** -> `List`
+  - [x] **remove(list, position)** -> `List`
+  - [x] **reverse(list)** -> `List`
+  - [x] **index of(list, match)** -> `Number`
+  - [x] **union(list...)** -> `List`: concatenate with duplicate removal.
+  - [x] **distinct values(list)** -> `List`: Duplicate removal.
+  - [x] **flatten(list)** -> `Any`: Flatten nested lists.
+  - [x] **product(list or varargs)** -> `Number`: Returns the product of the numbers.
+  - [x] **median(list or varargs)** -> `Any`
+  - [x] **stddev(list or varargs)** -> `Number`
+  - [x] **mode(list or varargs)** -> `Any`
 
 **Ranges**:
 
@@ -240,31 +240,31 @@ The functions marked as "four ways" can take any of these argument lists:
 
 Here are the functions:
 
-  - [x] **before(four ways)**
-  - [x] **after(four ways)**
-  - [x] **meets(range1, range2)**
-  - [x] **met by(range1, range2)**
-  - [x] **overlaps(range1, range2)**
-  - [x] **overlaps before(range1, range2)**
-  - [x] **overlaps after(range1, range2)**
-  - [x] **finishes(point, range) or (range1, range2)**
-  - [x] **finished by(range, point) or (range1, range2)**
-  - [x] **includes(range, point) or (range1, range2)**
-  - [x] **during(point, range) or (range1, range2)**
-  - [x] **starts(point, range) or (range1, range2)**
-  - [x] **started by(range, point) or (range1, range2)**
-  - [x] **coincides(point1, point2) or (range1, range2)**
+  - [x] **before(four ways)** -> `Boolean`
+  - [x] **after(four ways)** -> `Boolean`
+  - [x] **meets(range1, range2)** -> `Boolean`
+  - [x] **met by(range1, range2)** -> `Boolean`
+  - [x] **overlaps(range1, range2)** -> `Boolean`
+  - [x] **overlaps before(range1, range2)** -> `Boolean`
+  - [x] **overlaps after(range1, range2)** -> `Boolean`
+  - [x] **finishes(point, range) or (range1, range2)** -> `Boolean`
+  - [x] **finished by(range, point) or (range1, range2)** -> `Boolean`
+  - [x] **includes(range, point) or (range1, range2)** -> `Boolean`
+  - [x] **during(point, range) or (range1, range2)** -> `Boolean`
+  - [x] **starts(point, range) or (range1, range2)** -> `Boolean`
+  - [x] **started by(range, point) or (range1, range2)** -> `Boolean`
+  - [x] **coincides(point1, point2) or (range1, range2)** -> `Boolean`
 
 The spec calls the points "scalars". That certainly means numbers, but we will take it to also refer to dates and date and times.
 
 **Contexts**
 
-  - [x] **get value(context, key)**
-  - [x] **get entries(context)** -> List
+  - [x] **get value(context, key)** -> `Any`
+  - [x] **get entries(context)** -> `List`
 
 **Sort**
 
-  - [ ] **sort(list, precedes)**: The precedes function defines the ordering.
+  - [ ] **sort(list, precedes)** -> `List`: The precedes function defines the ordering.
 
 **Operators not supported by Rust**:
 

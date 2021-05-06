@@ -32,30 +32,36 @@ pub struct FeelFunction {
   /// The function name, being a QName, can have spaces in it!
   name_container: RefCell<QName>,
   function_container: Rc<dyn Fn(&FeelValue, &mut NestedContext) -> FeelValue>,
-  ladder_type: String
+  ladder_type: String,
+  /// Expected return type. 
+  /// TODO: This is a stopgap until support for Generic types like List<Number> is ready. 
+  /// Assume List means List<Any>, etc. 
+  pub return_type: FeelType
 }
 
 impl FeelFunction {
   /// Create a builtin FeelFunction, required to have a name.
   /// The ladder_type should be of the form "(T1, T2, ...) -> Treturn". 
   /// It describes the parameter types and return type. 
-  pub fn new_builtin<Q: Into<QName>>(name: Q, ladder_type: String, func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) -> Self {
+  pub fn new_builtin<Q: Into<QName>>(name: Q, ladder_type: String, return_type: FeelType, func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) -> Self {
     FeelFunction {
       function_type: FunctionType::Builtin,
       name_container: RefCell::new(name.into()),
       function_container: Rc::new(func),
-      ladder_type: ladder_type
+      ladder_type: ladder_type,
+      return_type: return_type
     }
   }
 
   /// Create an anonymous (unnamed) user defined FeelFunction.
   /// Its name may be set after creation via set_name.
-  pub fn new_user(ladder_type: String, func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) -> Self {
+  pub fn new_user(ladder_type: String, return_type: FeelType, func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) -> Self {
     FeelFunction {
       function_type: FunctionType::User,
       name_container: RefCell::new(ANONYMOUS.into()),
       function_container: Rc::new(func),
-      ladder_type: ladder_type
+      ladder_type: ladder_type,
+      return_type: return_type
     }
   }
 
@@ -166,7 +172,7 @@ impl Deref for FeelFunction {
 #[cfg(test)]
 mod tests {
   use std::assert_ne;
-  use super::super::feel_value::{FeelValue};
+  use super::super::feel_value::{FeelValue,FeelType};
   use super::super::nested_context::NestedContext;
   use super::FeelFunction;
   use super::super::qname::QName;
@@ -175,7 +181,7 @@ mod tests {
     let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue {
       value.clone()
     };
-    let ff = FeelFunction::new_user("DUMMY".to_string(), f);
+    let ff = FeelFunction::new_user("DUMMY".to_string(), FeelType::Any, f);
     ff
   }
 

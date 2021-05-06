@@ -183,6 +183,8 @@ impl Duration {
     Self::new_from_seconds(seconds)
   }
 
+  pub fn get_variety(&self) -> DurationVariety { self.variety }
+
   /// Compute minuend minus subtrahend, the date difference as a YearMonth Duration (rounded to the nearest month).
   pub fn date_difference_months(minuend: NaiveDate, subtrahend: NaiveDate) -> Duration {
     let days_difference = minuend.signed_duration_since(subtrahend).num_days();

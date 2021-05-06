@@ -1,6 +1,7 @@
 use std::fmt;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::str::FromStr;
 use std::convert::{From,TryFrom};
 use std::string::ToString;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
@@ -8,7 +9,7 @@ use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use super::qname::{QName, Stringlike};
 use super::context::{Context, ContextReader};
-use super::duration::Duration;
+use super::duration::{Duration,DurationVariety,DAYS_PER_MONTH};
 use super::range::Range;
 use super::feel_function::FeelFunction;
 use super::execution_log::ExecutionLog;
@@ -289,6 +290,20 @@ impl FeelValue {
         }
       },
       None => None
+    }
+  }
+
+  pub fn new_duration(duration_string: &str) -> Option<Self> {
+    match Duration::from_str(duration_string) {
+      Ok(duration) => {
+        match duration.get_variety() {
+          DurationVariety::DayTime => Some(FeelValue::DayTimeDuration(duration)),
+          DurationVariety::YearMonth => Some(FeelValue::YearMonthDuration(duration)),
+          DurationVariety::Full if duration.are_year_month_zero() => Some(FeelValue::DayTimeDuration(duration.as_day_time(DAYS_PER_MONTH as f32))),
+          _ => Some(FeelValue::YearMonthDuration(duration.as_year_month(DAYS_PER_MONTH as f32)))
+        }
+      },
+      _ => None
     }
   }
 

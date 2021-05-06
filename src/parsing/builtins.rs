@@ -1923,8 +1923,7 @@ impl Builtins {
   }
 
 
-  /// week of year(date or date and time) - Gregorian number of the week within the year, 
-  /// according to ISO 8601
+  /// week of year(date or date and time) - Gregorian number of the week within the year, according to ISO 8601
   pub fn week_of_year<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
     Builtins::date_or_datetime_helper(
       &"week of year", 
@@ -1934,6 +1933,30 @@ impl Builtins {
       |date_time| date_time.iso_week().week().into()
     )
   }
+
+  /// duration(duration_string) -> Any: Convert to either a days and time or years and months duration from a string.
+  pub fn duration<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
+    let fname = "duration";
+    Builtins::string_transform(
+      parameters, 
+      _contexts, 
+      fname, 
+      |s| {
+        match FeelValue::new_duration(s) {
+          Some(duration) => duration,
+          None => {
+            ExecutionLog::log(&format!("{} builtin called with invalid duration string {}.", fname, s));
+            FeelValue::Null
+          }
+        }
+    })
+  }
+   
+  // years and months duration(from, to) -> YearsAndMonthsDuration: Convert to a years and months duration 
+  // the difference between from and to, both of which must be of the matching types, either date or date and time.
+
+
+
 
   //// ////////////////////////////////////////////////
   ////                                             ////
@@ -3805,6 +3828,15 @@ mod tests {
       week_of_year_test_case(2005, 1, 3, true, 1);
       week_of_year_test_case(2005, 1, 9, true, 1);
     }
+
+    //// Duration tests
+    
+    /// Test creating year and month duration as well as day time duration 
+    #[test]
+    fn test_duration() {
+      // TODO - write test
+    }
+    
 
     //// Creation of Date, Time, and Date and Time value tests
     
