@@ -7,6 +7,7 @@ extern crate pest_derive;
 extern crate lazy_static;
 
 pub mod parsing;
+pub mod execution;
 
 #[allow(unused_imports)]
 use parsing::qname::QName;

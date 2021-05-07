@@ -9,13 +9,11 @@ pub mod context;
 pub mod range;
 pub mod nested_context;
 pub mod arguments;
-pub mod builtins;
 pub mod execution_log;
 pub mod parameter_binding;
 pub mod exclusive_range;
 pub mod exclusive_inclusive_range;
 pub mod substring;
-pub mod statistics;
 pub mod golden_ratio;
 
 

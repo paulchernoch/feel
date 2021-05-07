@@ -9,12 +9,13 @@ use std::collections::HashSet;
 use std::convert::{TryFrom,TryInto};
 use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime};
 use chrono::format::{Item, Fixed, ParseResult};
-use super::range::Range;
-use super::context::{Context,ContextReader};
-use super::feel_value::{FeelValue, FeelType};
-use super::execution_log::ExecutionLog;
-use super::arguments::{Arguments,Validity};
-use super::substring::Substring;
+use crate::parsing::range::Range;
+use crate::parsing::context::{Context,ContextReader};
+use crate::parsing::feel_value::{FeelValue, FeelType};
+use crate::parsing::execution_log::ExecutionLog;
+use crate::parsing::arguments::{Arguments,Validity};
+use crate::parsing::feel_function::FeelFunction;
+use crate::parsing::substring::Substring;
 use super::statistics::{sample_standard_deviation, mode_with_ties, MedianIndex};
 use super::statistics::median as stats_median;
 
@@ -1009,7 +1010,6 @@ impl Builtins {
       FeelValue::Number(n)
     }
   }
-
 
   /// decimal(number, places) rounds the number to the desired scale.
   /// It uses the "round to even" rule.
@@ -2443,6 +2443,39 @@ impl Builtins {
     }
   }
 
+  //// ////////////////////////////////////////////////
+  ////                                             ////
+  ////               Sort function                 ////
+  ////                                             ////
+  //// ////////////////////////////////////////////////
+
+  /// Sort(list, precedes): a list using an ordering function
+  pub fn sort<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    let fname = "sort";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..=2)
+      .expect_type(0_usize, FeelType::List, false)
+      .expect_type(1_usize, FeelType::Function, false)
+      .validated() {
+      Ok(arguments) => {
+        let a = &arguments[0];
+        let b = &arguments[1];
+        match (a, b) {
+          (FeelValue::List(rr_list), FeelValue::Function(f)) if f.return_type == FeelType::Boolean || f.return_type == FeelType::Any => {
+            // TODO: Sort the list. 
+            // Before sorting, we will compare the first two elements using the sort function to see if it returns a Boolean. 
+            // If it does not, we know the function can't be used as a sort comparison function and will return Null. 
+            FeelValue::Null
+          },
+          _ => {
+            ExecutionLog::log(&format!("Called {}(list, precedes) with an ordering function that does not return a Boolean", fname));
+            FeelValue::Null
+          }
+        }        
+      },
+      Err(_) => FeelValue::Null
+    }
+  }
 
 } // End of Builtins
 
@@ -2455,18 +2488,18 @@ impl Builtins {
 #[cfg(test)]
 mod tests {
   use std::rc::Rc;
-  use super::super::feel_value::{FeelValue};
-  use super::super::context::{Context};
+  use crate::parsing::feel_value::{FeelValue};
+  use crate::parsing::context::{Context};
   use std::ops::{RangeBounds, Bound};
   use std::cmp::Ordering;
   use std::str::FromStr;
   use chrono::{NaiveDate,NaiveDateTime,NaiveTime};
-  use super::super::range::Range;
+  use crate::parsing::range::Range;
   use super::Builtins;
-  use super::super::exclusive_inclusive_range::ExclusiveInclusiveRange;
-  use super::super::exclusive_range::ExclusiveRange;
-  use super::super::duration::Duration;
-  use super::super::execution_log::ExecutionLog;
+  use crate::parsing::exclusive_inclusive_range::ExclusiveInclusiveRange;
+  use crate::parsing::exclusive_range::ExclusiveRange;
+  use crate::parsing::duration::Duration;
+  use crate::parsing::execution_log::ExecutionLog;
 
   //// Boolean function tests
   
