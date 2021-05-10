@@ -1,6 +1,6 @@
 use std::fmt;
 use std::rc::Rc;
-use std::cell::RefCell;
+use std::cell::{RefCell,Ref};
 use std::str::FromStr;
 use std::convert::{From,TryFrom};
 use std::string::ToString;
@@ -452,6 +452,24 @@ impl FeelValue {
       _ => None
     }
   }
+
+  /// If the FeelValue is a List, get a Ref to the element at the given index. 
+  /// If another variant or the index is out of range, return None. 
+  pub fn index<'a>(&'a self, index: usize) -> Option<Ref<'a, Self>> {
+    match self {
+      FeelValue::List(rr_list) => {
+        let list = rr_list.borrow();
+        if list.len() <= index {
+          None
+        }
+        else {
+          Some(Ref::map(list, |x| &x[index]))
+        }
+      },
+      _ => None
+    }
+  }
+
 
   /// Flatten a hierarchy of FeelValues where most FeelValues are leaves, but FeelValue::List's are
   /// considered branches. 

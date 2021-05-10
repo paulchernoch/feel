@@ -1,5 +1,5 @@
 use std::rc::Rc;
-use std::cell::Ref;
+use std::cell::{Ref,RefCell};
 use std::cmp::Ordering;
 use std::ops::{Bound, RangeInclusive};
 use std::ops::Range as OpsRange;
@@ -11,10 +11,10 @@ use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime};
 use chrono::format::{Item, Fixed, ParseResult};
 use crate::parsing::range::Range;
 use crate::parsing::context::{Context,ContextReader};
+use crate::parsing::nested_context::NestedContext;
 use crate::parsing::feel_value::{FeelValue, FeelType};
 use crate::parsing::execution_log::ExecutionLog;
 use crate::parsing::arguments::{Arguments,Validity};
-use crate::parsing::feel_function::FeelFunction;
 use crate::parsing::substring::Substring;
 use super::statistics::{sample_standard_deviation, mode_with_ties, MedianIndex};
 use super::statistics::median as stats_median;
@@ -2450,7 +2450,10 @@ impl Builtins {
   //// ////////////////////////////////////////////////
 
   /// Sort(list, precedes): a list using an ordering function
-  pub fn sort<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+  /// 
+  /// Note: This is the only builtin that takes a mutable NestedContext as argument, 
+  /// instead of an immutable ContextReader. This is because a function can push and pop context frames.
+  pub fn sort(parameters: FeelValue, contexts: &mut NestedContext) -> FeelValue {
     let fname = "sort";
     match Builtins::make_validator(fname, parameters)
       .arity(2..=2)
@@ -2460,15 +2463,46 @@ impl Builtins {
       Ok(arguments) => {
         let a = &arguments[0];
         let b = &arguments[1];
+        let return_type_error_message = format!("Called {}(list, precedes) with an ordering function that does not return a Boolean", fname);
         match (a, b) {
           (FeelValue::List(rr_list), FeelValue::Function(f)) if f.return_type == FeelType::Boolean || f.return_type == FeelType::Any => {
-            // TODO: Sort the list. 
+             
             // Before sorting, we will compare the first two elements using the sort function to see if it returns a Boolean. 
             // If it does not, we know the function can't be used as a sort comparison function and will return Null. 
-            FeelValue::Null
+            let list = rr_list.borrow();
+            match list.len() {
+              0 => a.clone(),
+              1 => a.clone(),
+              _ => {
+                match f(&FeelValue::new_list(vec![a.index(0).unwrap().clone(),a.index(1).unwrap().clone()]), contexts) {
+                  FeelValue::Boolean(_) => {
+                    // TODO: Sort the list.
+                    let mut list_copy: Vec<FeelValue> = list.clone();
+                    let arg_vec = Rc::new(RefCell::new(vec![FeelValue::Null, FeelValue::Null]));
+                    let precedes_args = FeelValue::List(arg_vec.clone());
+                    let comparator = |a: &FeelValue, b: &FeelValue| -> Ordering {
+                      arg_vec.borrow_mut()[0] = a.clone();
+                      arg_vec.borrow_mut()[1] = b.clone();
+                      match f(&precedes_args, contexts) {
+                        FeelValue::Boolean(false) => Ordering::Greater,
+                        FeelValue::Boolean(true) => Ordering::Less,
+                        // If the comparator returns Null or something else, assume a < b
+                        _ => Ordering::Less
+                      }
+                    };
+                    list_copy.sort_by(comparator);
+                    FeelValue::new_list(list_copy)
+                  },
+                  _ => {
+                    ExecutionLog::log(&return_type_error_message);
+                    FeelValue::Null
+                  }
+                }
+              }
+            }
           },
           _ => {
-            ExecutionLog::log(&format!("Called {}(list, precedes) with an ordering function that does not return a Boolean", fname));
+            ExecutionLog::log(&return_type_error_message);
             FeelValue::Null
           }
         }        
@@ -2488,11 +2522,13 @@ impl Builtins {
 #[cfg(test)]
 mod tests {
   use std::rc::Rc;
-  use crate::parsing::feel_value::{FeelValue};
-  use crate::parsing::context::{Context};
   use std::ops::{RangeBounds, Bound};
   use std::cmp::Ordering;
-  use std::str::FromStr;
+  use std::str::FromStr;  
+  use crate::parsing::feel_value::{FeelValue,FeelType};
+  use crate::parsing::feel_function::FeelFunction;
+  use crate::parsing::context::{Context};
+  use crate::parsing::nested_context::NestedContext;
   use chrono::{NaiveDate,NaiveDateTime,NaiveTime};
   use crate::parsing::range::Range;
   use super::Builtins;
@@ -4103,5 +4139,59 @@ mod tests {
       }
       instance_of_test_case(make_rng(1.0..5.0), "range<number>", true.into()); 
 
+    }
+
+    //// Sort tests
+    
+    #[test]
+    fn test_sort_numbers() {
+      let unsorted = FeelValue::new_from_iterator(vec![2,4,6,8,10,1,3,5,7,9]);
+      let expected = FeelValue::new_from_iterator(vec![1,2,3,4,5,6,7,8,9,10]);
+      let function_ladder_type = FeelFunction::make_ladder_type_from_types(&vec![FeelType::Number,FeelType::Number], FeelType::Boolean);
+      let mut nested_ctx = NestedContext::new();
+      
+      let precedes = FeelValue::Function(
+        FeelFunction::new_user(
+          function_ladder_type, 
+          FeelType::Boolean, 
+          |args: &FeelValue, _ctx: &mut NestedContext| -> FeelValue {
+            let a = args.index(0).unwrap();
+            let b = args.index(1).unwrap();
+            match (&*a,&*b) {
+              (FeelValue::Number(a_num), FeelValue::Number(b_num)) => (*a_num < *b_num).into(),
+              _ => FeelValue::Null
+            }
+          }
+        )
+      );
+      let sort_args = FeelValue::new_list(vec![unsorted, precedes]);
+      let actual = Builtins::sort(sort_args, &mut nested_ctx);
+      assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_sort_strings() {
+      let unsorted = FeelValue::new_from_iterator(vec!["cat", "dog", "canary", "duck", "fish", "horse", "alligator", "duck", "goose"]);
+      let expected = FeelValue::new_from_iterator(vec!["alligator", "canary", "cat", "dog", "duck", "duck", "fish", "goose", "horse"]);
+      let function_ladder_type = FeelFunction::make_ladder_type_from_types(&vec![FeelType::String,FeelType::String], FeelType::Boolean);
+      let mut nested_ctx = NestedContext::new();
+      
+      let precedes = FeelValue::Function(
+        FeelFunction::new_user(
+          function_ladder_type, 
+          FeelType::Boolean, 
+          |args: &FeelValue, _ctx: &mut NestedContext| -> FeelValue {
+            let a = args.index(0).unwrap();
+            let b = args.index(1).unwrap();
+            match (&*a,&*b) {
+              (FeelValue::String(a_str), FeelValue::String(b_str)) => (a_str < b_str).into(),
+              _ => FeelValue::Null
+            }
+          }
+        )
+      );
+      let sort_args = FeelValue::new_list(vec![unsorted, precedes]);
+      let actual = Builtins::sort(sort_args, &mut nested_ctx);
+      assert_eq!(expected, actual);
     }
 }

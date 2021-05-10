@@ -26,7 +26,7 @@ that was the basis of this project.
  - [x] FeelFunction added to FeelValue
  - [x] Execution Log
  - [x] Arguments & validation
- - [ ] **82** Built-in functions / operators:
+ - [x] **82** Built-in functions / operators:
     - [x] 3 Miscellaneous conversion
     - [x] 10 Numeric
     - [x] 1 Boolean
@@ -38,7 +38,7 @@ that was the basis of this project.
     - [x] 22 List
     - [x] 14 Range
     - [x] 2 Context
-    - [ ] 1 Sort
+    - [x] 1 Sort
     - [x] 2 Operators
  - [ ] 29 Special Properties of six data types
  - [ ] User Defined Functions
@@ -49,6 +49,15 @@ that was the basis of this project.
 Do not want to pass a logger object around to every function, so I need a way to store a logger with each thread and free it when the thread exits. The logger will be available to every function without needing to pass it in as an argument. 
 
  - [x] A thread-based contextual logger
+
+## Execution Engine
+
+ - [ ] FeelRuntime struct: value stack, op stack, definition stack, string stack
+ - [ ] FeelOpcode enum
+ - [ ] Serialization (Send/Receive)
+ - [ ] Convert FeelOpcode to FeelValue
+ - [ ] Control Flow (loops, if-else, list comprehensions, function calls, etc)
+ - [ ] Execute method
 
 ## Simple Expression Tree Walk
 
@@ -62,7 +71,7 @@ Do not want to pass a logger object around to every function, so I need a way to
 
 Must add a `get_property` method to FeelValue that can return these property values (or null, if undefined).
 
-These properties are listed in Table 65 and Table 66 of §10.3.2.15 of the DMN version 1.3 spec.
+These 29 properties are listed in Table 65 and Table 66 of §10.3.2.15 of the DMN version 1.3 spec.
 
   - [ ] **date**: year, month, day, weekday
   - [ ] **date and time**: year, month, day, weekday, 
@@ -264,7 +273,7 @@ The spec calls the points "scalars". That certainly means numbers, but we will t
 
 **Sort**
 
-  - [ ] **sort(list, precedes)** -> `List`: The precedes function defines the ordering.
+  - [x] **sort(list, precedes)** -> `List`: The precedes function defines the ordering.
 
 **Operators not supported by Rust**:
 

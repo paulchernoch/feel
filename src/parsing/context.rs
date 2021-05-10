@@ -21,6 +21,7 @@ pub struct Context {
 
 impl Context {
   /// Insert a key-value pair into the context and return the prior value, if any.
+  /// Note: Interior mutability exploited so that a non-mutable reference may be passed.
   pub fn insert<Q: Into<QName>>(&self, k: Q, v: FeelValue) -> Option<FeelValue> {
     self.contents.borrow_mut().insert(k.into(), v)
   }

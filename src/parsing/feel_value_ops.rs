@@ -2,7 +2,7 @@
 use std::ops;
 use std::cmp::{Ord, PartialOrd, Ordering};
 use std::rc::Rc;
-use std::cell::RefCell;
+use std::cell::{RefCell};
 use super::feel_value::{FeelValue, FeelType};
 use super::duration::{Duration, DAYS_PER_MONTH};
 use super::execution_log::ExecutionLog;
