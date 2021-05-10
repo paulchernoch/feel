@@ -41,6 +41,7 @@ that was the basis of this project.
     - [x] 1 Sort
     - [x] 2 Operators
  - [ ] 29 Special Properties of six data types
+ - [ ] FeelGenericType - To encapsulate all the type logic
  - [ ] User Defined Functions
     - [x] ParameterBinding 
 
@@ -52,7 +53,7 @@ Do not want to pass a logger object around to every function, so I need a way to
 
 ## Execution Engine
 
- - [ ] FeelRuntime struct: value stack, op stack, definition stack, string stack
+ - [ ] FeelRuntime struct: value stack, literal stack, op stack, definition stack, string stack
  - [ ] FeelOpcode enum
  - [ ] Serialization (Send/Receive)
  - [ ] Convert FeelOpcode to FeelValue
@@ -93,12 +94,17 @@ These 29 properties are listed in Table 65 and Table 66 of §10.3.2.15 of the DM
  - [ ] Calling Functions
  - [ ] Iteration contexts (lists, for loops)
 
-## Caching and Related Performance Enhancements
+## Caching and other Performance Enhancements
 
  - [ ] LRU Rule Cache
  - [ ] Redis Cache
  - [ ] Memoization
  - [ ] Regex Cache
+ - [ ] `FeelValue::NumberList` - to reduce boxing/unboxing overhead make a new variant of FeelValue similar to FeelValue::List.
+       Instead of holding Boxed FeelValue::Numbers in the Vec, just hold raw f64 values.
+       Add branches for all the Builtins that can handle this new variant more efficiently.
+ - [ ] Detect if the Sort `precedes` function is a simple < or > operator comparison of the two values. 
+       If it is, sort using the Ord implementation.  
 
 ## Service
 
