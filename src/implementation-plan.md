@@ -21,7 +21,7 @@ that was the basis of this project.
  - [x] Range
     - [x] Range includes
     - [x] Range added to FeelValue
-    - [!] 14 HL7 CQL Range functions => implemented in Builtins instead.
+    - [x] 14 HL7 CQL Range functions => implemented in Builtins instead.
  - [x] FeelFunction
  - [x] FeelFunction added to FeelValue
  - [x] Execution Log
@@ -40,8 +40,8 @@ that was the basis of this project.
     - [x] 2 Context
     - [x] 1 Sort
     - [x] 2 Operators
- - [ ] 29 Special Properties of six data types
- - [ ] FeelGenericType - To encapsulate all the type logic
+ - [x] 29 Special Properties of six data types (Date, Time, Duration, Range)
+ - [ ] LadderType - To encapsulate all the type logic
  - [ ] User Defined Functions
     - [x] ParameterBinding 
 
@@ -74,13 +74,13 @@ Must add a `get_property` method to FeelValue that can return these property val
 
 These 29 properties are listed in Table 65 and Table 66 of §10.3.2.15 of the DMN version 1.3 spec.
 
-  - [ ] **date**: year, month, day, weekday
-  - [ ] **date and time**: year, month, day, weekday, 
+  - [x] **date**: year, month, day, weekday
+  - [x] **date and time**: year, month, day, weekday, 
     hour, minute, second, time offset, timezone
-  - [ ] **time**: hour, minute, second, time offset, timezone
-  - [ ] **years and months duration**: years, months
-  - [ ] **days and time duration**: days, hours, minutes, seconds
-  - [ ] **range**: start, end, start included, end included
+  - [x] **time**: hour, minute, second, time offset, timezone
+  - [x] **years and months duration**: years, months
+  - [x] **days and time duration**: days, hours, minutes, seconds
+  - [x] **range**: start, end, start included, end included
 
 ## Complex Expressions
 
