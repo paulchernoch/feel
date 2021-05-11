@@ -186,10 +186,18 @@ impl Duration {
   pub fn get_days(&self) -> i32 { self.total_days() }
 
   /// Normalized hours (in the range [-23,23])
-  pub fn get_hours(&self) -> i32 { (self.hours as i32 + (self.minutes as i32 + (self.seconds as i32 / 60) / 60) % 24 as i32) * if self.positive {1} else {-1} }
+  pub fn get_hours(&self) -> i32 { 
+    let (h, m, s) = (self.hours as i32, self.minutes as i32, self.seconds as i32);
+    let abs_hours = (h + ((m + s/60) / 60)) % 24;
+    abs_hours * if self.positive {1} else {-1} 
+  }
 
   /// Normalized minutes (in the range [-59,59])
-  pub fn get_minutes(&self) -> i32 { (self.minutes as i32 + (self.seconds as i32 / 60) % 60 as i32) * if self.positive {1} else {-1} }
+  pub fn get_minutes(&self) -> i32 { 
+    let (m, s) = (self.minutes as i32, self.seconds as i32);
+    let abs_minutes = (m + s/60) % 60;
+    abs_minutes * if self.positive {1} else {-1} 
+  }
 
   /// Normalized seconds (in the range [-59,59])
   pub fn get_seconds(&self) -> i32 { self.seconds as i32 % 60 as i32 * if self.positive {1} else {-1} }
