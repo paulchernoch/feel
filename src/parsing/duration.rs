@@ -178,6 +178,22 @@ impl Duration {
     Duration::new(positive, years_can as u32, months_can as u32, days_can as u32, hours_can as u32, minutes_can as u32, seconds_can as f32)
   }
 
+  /// Normalized number of years
+  pub fn get_years(&self) -> i32 { (self.years + (self.months / 12)) as i32 * if self.positive {1} else {-1} }
+
+  /// Normalized number of months (in the range [-11,11])
+  pub fn get_months(&self) -> i32 { (self.months % 12) as i32 * if self.positive {1} else {-1} }
+  pub fn get_days(&self) -> i32 { self.total_days() }
+
+  /// Normalized hours (in the range [-23,23])
+  pub fn get_hours(&self) -> i32 { (self.hours as i32 + (self.minutes as i32 + (self.seconds as i32 / 60) / 60) % 24 as i32) * if self.positive {1} else {-1} }
+
+  /// Normalized minutes (in the range [-59,59])
+  pub fn get_minutes(&self) -> i32 { (self.minutes as i32 + (self.seconds as i32 / 60) % 60 as i32) * if self.positive {1} else {-1} }
+
+  /// Normalized seconds (in the range [-59,59])
+  pub fn get_seconds(&self) -> i32 { self.seconds as i32 % 60 as i32 * if self.positive {1} else {-1} }
+
   pub fn new_from_nanoseconds(nano_seconds: i64) -> Self {
     let seconds = nano_seconds as f64 / 1.0e9;
     Self::new_from_seconds(seconds)
