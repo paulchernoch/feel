@@ -4,6 +4,7 @@ use super::feel_value::{FeelValue, FeelType};
 use super::context::ContextReader;
 use std::ops::{RangeBounds, Bound};
 use std::hash::{Hash};
+use super::lattice_type::LatticeType;
 
 // Note: Many important functions involving Ranges are implemented in Builtins. 
 
@@ -128,7 +129,7 @@ impl Range {
     }
   }
 
-  /// Identify the type of items that may be tested against this range.
+  /// Identify the non-generic type of items that may be tested against this range.
   pub fn get_bounds_type<C: ContextReader>(&self, contexts: &C) -> FeelType {
     match (self.start_bound(contexts), self.end_bound(contexts)) {
       (Bound::Included(b), _) => b.get_type(),
@@ -136,6 +137,17 @@ impl Range {
       (_, Bound::Included(b)) => b.get_type(),
       (_, Bound::Excluded(b)) => b.get_type(),
       _ => FeelType::Null // Very Unlikely 
+    }
+  }
+
+  /// Identify the generic lattice type of items that may be tested against this range.
+  pub fn get_bounds_lattice_type<C: ContextReader>(&self, contexts: &C) -> LatticeType {
+    match (self.start_bound(contexts), self.end_bound(contexts)) {
+      (Bound::Included(b), _) => LatticeType::from_value(&b, contexts),
+      (Bound::Excluded(b), _) => LatticeType::from_value(&b, contexts),
+      (_, Bound::Included(b)) => LatticeType::from_value(&b, contexts),
+      (_, Bound::Excluded(b)) => LatticeType::from_value(&b, contexts),
+      _ => LatticeType::Null // Very Unlikely 
     }
   }
 

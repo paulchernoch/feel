@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug,Display,Formatter,Result};
 use super::qname::QName;
 use super::feel_value::FeelValue;
+use super::lattice_type::{LatticeType,ContextTypeBuilder};
 
 // TODO: Permit changing the value of a key for when we have an iteration context,
 // used when iterating over lists. See §10.3.2.14 of the DMN Spec version 1.3.
@@ -72,6 +73,14 @@ impl Context {
       .collect();
     pairs.sort_by(|a, b| a.try_get(&key_key).unwrap().cmp(&b.try_get(&key_key).unwrap()));
     pairs
+  }
+
+  pub fn infer_lattice_type<C: ContextReader>(&self, contexts: &C) -> LatticeType {
+    let mut builder = ContextTypeBuilder::new();
+    for (k,v) in self.contents.borrow().iter() {
+        builder = builder.add_key(k.to_string(), LatticeType::from_value(v, contexts));
+    }
+    builder.build()
   }
 }
 
