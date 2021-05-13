@@ -168,11 +168,10 @@ impl LatticeType {
             (LatticeType::Range(t1), LatticeType::Range(t2)) => t1.conforms_to(&*t2),
             (LatticeType::List(t1), LatticeType::List(t2)) => t1.conforms_to(&*t2),
             (LatticeType::Context(key_types1), LatticeType::Context(key_types2)) 
-                if key_types1.len() == key_types2.len() => {
-                key_types1
+                if key_types1.len() >= key_types2.len() => {
+                key_types2
                     .iter()
-                    .zip(key_types2.iter())
-                    .all(|((key1,type1),(key2,type2))| key1 == key2 && type1.conforms_to(type2))
+                    .all(|(key2,type2)| key_types1.iter().any(|(key1,type1)| key1 == key2 && type1.conforms_to(type2) ))
             },
             (LatticeType::Function { parameters: parm1, return_type: rt1 }, 
                 LatticeType::Function { parameters: parm2, return_type: rt2 })
@@ -492,14 +491,18 @@ mod tests {
             .add_key("name", LatticeType::String)
             .add_key("age", LatticeType::String)
             .build();
-        let arity_differs = ContextTypeBuilder::new()
+        let extra_field = ContextTypeBuilder::new()
             .add_key("name", LatticeType::String)
             .add_key("nationality", LatticeType::String)
             .add_key("age", LatticeType::Number)
             .build();
-            assert!(context_type.conforms_to(&same_type));
-            assert!(! context_type.conforms_to(&types_differ));
-            assert!(! context_type.conforms_to(&arity_differs));
+        assert!(context_type.conforms_to(&same_type));
+        assert!(! context_type.conforms_to(&types_differ));
+        assert!(! context_type.conforms_to(&extra_field));
+        // Reverse the order and you may have conformance. 
+        // A context with more keys can conform to a context with fewer keys, 
+        // if none are missing and the types conform. 
+        assert!(extra_field.conforms_to(&context_type));
     }
   
     #[test]
