@@ -41,7 +41,7 @@ that was the basis of this project.
     - [x] 1 Sort
     - [x] 2 Operators
  - [x] 29 Special Properties of six data types (Date, Time, Duration, Range)
- - [ ] LatticeType - To encapsulate all the type logic
+ - [x] LatticeType - To encapsulate all the type logic
  - [ ] User Defined Functions
     - [x] ParameterBinding 
 

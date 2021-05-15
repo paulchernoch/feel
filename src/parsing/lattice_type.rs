@@ -1,7 +1,10 @@
 use std::fmt::{Debug,Display,Formatter,Result};
+use std::str::FromStr;
+use std::result::Result as stdResult;
 use super::feel_value::FeelType;
 use super::context::ContextReader;
 use super::feel_value::FeelValue;
+use super::lattice_type_parser::parse_lattice_type;
 
 /// Models the Generic Type Lattice shown in Figure 10-16 in the DMN 1.3 Spec.
 /// Types may be Null, Simple (number, string, boolean, date, time, date and time, years and months duration, days and time duration) 
@@ -120,9 +123,16 @@ impl LatticeType {
     }
 
 
-    /// Create a LatticeType::Function. 
+    /// Create a LatticeType::Function with the given parameter types and return type. 
     pub fn function(parameters: Vec<LatticeType>, return_type: LatticeType) -> LatticeType {
         LatticeType::Function { parameters: parameters, return_type: Box::new(return_type) }
+    }
+
+    /// Create a LatticeType::Function with the given number of parameters, all of the given type, and returning the same type. 
+    /// This is good for creating a function that takes Any and returns Any, or takes Strings and returns a String.
+    pub fn homogeneous_function(parameter_count: usize, lattice_type: LatticeType) -> LatticeType {
+        let params: Vec<LatticeType> = (1..=parameter_count).map(|_i| lattice_type.clone()).collect();
+        LatticeType::Function { parameters: params, return_type: Box::new(lattice_type) }
     }
 
     /// Create a LatticeType::Range.
@@ -360,6 +370,17 @@ impl Display for LatticeType {
     }
 }
 
+impl FromStr for LatticeType {
+    type Err = String;
+
+    fn from_str(s: &str) -> stdResult<Self, Self::Err> {
+        match parse_lattice_type(s) {
+            Ok(lattice_type) => stdResult::Ok(lattice_type),
+            Err(message) => stdResult::Err(message)
+        }
+    }
+}
+
 /////////////// TESTS /////////////////
 
 #[cfg(test)]
@@ -368,6 +389,7 @@ mod tests {
     use super::ContextTypeBuilder;
     use super::super::feel_value::FeelValue;
     use super::super::context::Context;
+    use std::str::FromStr;
 
     #[test]
     fn test_equivalence() {
@@ -550,12 +572,16 @@ mod tests {
                 ]
             ).to_string()
         );
-
         assert_eq!(
             "function(string, number) -> string", 
             &LatticeType::function(vec![LatticeType::String, LatticeType::Number], LatticeType::String).to_string()
         );
+    }
 
+    #[test]
+    fn test_from_str() {
+        assert_eq!(LatticeType::from_str("date and time").unwrap(), LatticeType::DateAndTime);
+        assert!(LatticeType::from_str("error").is_err());
     }
 
 }

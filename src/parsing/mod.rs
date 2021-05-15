@@ -16,6 +16,7 @@ pub mod exclusive_inclusive_range;
 pub mod substring;
 pub mod golden_ratio;
 pub mod lattice_type;
+pub mod lattice_type_parser;
 
 
 pub fn hello() {

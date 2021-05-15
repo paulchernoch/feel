@@ -1,0 +1,67 @@
+// Pest Grammar for parsing DMN Feel LatticeTypes.
+// LatticeTypes are generic types. They are recursive.
+// The typical place where these strings will be found is on 
+// the righthand side of the instance of operator.
+// Examples:
+//   boolean
+//   number
+//   list<number>
+//   list<list<string>>
+//   range<date>
+//   Any
+//   Null
+//   context<name: string, age: number>
+//   function<string, number> -> string 
+//   function<Any> -> Any
+
+ladder_type = _{
+    SOI ~ a_type ~ EOI
+}
+
+a_type = _{
+    null
+  | any   
+  | number
+  | string
+  | name
+  | boolean
+  | date_and_time
+  | date
+  | time
+  | years_and_months_duration
+  | days_and_time_duration
+  | range
+  | list
+  | context
+  | function
+}
+
+null = !{ "Null" }
+any = !{ "Any" }
+number = !{ "number" }
+string = !{ "string" }
+name = !{ "name" } 
+boolean = !{ "boolean" }
+date_and_time = !{ "date" ~ "and" ~ "time" }
+date = !{ "date" }
+time = !{ "time" }
+years_and_months_duration = !{ "years" ~ "and" ~ "months" ~ "duration" }
+days_and_time_duration = !{ "days" ~ "and" ~ "time" ~ "duration" }
+range = !{ "range" ~ "<" ~ a_type ~ ">" }
+list = !{ "list" ~ "<" ~ a_type ~ ">" }
+
+// Context
+context = !{ "context" ~ "<" ~ context_items ~ ">" }
+context_items = _{ context_item ~ ("," ~ context_item)* }
+context_item = !{ key ~ ":" ~ a_type }
+key = !{ key_without_space ~ key_with_space* }
+// key_without_space and key_with_space exclude colon and double quotes
+key_without_space = _{ "!" | '#'..'/' | '0'..'9' | ';'..'@' | 'A'..'Z' | '['..'`' | 'a'..'z' | '{'..'~' }
+key_with_space = _{ " " | key_without_space }
+
+// function
+function = !{ "function" ~ "(" ~ parameters ~ ")" ~ "->" ~ return_type }
+parameters = !{ a_type ~ ("," ~ a_type)* }
+return_type = !{ a_type }
+
+WHITESPACE = _{ " " }

@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::result::Result as stdResult;
 use std::cell::{Ref,RefCell};
 use std::cmp::Ordering;
 use std::ops::{Bound, RangeInclusive};
@@ -7,6 +8,7 @@ use regex::Regex; // TODO: Should have a Regex LRU cache.
 use math::round;
 use std::collections::HashSet;
 use std::convert::{TryFrom,TryInto};
+use std::str::FromStr;
 use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime};
 use chrono::format::{Item, Fixed, ParseResult};
 use crate::parsing::range::Range;
@@ -16,6 +18,7 @@ use crate::parsing::feel_value::{FeelValue, FeelType};
 use crate::parsing::execution_log::ExecutionLog;
 use crate::parsing::arguments::{Arguments,Validity};
 use crate::parsing::substring::Substring;
+use crate::parsing::lattice_type::LatticeType;
 use super::statistics::{sample_standard_deviation, mode_with_ties, MedianIndex};
 use super::statistics::median as stats_median;
 
@@ -2395,13 +2398,12 @@ impl Builtins {
   /// The first argument may be anything. 
   /// The second argument may be a FeelValue::String or FeelValue::Name indicating the type 
   /// or FeelValue::Null. If Null, then it is a check of whether the first argument is a Null. 
-  /// Two comparisons may be made, one against the exact type and one aginst the type that is
-  /// one rung up the type ladder for the value. 
+  /// This measures type conformance, not equivalence. 
   /// For example, if the value is a list<number>, both of these would be true: 
   ///      value instance of "list<number>"
   ///      value instance of "list<Any>"
   /// 
-  /// The type String must conform to the values returned by FeelValue::get_ladder_type. 
+  /// The type String must be parseable into a LatticeType. 
   pub fn instance_of<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
     let fname = "instance of";
     match Builtins::make_validator(fname, parameters)
@@ -2414,23 +2416,31 @@ impl Builtins {
         match b {
           FeelValue::Null => a.is_null().into(),
           FeelValue::String(type_string) => {
-            let norm_type_string = FeelValue::normalize_ladder_type(type_string);
-            let exact_type = FeelValue::normalize_ladder_type(&a.get_ladder_type(false, contexts));
-            if norm_type_string == FeelType::Any.feel_type() { true.into() }
-            else if norm_type_string == exact_type { true.into() }
-            else {
-              let general_type = FeelValue::normalize_ladder_type(&a.get_ladder_type(true, contexts));
-              (norm_type_string == general_type).into()
+            let target_type_result = LatticeType::from_str(&type_string);
+            match target_type_result {
+              stdResult::Ok(target_type) => {
+                let argument_type = a.get_lattice_type(contexts);
+                let conforms = argument_type.conforms_to(&target_type);
+                conforms.into()
+              },
+              stdResult::Err(message) => {
+                ExecutionLog::log(&format!("Called {}(value, type) using a string {:?} not recognized as a valid type expression. {}", fname, b, message));
+                FeelValue::Null
+              }
             }
           },
           FeelValue::Name(qname) => {
-            let norm_type_string = FeelValue::normalize_ladder_type(&qname.to_string());
-            let exact_type = FeelValue::normalize_ladder_type(&a.get_ladder_type(false, contexts));
-            if norm_type_string == FeelType::Any.feel_type() { true.into() }
-            else if norm_type_string == exact_type { true.into() }
-            else {
-              let general_type = FeelValue::normalize_ladder_type(&a.get_ladder_type(true, contexts));
-              (norm_type_string == general_type).into()
+            let target_type_result = LatticeType::from_str(&qname.to_string());
+            match target_type_result {
+              stdResult::Ok(target_type) => {
+                let argument_type = a.get_lattice_type(contexts);
+                let conforms = argument_type.conforms_to(&target_type);
+                conforms.into()
+              },
+              stdResult::Err(message) => {
+                ExecutionLog::log(&format!("Called {}(value, type) using a string {:?} not recognized as a valid type expression. {}", fname, b, message));
+                FeelValue::Null
+              }
             }
           },
           _ => {
@@ -2465,7 +2475,8 @@ impl Builtins {
         let b = &arguments[1];
         let return_type_error_message = format!("Called {}(list, precedes) with an ordering function that does not return a Boolean", fname);
         match (a, b) {
-          (FeelValue::List(rr_list), FeelValue::Function(f)) if f.return_type == FeelType::Boolean || f.return_type == FeelType::Any => {
+          (FeelValue::List(rr_list), FeelValue::Function(f)) 
+            if LatticeType::Boolean.conforms_to(&f.get_return_type()) => {
              
             // Before sorting, we will compare the first two elements using the sort function to see if it returns a Boolean. 
             // If it does not, we know the function can't be used as a sort comparison function and will return Null. 
@@ -2525,7 +2536,7 @@ mod tests {
   use std::ops::{RangeBounds, Bound};
   use std::cmp::Ordering;
   use std::str::FromStr;  
-  use crate::parsing::feel_value::{FeelValue,FeelType};
+  use crate::parsing::feel_value::{FeelValue};
   use crate::parsing::feel_function::FeelFunction;
   use crate::parsing::context::{Context};
   use crate::parsing::nested_context::NestedContext;
@@ -2536,6 +2547,7 @@ mod tests {
   use crate::parsing::exclusive_range::ExclusiveRange;
   use crate::parsing::duration::Duration;
   use crate::parsing::execution_log::ExecutionLog;
+  use crate::parsing::lattice_type::LatticeType;
 
   //// Boolean function tests
   
@@ -4147,13 +4159,12 @@ mod tests {
     fn test_sort_numbers() {
       let unsorted = FeelValue::new_from_iterator(vec![2,4,6,8,10,1,3,5,7,9]);
       let expected = FeelValue::new_from_iterator(vec![1,2,3,4,5,6,7,8,9,10]);
-      let function_ladder_type = FeelFunction::make_ladder_type_from_types(&vec![FeelType::Number,FeelType::Number], FeelType::Boolean);
+      let function_lattice_type = LatticeType::function(vec![LatticeType::Number, LatticeType::Number], LatticeType::Boolean);
       let mut nested_ctx = NestedContext::new();
       
       let precedes = FeelValue::Function(
         FeelFunction::new_user(
-          function_ladder_type, 
-          FeelType::Boolean, 
+          function_lattice_type, 
           |args: &FeelValue, _ctx: &mut NestedContext| -> FeelValue {
             let a = args.index(0).unwrap();
             let b = args.index(1).unwrap();
@@ -4173,13 +4184,12 @@ mod tests {
     fn test_sort_strings() {
       let unsorted = FeelValue::new_from_iterator(vec!["cat", "dog", "canary", "duck", "fish", "horse", "alligator", "duck", "goose"]);
       let expected = FeelValue::new_from_iterator(vec!["alligator", "canary", "cat", "dog", "duck", "duck", "fish", "goose", "horse"]);
-      let function_ladder_type = FeelFunction::make_ladder_type_from_types(&vec![FeelType::String,FeelType::String], FeelType::Boolean);
+      let function_lattice_type = LatticeType::function(vec![LatticeType::String, LatticeType::String], LatticeType::Boolean);
       let mut nested_ctx = NestedContext::new();
       
       let precedes = FeelValue::Function(
         FeelFunction::new_user(
-          function_ladder_type, 
-          FeelType::Boolean, 
+          function_lattice_type, 
           |args: &FeelValue, _ctx: &mut NestedContext| -> FeelValue {
             let a = args.index(0).unwrap();
             let b = args.index(1).unwrap();
