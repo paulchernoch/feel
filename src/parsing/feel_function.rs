@@ -153,6 +153,7 @@ impl Deref for FeelFunction {
 #[cfg(test)]
 mod tests {
   use std::assert_ne;
+  use std::rc::Rc;
   use super::super::feel_value::{FeelValue};
   use super::super::nested_context::NestedContext;
   use super::FeelFunction;
@@ -192,6 +193,24 @@ mod tests {
     let parameter: FeelValue = 42.into();
     let result = ff(&parameter, &mut ctx);
     assert_eq!(parameter, result, "Result should be a clone of parameter");
+  }
+
+  #[derive(Clone)]
+  pub struct MockCompiledExpression {}
+
+  impl MockCompiledExpression {
+    pub fn exec(&self, value: &FeelValue, _ctx: &mut NestedContext) -> FeelValue {
+      FeelValue::String("Hello".to_string())
+    }
+
+    pub fn compile(&self) -> Rc<dyn Fn(&FeelValue, &mut NestedContext) -> FeelValue> 
+    {
+      let c = self.clone();
+      let f = move |value: &FeelValue, ctx: &mut NestedContext| -> FeelValue {
+        c.exec(value, ctx)
+      };
+      Rc::new(f)
+    }
   }
 
 }

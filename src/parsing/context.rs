@@ -91,6 +91,21 @@ pub trait ContextReader {
 
   /// Get the value associated with the key, if any.
   fn get<Q: Into<QName> + Clone>(&self, k: Q) -> Option<FeelValue>;
+
+  /// If the Context is an iterator (such as an IterationContext in a for loop)
+  /// advance the pointer to the next in the series. 
+  /// A false return means that the Context is not an iterator OR
+  /// it is an iterator but there are no more items to yield. 
+  fn move_next(&self) -> bool;
+
+  /// The length of the series of items that this context can generate by calling move_next. 
+  /// If this is not an iterable context then return one. 
+  /// If an iterable context (like in a for loop) then return the number of items to be looped over. 
+  /// The iteration may stop before all such items are generated, such as for the 
+  /// "some" and "every" features. 
+  fn length(&self) -> usize;
+
+  
 }
 
 impl ContextReader for Context {
@@ -106,6 +121,14 @@ impl ContextReader for Context {
       Some(value) => Some(value.clone()),
       None => None
     }
+  }
+
+  fn move_next(&self) -> bool {
+    false
+  }
+
+  fn length(&self) -> usize {
+    1
   }
 }
 

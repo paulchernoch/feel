@@ -73,6 +73,14 @@ impl ContextReader for NestedContext {
     }
     Option::None
   }
+
+  fn move_next(&self) -> bool {
+    false
+  }
+
+  fn length(&self) -> usize {
+    1
+  }
 }
 
 /////////////// TESTS /////////////////

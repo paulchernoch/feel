@@ -16,7 +16,13 @@ that was the basis of this project.
  - [x] Enum Defined
  - [x] Equality
  - [x] Add, Sub, Mul, Div
- - [x] Nested Context
+ - [ ] Contexts
+    - [x] Context
+    - [x] NestedContext
+    - [ ] LoopIterationContext (for one or more nested for-loops)
+    - [ ] PredicateIterationContext (for "every" and "some", which exits as soon 
+          as predicate is known to be true or false) 
+    - [ ] ListFilterIterationContext (each item in list assigned to 'item' key in the context)
  - [x] Inequality Operators
  - [x] Range
     - [x] Range includes
@@ -53,11 +59,25 @@ Do not want to pass a logger object around to every function, so I need a way to
 
 ## Execution Engine
 
- - [ ] FeelRuntime struct: value stack, literal stack, op stack, definition stack, string stack
- - [ ] FeelOpcode enum
+ - [ ] FeelRuntime struct: heap stack (literals like strings), data stack, code stack (opcodes), contexts stack, iterations (IterationContext)
+ - [ ] FeelReference enum
+ - [ ] `Opcode` enum
+ - [ ] `IterationContext` (for loops)
+ - [ ] if - then - else
+ - [ ] list access (negative indices are from the end)
+ - [ ] filter expressions (using the special variable "item" in lists, or field names without "item" in contexts)
+ - [ ] context selection (using dot name after a list of contexts yields a list of values of the name property taken from all the contexts)
+ - [ ] quantified expressions (some name in expression satisfies expression, every name in expression satisfies expression),
+ - [ ] expression between expression and expression
+ - [ ] expression in positive unary test
+ - [ ] expression in ( positive unary tests )
+ - [ ] instance of expression
+ - [ ] function definition
+ - [ ] Function calls
+ - [ ] context key lookup
+ - [ ] automatic conversions (§ 10.3.2.9.4) to and from singleton lists.
  - [ ] Serialization (Send/Receive)
  - [ ] Convert FeelOpcode to FeelValue
- - [ ] Control Flow (loops, if-else, list comprehensions, function calls, etc)
  - [ ] Execute method
 
 ## Simple Expression Tree Walk
