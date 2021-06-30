@@ -1,28 +1,27 @@
 # Execution Engine Design
 
-The Execution `Engine` will be a virtual machine which stores: 
+The Execution Engine `Interpreter` will be a virtual machine which stores: 
   - **instruction stack** (holds `OpCode`s, Enums which are like assembly language instructions)
   - **instruction pointer** (integer index to the currently executing `OpCode`)
   - **data stack** (stack of `FeelValue` objects, which are intermediate values used in the calculations and from which the result of the expression will be plucked.)
   - **context** (a `NestedContext` onto which frames can be pushed or popped)
   - **heap** (Strings, which are of variable size. An `OpCode` can reference one of these Strings and be used to construct a `FeelValue::String`)
 
-The parser will translate the source code text into an `Engine`. All literal Strings  will be added to the `heap` and pointed to by `OpCode`s that reference them by integer index. Other literals will be represented by a series of instructions that can be used to construct them from strings or other `FeelValue`s. All logic (arithmetic operations, function calls, value lookups, for-loops, etc) will be translated into `OpCodes` that perform actions, in postfix order, like the **Forth** language.
+The parser will translate the source code text into a `CompiledExpression`, used as the basis of an `Interpreter`. All literal Strings  will be added to the `heap` and pointed to by `OpCode`s that reference them by integer index. Other literals will be represented by a series of instructions that can be used to construct them from strings or other `FeelValue`s. All logic (arithmetic operations, function calls, value lookups, for-loops, etc) will be translated into `OpCodes` that perform actions, in postfix order, like the **Forth** language.
 
 ## Caching: Send and Sync
 
 To implement a service that handles multiple users, we must maintain a cache of compiled expressions. For them to be useable by multiple threads, Rust requires them to implement the `Send` and `Sync` traits. Since `FeelValue` does not and cannot, we need to segregate parts of the type that employ interior mutability 
-(List and Context) that cannot implement Send and Sync. Thus the parser will generate a `CompiledExpression`, which only has the `InstructionStack` and a `Heap`. This will be immutable, can be cached and will implement `Send` and `Sync`. When it is time to be executed, an `Engine` is created from the `CompiledExpression` and is used to compute the result.
+(List and Context) that cannot implement Send and Sync. Thus the parser will generate a `CompiledExpression`, which only has the `InstructionStack` and a `Heap`. This will be immutable, can be cached and will implement `Send` and `Sync`. When it is time to be executed, an `Interpreter` is created from the `CompiledExpression` and is used to compute the result.
 
 ## Structs
 
 The key structs and traits for the engine will be:
 
-  - `Engine` will hold a `CompiledExpression`, maybe delegate to it using `Ambassador`
+  - `Interpreter` will hold a `CompiledExpression`, maybe delegate to it using `Ambassador`
   - `OpCode`
   - `CompiledExpression` will implement `Send` and `Sync`
   - `FeelValue`
-  - `DataValue` will be an enum with variants for `FeelValue` and certain delimiters (`EndOfList`, `EndOfContext`)
   - `ContextReader` trait and the structs that implement it:
   
     * `Context` (used for user defined dictionaries, the builtin functions context)
@@ -34,7 +33,7 @@ The key structs and traits for the engine will be:
 
 ## User Defined Functions
 
-User defined functions are tricky, as when they are called, we must push a new `Context` for its parameters and direct execution to a separate `Engine` for that function. When the function exits, we resume execution of the previous `Engine`.
+User defined functions are tricky, as when they are called, we must push a new `Context` for its parameters and direct execution to a separate `Interpreter` for that function. When the function exits, we resume execution of the previous `Interpreter`.
 
 ## Iteration Contexts
 

@@ -21,6 +21,9 @@ use parsing::context::Context;
 #[allow(unused_imports)]
 use parsing::feel_value::FeelValue;
 
+#[allow(unused_imports)]
+use execution::opcode;
+
 extern crate strum;
 #[macro_use]
 extern crate strum_macros;

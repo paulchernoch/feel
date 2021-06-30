@@ -21,4 +21,4 @@ libmath = "0.2"
 regex = "1.4"
 lazy_static = "1.4"
 pdqselect = "0.1"
-
+ordered-float = "2.0"
