@@ -313,6 +313,7 @@ mod tests {
   use super::super::compiled_expression::CompiledExpression;
   use super::Interpreter;
   use crate::parsing::nested_context::NestedContext;
+  use std::str::FromStr;
 
   #[test]
   fn test_addition() {
@@ -328,6 +329,18 @@ mod tests {
     assert_eq!(actual, expected);
   }
 
+  #[test]
+  fn test_arithmetic() {
+    let mut i = make_interpreter_from_strings(vec![
+        "num(1)", "num(2)", "*", "num(3)", "*", "num(4)", "+", "num(0.1)", "/", "num(58)", "-"
+      ].iter().map(|s| s.to_string()).collect(), 
+      Vec::new()
+    );
+    let actual = i.execute();
+    let expected: FeelValue = 42.into();
+    assert_eq!(actual, expected);
+  }
+
   fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {
     let ctx = NestedContext::new();
     let mut expr = CompiledExpression::new("test");
@@ -335,6 +348,19 @@ mod tests {
         expr.find_or_add_to_heap(s);
     }
     for op in ops {
+        expr.push(op);
+    }
+    Interpreter::new(expr, ctx)
+  }
+
+  fn make_interpreter_from_strings(ops: Vec<String>, heap: Vec<String>) -> Interpreter {
+    let ctx = NestedContext::new();
+    let mut expr = CompiledExpression::new("test");
+    for s in heap {
+        expr.find_or_add_to_heap(s);
+    }
+    for op_string in ops {
+        let op = OpCode::from_str(&op_string).unwrap();
         expr.push(op);
     }
     Interpreter::new(expr, ctx)

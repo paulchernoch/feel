@@ -307,9 +307,9 @@ impl FromStr for OpCode {
                 lazy_static! {
                     static ref FANCY_OPCODE_RE: Regex = Regex::new(r"(?x)
                         ^                              # Match start of string
-                        (?P<opname>[-+\#a-zA-Z]+)     # Match abbreviated name of OpCode as 'opname'
+                        (?P<opname>[-+\#a-zA-Z]+)      # Match abbreviated name of OpCode as 'opname'
                         \(                             # Open parentheses
-                        (?P<arg1>[0-9]+)               # Match first number as 'arg1'
+                        (?P<arg1>-?[0-9]+([.][0-9]+)?) # Match first number as 'arg1'
                         (/                             # Delimiter
                         (?P<arg2>[0-9]+)               # Optionally match second number as 'arg2'
                         /                              # Delimiter
