@@ -248,7 +248,6 @@ impl FromStr for OpCode {
     /// Parse an OpCode from a string.
     /// This is mostly for unit tests, to make it convenient to create test data. 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        // TODO: Parse the more complicated cases that have arguments. 
         let op = match s {
             "+" => OpCode::Add,
             "-" => OpCode::Subtract,

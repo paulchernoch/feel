@@ -60,6 +60,40 @@ impl ops::Neg for &FeelValue {
   }
 }
 
+impl ops::Not for FeelValue {
+  type Output = FeelValue;
+
+  fn not(self) -> Self::Output {
+    if self.is_true() {
+        false.into()
+    }
+    else if self.is_false() {
+        true.into()
+    }
+    else {
+      ExecutionLog::log(&format!("Cannot perform logical not of {}", self.get_type().to_string()));
+      FeelValue::Null
+    }
+  }
+}
+
+impl ops::Not for &FeelValue {
+  type Output = FeelValue;
+
+  fn not(self) -> Self::Output {
+    if self.is_true() {
+        false.into()
+    }
+    else if self.is_false() {
+        true.into()
+    }
+    else {
+      ExecutionLog::log(&format!("Cannot perform logical not of {}", self.get_type().to_string()));
+      FeelValue::Null
+    }
+  }
+}
+
 impl<'a, 'b> ops::Sub<&'b FeelValue> for &'a FeelValue {
   type Output = FeelValue;
 
@@ -298,11 +332,13 @@ impl Ord for FeelValue {
 
 #[cfg(test)]
 mod tests {
+  use std::cmp::{Ord, PartialOrd, Ordering};
   use std::str::FromStr;
   use chrono::{ NaiveDate, NaiveTime };
   use super::super::duration::Duration;
   // use super::super::feel_value::{Numeric};
   use super::super::feel_value::{FeelValue};
+  use super::super::feel_value_ops;
   use super::super::execution_log::ExecutionLog;
   // use std::assert_ne;
 
@@ -415,6 +451,8 @@ mod tests {
     assert_eq!(true, x > y, "x > y");
     assert_eq!(false, x < y, "x < y");
     assert_eq!(false, x <= y, "x <= y");
+    assert_eq!(true, x != y, "x != y");
+    assert_eq!(false, x != x, "x != x");
   }
 
   #[test]
@@ -435,4 +473,15 @@ mod tests {
     assert_eq!(true, x <= y, "x <= y");
     assert_eq!(false, x >= y, "x >= y");
   }
+
+  #[test]
+  fn test_not() {
+    let t: FeelValue = false.into();
+    let f: FeelValue = true.into();
+    assert_eq!(f, ! t.clone(), "! true");
+    assert_eq!(t, ! f.clone(), "! false");
+  }
+
+  // NOTE: Logical and and logical or operators may not be overloaded in Rust. 
+
 }

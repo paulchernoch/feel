@@ -1,5 +1,6 @@
 use std::fmt::{Display,Formatter,Result};
 use super::opcode::OpCode;
+use crate::parsing::feel_value::FeelValue;
 
 /// Product of parsing a Feel expression into a postfix ordered series of operations plus a heap of strings. 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +50,15 @@ impl CompiledExpression {
     pub fn new_load_string<S: Into<String>>(&mut self, string_to_load: S) -> OpCode {
         let heap_position = self.find_or_add_to_heap(string_to_load);
         OpCode::LoadString(heap_position) 
+    }
+
+    /// Get the string from the given zero-based position in the heap and create a FeelValue::String for it,
+    /// unless the index is out of bounds, in which case a FeelValue::Null is returned. 
+    pub fn get_from_heap(&self, index: usize) -> FeelValue {
+        match self.heap.get(index) {
+            Some(s) => FeelValue::String(s.clone()),
+            None => FeelValue::Null
+        }
     }
 
     /// Push an operation onto the end of the operations stack.
