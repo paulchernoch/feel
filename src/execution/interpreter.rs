@@ -1,10 +1,9 @@
-use std::cmp::{Ord, PartialOrd, Ordering};
-use std::ops::{Add,Sub,Mul,Div};
+// use std::cmp::{Ord, PartialOrd, Ordering};
 use super::opcode::OpCode;
 use super::compiled_expression::CompiledExpression;
 use crate::parsing::execution_log::ExecutionLog;
 use crate::parsing::feel_value::{FeelValue,FeelType};
-use crate::parsing::feel_value_ops;
+// use crate::parsing::feel_value_ops;
 use crate::execution::builtins::Builtins;
 use crate::parsing::nested_context::NestedContext;
 use crate::parsing::context::Context;
@@ -307,7 +306,7 @@ impl Interpreter {
 
 #[cfg(test)]
 mod tests {
-
+  #![allow(non_snake_case)]
   use crate::parsing::feel_value::{FeelValue};
   use super::super::opcode::OpCode;
   use super::super::compiled_expression::CompiledExpression;
@@ -331,14 +330,25 @@ mod tests {
 
   #[test]
   fn test_arithmetic() {
-    let mut i = make_interpreter_from_strings(vec![
-        "num(1)", "num(2)", "*", "num(3)", "*", "num(4)", "+", "num(0.1)", "/", "num(58)", "-"
-      ].iter().map(|s| s.to_string()).collect(), 
+    let actual = parse_and_execute(
+      vec!["num(1)", "num(2)", "*", "num(3)", "*", "num(4)", "+", "num(0.1)", "/", "num(58)", "-"], 
       Vec::new()
     );
-    let actual = i.execute();
     let expected: FeelValue = 42.into();
     assert_eq!(actual, expected);
+  }
+
+  #[test]
+  fn test_inequalities() {
+
+    let FALSE: FeelValue = false.into();
+    let TRUE: FeelValue = true.into();
+    assert_eq!(FALSE, parse_and_execute(vec!["num(1)", "num(2)", ">"], Vec::new()));
+    assert_eq!(TRUE, parse_and_execute(vec!["num(1)", "num(2)", "<"], Vec::new()));
+    assert_eq!(TRUE, parse_and_execute(vec!["num(1)", "num(1)", ">="], Vec::new()));
+    assert_eq!(TRUE, parse_and_execute(vec!["num(1)", "num(2)", "<="], Vec::new()));
+    assert_eq!(TRUE, parse_and_execute(vec!["num(2)", "num(2)", "="], Vec::new()));
+    assert_eq!(FALSE, parse_and_execute(vec!["num(1)", "num(2)", "="], Vec::new()));
   }
 
   fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {
@@ -364,6 +374,15 @@ mod tests {
         expr.push(op);
     }
     Interpreter::new(expr, ctx)
+  }
+
+  fn parse_and_execute(ops: Vec<&str>, heap: Vec<String>) -> FeelValue {
+    let op_strings: Vec<String> = ops
+      .iter()
+      .map(|s| s.to_string())
+      .collect();
+    let mut interpreter = make_interpreter_from_strings(op_strings, heap);
+    interpreter.execute()
   }
 
 }

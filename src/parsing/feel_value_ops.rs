@@ -1,6 +1,6 @@
-//use std::cmp;
 use std::ops;
-use std::cmp::{Ord, PartialOrd, Ordering};
+// use std::cmp::{Ord, PartialOrd, Ordering};
+use std::cmp::{Ordering};
 use std::rc::Rc;
 use std::cell::{RefCell};
 use super::feel_value::{FeelValue, FeelType};
@@ -332,13 +332,11 @@ impl Ord for FeelValue {
 
 #[cfg(test)]
 mod tests {
-  use std::cmp::{Ord, PartialOrd, Ordering};
   use std::str::FromStr;
   use chrono::{ NaiveDate, NaiveTime };
   use super::super::duration::Duration;
   // use super::super::feel_value::{Numeric};
   use super::super::feel_value::{FeelValue};
-  use super::super::feel_value_ops;
   use super::super::execution_log::ExecutionLog;
   // use std::assert_ne;
 
