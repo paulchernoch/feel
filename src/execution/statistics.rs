@@ -164,7 +164,7 @@ where T: Hash + Eq + Ord + Clone, {
     *n
   }
 
-  // Updates the tallies, etc. after each item is visited.
+  /// Updates the tallies, etc. after each item is visited.
   fn update<'a, T>(value: &'a T, tallies: &mut HashMap<&'a T, usize>, common: &mut Vec<&'a T>, max_ct: &mut usize) 
   where T: Hash + Eq + Ord + Clone {
     let new_count = incr(tallies.entry(value).or_insert(0));

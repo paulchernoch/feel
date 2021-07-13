@@ -185,8 +185,28 @@ impl Interpreter {
                     OpCode::In => {},
                     OpCode::Filter => {},
                     OpCode::InstanceOf => {},
-                    OpCode::CreateList => {},
-                    OpCode::PushList => {},
+                    */
+                    OpCode::CreateList => {
+                        self.advance();
+                        self.push_data(FeelValue::new_list(Vec::new()));
+                    },
+                    OpCode::PushList => {
+                        self.advance();
+                        let (list, item) = self.pop_two();
+                        match list.clone() {
+                            FeelValue::List(rr_list) => {
+                                rr_list.borrow_mut().push(item);
+                                self.push_data(list);
+                            },
+                            _ => {
+                                ExecutionLog::log(
+                                    &format!("Cannot push value onto {}", list.get_type().to_string())
+                                );
+                                self.push_data(FeelValue::Null);
+                            }
+                        };
+                    },
+                    /*
                     OpCode::LoadFromContext => {},
                     OpCode::AddEntryToContext => {},
                     OpCode::PushContext => {},
@@ -387,6 +407,28 @@ mod tests {
     assert_eq!(TRUE, parse_and_execute(vec!["num(1)", "num(1)", "num(3)", "between"], Vec::new()));
     assert_eq!(FALSE, parse_and_execute(vec!["num(0)", "num(1)", "num(3)", "between"], Vec::new()));
     assert_eq!(FALSE, parse_and_execute(vec!["num(4)", "num(1)", "num(3)", "between"], Vec::new()));
+  }
+
+  #[test]
+  fn test_load_string() {
+    let FALSE: FeelValue = false.into();
+    let TRUE: FeelValue = true.into();
+    let duck: FeelValue = "Duck".into();
+    let goose: FeelValue = "Goose".into();
+    let heap: Vec<String> = vec!["Duck".to_string(), "Goose".to_string()];
+    assert_eq!(duck, parse_and_execute(vec!["string(0)"], heap.clone()));
+    assert_eq!(goose, parse_and_execute(vec!["string(1)"], heap.clone()));
+    assert_eq!(TRUE, parse_and_execute(vec!["string(0)", "string(0)", "="], heap.clone()));
+    assert_eq!(FALSE, parse_and_execute(vec!["string(0)", "string(1)", "="], heap.clone()));
+  }
+
+  #[test]
+  fn test_list_push() {
+    let duck: FeelValue = "Duck".into();
+    let goose: FeelValue = "Goose".into();
+    let heap: Vec<String> = vec!["Duck".to_string(), "Goose".to_string()];
+    let expected = FeelValue::new_list(vec![duck, goose]);
+    assert_eq!(expected, parse_and_execute(vec!["list", "string(0)", "push", "string(1)", "push"], heap.clone()));
   }
 
   fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {
