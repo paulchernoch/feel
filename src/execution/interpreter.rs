@@ -379,6 +379,16 @@ mod tests {
     assert_eq!(FeelValue::Number(8.0), parse_and_execute(vec!["num(2)", "num(3)", "^"], Vec::new()));
   }
 
+  #[test]
+  fn test_between() {
+    let FALSE: FeelValue = false.into();
+    let TRUE: FeelValue = true.into();
+    assert_eq!(TRUE, parse_and_execute(vec!["num(2)", "num(1)", "num(3)", "between"], Vec::new()));
+    assert_eq!(TRUE, parse_and_execute(vec!["num(1)", "num(1)", "num(3)", "between"], Vec::new()));
+    assert_eq!(FALSE, parse_and_execute(vec!["num(0)", "num(1)", "num(3)", "between"], Vec::new()));
+    assert_eq!(FALSE, parse_and_execute(vec!["num(4)", "num(1)", "num(3)", "between"], Vec::new()));
+  }
+
   fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {
     let ctx = NestedContext::new();
     let mut expr = CompiledExpression::new("test");
