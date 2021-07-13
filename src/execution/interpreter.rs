@@ -340,7 +340,6 @@ mod tests {
 
   #[test]
   fn test_inequalities() {
-
     let FALSE: FeelValue = false.into();
     let TRUE: FeelValue = true.into();
     assert_eq!(FALSE, parse_and_execute(vec!["num(1)", "num(2)", ">"], Vec::new()));
@@ -349,6 +348,35 @@ mod tests {
     assert_eq!(TRUE, parse_and_execute(vec!["num(1)", "num(2)", "<="], Vec::new()));
     assert_eq!(TRUE, parse_and_execute(vec!["num(2)", "num(2)", "="], Vec::new()));
     assert_eq!(FALSE, parse_and_execute(vec!["num(1)", "num(2)", "="], Vec::new()));
+    assert_eq!(TRUE, parse_and_execute(vec!["num(1)", "num(2)", "!="], Vec::new()));
+    assert_eq!(FALSE, parse_and_execute(vec!["num(2)", "num(2)", "!="], Vec::new()));
+  }
+
+  #[test]
+  fn test_logical_and() {
+    let FALSE: FeelValue = false.into();
+    let TRUE: FeelValue = true.into();
+    assert_eq!(TRUE, parse_and_execute(vec!["true", "true", "and"], Vec::new()));
+    assert_eq!(FALSE, parse_and_execute(vec!["true", "false", "and"], Vec::new()));
+    assert_eq!(FALSE, parse_and_execute(vec!["false", "true", "and"], Vec::new()));
+    assert_eq!(FALSE, parse_and_execute(vec!["false", "false", "and"], Vec::new()));
+    assert_eq!(FeelValue::Null, parse_and_execute(vec!["num(2)", "false", "and"], Vec::new()));
+  }
+
+  #[test]
+  fn test_logical_or() {
+    let FALSE: FeelValue = false.into();
+    let TRUE: FeelValue = true.into();
+    assert_eq!(TRUE, parse_and_execute(vec!["true", "true", "or"], Vec::new()));
+    assert_eq!(TRUE, parse_and_execute(vec!["true", "false", "or"], Vec::new()));
+    assert_eq!(TRUE, parse_and_execute(vec!["false", "true", "or"], Vec::new()));
+    assert_eq!(FALSE, parse_and_execute(vec!["false", "false", "or"], Vec::new()));
+    assert_eq!(FeelValue::Null, parse_and_execute(vec!["num(2)", "false", "or"], Vec::new()));
+  }
+
+  #[test]
+  fn test_exponentiation() {
+    assert_eq!(FeelValue::Number(8.0), parse_and_execute(vec!["num(2)", "num(3)", "^"], Vec::new()));
   }
 
   fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {
