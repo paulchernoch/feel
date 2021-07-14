@@ -208,6 +208,56 @@ impl Validity {
     }
   }
 
+  pub fn expect_string_or_name(self, zero_based_argument: usize, allow_null: bool) -> Self {
+    if !self.is_valid() {
+      return self;
+    }
+    if zero_based_argument == 0 && self.has_list_as_sole_argument() {
+      // If a list with a single list argument, assume the type constraint is 
+      // to be applied to the first element of the inner list. 
+      let list = &self.arguments()[0];
+      match list.list_length() {
+        Some(len) if len >= 1 => {
+          match list {
+            FeelValue::List(rr_list) => {
+              let actual_type = rr_list.borrow()[0].get_type();
+              let is_null = actual_type == FeelType::Null;
+              if actual_type != FeelType::String && actual_type != FeelType::Name && !(is_null && allow_null)  {
+                ExecutionLog::log(&format!(
+                  "Called {:?} with {:?} for first argument, expected String or Qualified Name", 
+                  self.name(), actual_type
+                ));
+                self.and(false)
+              }
+              else {
+                self
+              }
+            },
+            _ => unreachable!()
+          }
+        },
+        _ => {
+          ExecutionLog::log(&format!("Called {:?} with empty list, expected String or Qualified Name", self.name()));
+          self.and(false)
+        }
+      }
+    }
+    else {
+      let actual_type = self.arguments()[zero_based_argument].get_type();
+      let is_null = self.arguments()[zero_based_argument].is_null();
+      if actual_type != FeelType::String && actual_type != FeelType::Name && !(is_null && allow_null)  {
+        ExecutionLog::log(&format!(
+          "Called {:?} with {:?} for argument {:?}, expected String or Qualified Name", 
+          self.name(), actual_type, zero_based_argument + 1
+        ));
+        self.and(false)
+      }
+      else {
+        self
+      }
+    }
+  }
+
   /// Range functions support one, two, or four different use cases. 
   /// The first argument may be a point (like a Number or Date) and/or Range.
   /// The second argument may be a point (like a Number or Date) and/or Range.

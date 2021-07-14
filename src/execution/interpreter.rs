@@ -217,8 +217,12 @@ impl Interpreter {
                     },
                     /*
                     OpCode::Filter => {},
-                    OpCode::InstanceOf => {},
                     */
+                    OpCode::InstanceOf => {
+                        self.advance();
+                        let result = Builtins::instance_of(self.make_args(2), &self.contexts);
+                        self.push_data(result);
+                    },
                     OpCode::CreateList => {
                         self.advance();
                         self.push_data(FeelValue::new_list(Vec::new()));
@@ -647,7 +651,15 @@ mod tests {
         FeelValue::Null, 
         exec_string("num(77) null >= branch(0/1/2) label(0) string(0) goto(3) label(1) string(1) goto(3) label(2) null label(3) return", heap.clone())
     );
+  }
 
+  #[test]
+  fn test_instance_of() {
+    let heap: Vec<String> = vec!["number".to_string(), "boolean".to_string(), "Any".to_string()];
+    assert_eq!(
+        FeelValue::Boolean(true), 
+        exec_string("num(6) string(0) is true string(1) is and false string(2) is and", heap.clone())
+    );
   }
 
   fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {

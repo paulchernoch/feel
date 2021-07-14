@@ -2448,7 +2448,7 @@ impl Builtins {
     let fname = "instance of";
     match Builtins::make_validator(fname, parameters)
       .arity(2..=2)
-      .expect_type(1_usize, FeelType::String, true)
+      .expect_string_or_name(1_usize, true)
       .validated() {
       Ok(arguments) => {
         let a = &arguments[0];
