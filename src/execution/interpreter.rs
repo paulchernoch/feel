@@ -613,6 +613,19 @@ mod tests {
     assert_eq!(expected, parse_and_execute(vec!["string(0)", "dt"], heap));
   }
 
+  /// Test uses a goto to jump past the plus and minus operators to perform a multiply, then hits a return that causes the final zero to not be pushed. 
+  #[test]
+  fn test_goto_address() {
+    assert_eq!(
+        FeelValue::Number(42.0), 
+        parse_and_execute(vec![
+                "num(6)", "num(7)", "goto(1)", "+", "-", "label(1)", "*", "return", "num(0)"
+            ], 
+            Vec::new()
+        )
+    );
+  }
+
   fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {
     let ctx = NestedContext::new();
     let mut expr = CompiledExpression::new("test");
