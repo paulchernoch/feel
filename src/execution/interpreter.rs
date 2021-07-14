@@ -249,8 +249,15 @@ impl Interpreter {
                         let args = self.make_args(1);
                         self.push_data(Builtins::date(args, &self.contexts));
                     },
+                    OpCode::CreateTime => {
+                        self.advance();
+                        let args = self.make_args(1);
+                        // NOTE: Though the "time" builtin can take one argument or three to four,
+                        //       this opcode will only expect a single argument. 
+                        //       To build a time from parts, you must call it using the CallFunction opcode. 
+                        self.push_data(Builtins::time(args, &self.contexts));
+                    },
 /*
-                    OpCode::CreateTime => {},
                     OpCode::CreateDateTime => {},
                     OpCode::CreateYearsAndMonthsDuration => {},
                     OpCode::CreateDayAndTimeDuration => {},
@@ -533,6 +540,13 @@ mod tests {
     let heap: Vec<String> = vec!["2020-02-15".to_string()];
     let expected = FeelValue::Date(NaiveDate::from_ymd(2020, 2, 15));
     assert_eq!(expected, parse_and_execute(vec!["string(0)", "date"], heap));
+  }
+
+  #[test]
+  fn test_create_time() {
+    let heap: Vec<String> = vec!["12:34:56z".to_string()];
+    let expected = FeelValue::new_time("12:34:56z").unwrap();
+    assert_eq!(expected, parse_and_execute(vec!["string(0)", "time"], heap));
   }
 
   fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {
