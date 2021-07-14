@@ -1,5 +1,5 @@
 // use std::cmp::{Ord, PartialOrd, Ordering};
-use super::opcode::OpCode;
+use super::opcode::{OpCode,RangeBoundType};
 use super::compiled_expression::CompiledExpression;
 use crate::parsing::execution_log::ExecutionLog;
 use crate::parsing::feel_value::{FeelValue,FeelType};
@@ -7,6 +7,7 @@ use crate::parsing::feel_value::{FeelValue,FeelType};
 use crate::execution::builtins::Builtins;
 use crate::parsing::nested_context::NestedContext;
 use crate::parsing::context::Context;
+use crate::parsing::range::Range;
 
 /*
   Execution engine that interprets a stream of OpCodes in the presence of a given context and produces a result.
@@ -181,8 +182,14 @@ impl Interpreter {
                         self.push_data((&value >= &range_start_inclusive && &value <= &range_end_inclusive).into());
                     },
 
+                    OpCode::In => {
+                        self.advance();
+                        let (lower, higher) = self.pop_two();
+                        let args = FeelValue::new_list(vec![lower, higher]);
+                        let result = Builtins::in_operator(args, &Context::new());
+                        self.push_data(result);
+                    },
                     /*
-                    OpCode::In => {},
                     OpCode::Filter => {},
                     OpCode::InstanceOf => {},
                     */
@@ -215,7 +222,14 @@ impl Interpreter {
                     OpCode::CreatePredicateContext(dimensions) => {},
                     OpCode::CreateFilterContext => {},
                     OpCode::LoadContext => {},
-                    OpCode::CreateRange { lower, upper } => {},
+                    */
+
+                    OpCode::CreateRange { lower, upper } => {
+                        self.advance();
+                        self.create_range(lower, upper);
+                    },
+
+/*
                     OpCode::CreateDate => {},
                     OpCode::CreateTime => {},
                     OpCode::CreateDateTime => {},
@@ -321,6 +335,54 @@ impl Interpreter {
         else {
             popped
         }
+    }
+
+    /// Pop one or two items from the data stack, construct a Range with the appropriate lower and upper bounds, 
+    /// and push it onto the data stack. 
+    /// Returns true on success, false on failure. 
+    /// If unable to create a Range, push a Null instead.
+    fn create_range(&mut self, lower: RangeBoundType, upper: RangeBoundType) -> bool {
+        let r:Range = match (lower, upper) {
+            (RangeBoundType::Exclusive, RangeBoundType::Exclusive) => {
+                let (lower_bound, upper_bound) = self.pop_two();
+                Range::new(&lower_bound, &upper_bound, false, false)
+            },
+            (RangeBoundType::Exclusive, RangeBoundType::Inclusive) => {
+                let (lower_bound, upper_bound) = self.pop_two();
+                Range::new(&lower_bound, &upper_bound, false, true)
+            },
+            (RangeBoundType::Inclusive, RangeBoundType::Exclusive) => {
+                let (lower_bound, upper_bound) = self.pop_two();
+                Range::new(&lower_bound, &upper_bound, true, false)
+            },
+            (RangeBoundType::Inclusive, RangeBoundType::Inclusive) => {
+                let (lower_bound, upper_bound) = self.pop_two();
+                Range::new(&lower_bound, &upper_bound, true, true)
+            },
+            (RangeBoundType::Open, RangeBoundType::Exclusive) => {
+                let upper_bound = self.pop_data();
+                Range::new_with_high(&upper_bound, false)
+            },
+            (RangeBoundType::Open, RangeBoundType::Inclusive) => {
+                let upper_bound = self.pop_data();
+                Range::new_with_high(&upper_bound, true)
+            },
+            (RangeBoundType::Inclusive, RangeBoundType::Open) => {
+                let lower_bound = self.pop_data();
+                Range::new_with_low(&lower_bound, true)
+            },
+            (RangeBoundType::Exclusive, RangeBoundType::Open) => {
+                let lower_bound = self.pop_data();
+                Range::new_with_low(&lower_bound, false)
+            },
+            (RangeBoundType::Open, RangeBoundType::Open) => {
+                ExecutionLog::log(&format!("Unrestricted Ranges are not supported"));
+                self.push_data(FeelValue::Null);
+                return false;
+            }
+        };
+        self.push_data(FeelValue::Range(r));
+        true
     }
 }
 
@@ -429,6 +491,21 @@ mod tests {
     let heap: Vec<String> = vec!["Duck".to_string(), "Goose".to_string()];
     let expected = FeelValue::new_list(vec![duck, goose]);
     assert_eq!(expected, parse_and_execute(vec!["list", "string(0)", "push", "string(1)", "push"], heap.clone()));
+  }
+
+  #[test]
+  fn test_in_list() {
+    let heap: Vec<String> = vec!["Duck".to_string(), "Goose".to_string()];
+    assert!(parse_and_execute(vec!["string(1)", "list", "string(0)", "push", "string(1)", "push", "in"], heap).is_true());
+  }
+
+  #[test]
+  fn test_in_range() {
+    let FALSE: FeelValue = false.into();
+    let TRUE: FeelValue = true.into();
+    assert_eq!(TRUE, parse_and_execute(vec!["num(10)", "num(1)", "num(10)", "[lo,hi]", "in"], Vec::new()));
+    assert_eq!(FALSE, parse_and_execute(vec!["num(10)", "num(1)", "num(10)", "[lo,hi)", "in"], Vec::new()));
+    assert_eq!(TRUE, parse_and_execute(vec!["num(5)", "num(3)", "[lo,..]", "in"], Vec::new()));
   }
 
   fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {
