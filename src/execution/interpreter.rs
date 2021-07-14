@@ -257,8 +257,12 @@ impl Interpreter {
                         //       To build a time from parts, you must call it using the CallFunction opcode. 
                         self.push_data(Builtins::time(args, &self.contexts));
                     },
+                    OpCode::CreateDateTime => {
+                        self.advance();
+                        let args = self.make_args(1);
+                        self.push_data(Builtins::date_and_time(args, &self.contexts));
+                    },
 /*
-                    OpCode::CreateDateTime => {},
                     OpCode::CreateYearsAndMonthsDuration => {},
                     OpCode::CreateDayAndTimeDuration => {},
 
@@ -547,6 +551,14 @@ mod tests {
     let heap: Vec<String> = vec!["12:34:56z".to_string()];
     let expected = FeelValue::new_time("12:34:56z").unwrap();
     assert_eq!(expected, parse_and_execute(vec!["string(0)", "time"], heap));
+  }
+
+  #[test]
+  fn test_create_date_and_time() {
+    let dt = "2021-05-04T12:34:56z";
+    let heap: Vec<String> = vec![dt.to_string()];
+    let expected = FeelValue::new_date_and_time(dt).unwrap();
+    assert_eq!(expected, parse_and_execute(vec!["string(0)", "dt"], heap));
   }
 
   fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {
