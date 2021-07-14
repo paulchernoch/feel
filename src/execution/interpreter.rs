@@ -70,6 +70,25 @@ impl Interpreter {
         self.instruction_pointer
     }
 
+    /// Create a FeelValue::List from values popped from the data stack such taht it can be used 
+    /// as arguments for a call to a Builtin function.
+    /// Arguments are reversed in order as they are popped fron the stack. 
+    /// E.g., Whatever was top of the data stack becomes the last argument. 
+    fn make_args(&mut self, arity: usize) -> FeelValue {
+        match arity {
+            1 => FeelValue::new_list(vec![self.pop_data()]),
+            2 => {
+                let (lower, higher) = self.pop_two();
+                FeelValue::new_list(vec![lower, higher])
+            },
+            3 => {
+                let (lower, middle, higher) = self.pop_three();
+                FeelValue::new_list(vec![lower, middle, higher])
+            },
+            _ => FeelValue::Null
+        }
+    }
+
     /// Execute a single instruction and adjust the instruction_pointer to point to the next instruction.
     /// This takes into account looping and branching. 
     /// Returns true if execution proceeded, false if execution is already complete. 
@@ -108,9 +127,7 @@ impl Interpreter {
                     },
                     OpCode::Exponentiate => {
                         self.advance();
-                        let (base, exponent) = self.pop_two();
-                        let args = FeelValue::new_list(vec![base, exponent]);
-                        let result = Builtins::power(args, &Context::new());
+                        let result = Builtins::power(self.make_args(2), &self.contexts);
                         self.push_data(result);
                     },
                     OpCode::Not => {
@@ -184,9 +201,7 @@ impl Interpreter {
 
                     OpCode::In => {
                         self.advance();
-                        let (lower, higher) = self.pop_two();
-                        let args = FeelValue::new_list(vec![lower, higher]);
-                        let result = Builtins::in_operator(args, &Context::new());
+                        let result = Builtins::in_operator(self.make_args(2), &self.contexts);
                         self.push_data(result);
                     },
                     /*
@@ -229,8 +244,12 @@ impl Interpreter {
                         self.create_range(lower, upper);
                     },
 
+                    OpCode::CreateDate => {
+                        self.advance();
+                        let args = self.make_args(1);
+                        self.push_data(Builtins::date(args, &self.contexts));
+                    },
 /*
-                    OpCode::CreateDate => {},
                     OpCode::CreateTime => {},
                     OpCode::CreateDateTime => {},
                     OpCode::CreateYearsAndMonthsDuration => {},
@@ -389,6 +408,7 @@ impl Interpreter {
 #[cfg(test)]
 mod tests {
   #![allow(non_snake_case)]
+  use chrono::{ NaiveDate, NaiveTime };
   use crate::parsing::feel_value::{FeelValue};
   use super::super::opcode::OpCode;
   use super::super::compiled_expression::CompiledExpression;
@@ -506,6 +526,13 @@ mod tests {
     assert_eq!(TRUE, parse_and_execute(vec!["num(10)", "num(1)", "num(10)", "[lo,hi]", "in"], Vec::new()));
     assert_eq!(FALSE, parse_and_execute(vec!["num(10)", "num(1)", "num(10)", "[lo,hi)", "in"], Vec::new()));
     assert_eq!(TRUE, parse_and_execute(vec!["num(5)", "num(3)", "[lo,..]", "in"], Vec::new()));
+  }
+
+  #[test]
+  fn test_create_date() {
+    let heap: Vec<String> = vec!["2020-02-15".to_string()];
+    let expected = FeelValue::Date(NaiveDate::from_ymd(2020, 2, 15));
+    assert_eq!(expected, parse_and_execute(vec!["string(0)", "date"], heap));
   }
 
   fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {

@@ -1908,20 +1908,20 @@ impl Builtins {
     F: FnOnce(&NaiveDate) -> FeelValue,
     G: FnOnce(&NaiveDateTime) -> FeelValue
     {
-    match Builtins::make_validator(fname, parameters)
-      .arity(1..=1)
-      .no_nulls()
-      .expect_date(0_usize)
-      .validated() {
-      Ok(arguments) => {
-        let a = &arguments[0];
-        match a {
-          FeelValue::DateAndTime(date_time) => date_time_xform(date_time),
-          FeelValue::Date(date) => date_xform(date),
-          _ => unreachable!()
-        }        
-      },
-      Err(_) => FeelValue::Null
+      match Builtins::make_validator(fname, parameters)
+        .arity(1..=1)
+        .no_nulls()
+        .expect_date(0_usize)
+        .validated() {
+        Ok(arguments) => {
+          let a = &arguments[0];
+          match a {
+            FeelValue::DateAndTime(date_time) => date_time_xform(date_time),
+            FeelValue::Date(date) => date_xform(date),
+            _ => unreachable!()
+          }        
+        },
+        Err(_) => FeelValue::Null
     }
   }
 
