@@ -104,6 +104,7 @@ impl Interpreter {
             Some(address) => {
                 match self.instructions.operations[address] {
                     // TODO: Semantics of FEEL addition, subtraction, etc may be tighter than the operator implementation. Verify and adjust.
+                    //  - Inequalities and between operator have been adapted to deal with Null properly.
 
                     OpCode::Add => {
                         self.advance();
@@ -171,12 +172,14 @@ impl Interpreter {
                     OpCode::LessThan => {
                         self.advance();
                         let (lower, higher) = self.pop_two();
-                        self.push_data((&lower < &higher).into());
+                        if lower.is_null() || higher.is_null() { self.push_data(FeelValue::Null); }
+                        else { self.push_data((&lower < &higher).into()); }
                     },
                     OpCode::LessThanOrEqual => {
                         self.advance();
                         let (lower, higher) = self.pop_two();
-                        self.push_data((&lower <= &higher).into());
+                        if lower.is_null() || higher.is_null() { self.push_data(FeelValue::Null); }
+                        else { self.push_data((&lower <= &higher).into()); }
                     },
                     OpCode::NotEqual => {
                         self.advance();
@@ -191,17 +194,20 @@ impl Interpreter {
                     OpCode::GreaterThan => {
                         self.advance();
                         let (lower, higher) = self.pop_two();
-                        self.push_data((lower > higher).into());
+                        if lower.is_null() || higher.is_null() { self.push_data(FeelValue::Null); }
+                        else { self.push_data((&lower > &higher).into()); }
                     },
                     OpCode::GreaterThanOrEqual => {
                         self.advance();
                         let (lower, higher) = self.pop_two();
-                        self.push_data((&lower >= &higher).into());
+                        if lower.is_null() || higher.is_null() { self.push_data(FeelValue::Null); }
+                        else { self.push_data((&lower >= &higher).into()); }
                     },
                     OpCode::Between => {
                         self.advance();
                         let (value, range_start_inclusive, range_end_inclusive) = self.pop_three();
-                        self.push_data((&value >= &range_start_inclusive && &value <= &range_end_inclusive).into());
+                        if value.is_null() || range_start_inclusive.is_null() || range_end_inclusive.is_null() { self.push_data(FeelValue::Null); }
+                        else { self.push_data((&value >= &range_start_inclusive && &value <= &range_end_inclusive).into()); }
                     },
 
                     OpCode::In => {
@@ -618,12 +624,30 @@ mod tests {
   fn test_goto_address() {
     assert_eq!(
         FeelValue::Number(42.0), 
-        parse_and_execute(vec![
-                "num(6)", "num(7)", "goto(1)", "+", "-", "label(1)", "*", "return", "num(0)"
-            ], 
-            Vec::new()
-        )
+        exec_string("num(6) num(7) goto(1) + - label(1) * return num(0)", Vec::new())
     );
+  }
+
+  /// Simulate an "if" statement, with branch jumps for true, false and null. 
+  #[test]
+  fn test_branch_address() {
+    let good = "Good".to_string();
+    let bad = "Bad".to_string();
+    let ugly = "Ugly".to_string();
+    let heap: Vec<String> = vec![good.clone(), bad.clone(), ugly.clone()];
+    assert_eq!(
+        FeelValue::String(good.clone()), 
+        exec_string("num(87) num(80) >= branch(0/1/2) label(0) string(0) goto(3) label(1) string(1) goto(3) label(2) null label(3) return", heap.clone())
+    );
+    assert_eq!(
+        FeelValue::String(bad.clone()), 
+        exec_string("num(77) num(80) >= branch(0/1/2) label(0) string(0) goto(3) label(1) string(1) goto(3) label(2) null label(3) return", heap.clone())
+    );
+    assert_eq!(
+        FeelValue::Null, 
+        exec_string("num(77) null >= branch(0/1/2) label(0) string(0) goto(3) label(1) string(1) goto(3) label(2) null label(3) return", heap.clone())
+    );
+
   }
 
   fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {
@@ -659,6 +683,17 @@ mod tests {
       .collect();
     let mut interpreter = make_interpreter_from_strings(op_strings, heap);
     interpreter.execute()
+  }
+
+  fn exec_string(op_string: &str, heap: Vec<String>) -> FeelValue {
+      let ops = split_into_ops(op_string);
+      parse_and_execute(ops, heap)
+  }
+
+  fn split_into_ops(op_string: &str) -> Vec<&str> {
+    let split = op_string.split(" ");
+    let vec: Vec<&str> = split.collect();
+    vec
   }
 
 }
