@@ -11,7 +11,7 @@ pub struct QName {
 }
 
 impl QName {
-  fn new<S>(name: &S) -> Self where S: Into<String> + Clone {
+  pub fn new<S>(name: &S) -> Self where S: Into<String> + Clone {
     QName { 
       // parts: vec![name.into()] 
       parts: name.clone().into().split_whitespace().map(|s| s.to_string()).collect()

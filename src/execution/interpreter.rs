@@ -6,8 +6,8 @@ use crate::parsing::feel_value::{FeelValue,FeelType};
 // use crate::parsing::feel_value_ops;
 use crate::execution::builtins::Builtins;
 use crate::parsing::nested_context::NestedContext;
-use crate::parsing::context::Context;
 use crate::parsing::range::Range;
+use crate::parsing::qname::QName;
 
 /*
   Execution engine that interprets a stream of OpCodes in the presence of a given context and produces a result.
@@ -67,6 +67,11 @@ impl Interpreter {
 
     fn advance(&mut self) -> usize {
         self.instruction_pointer += 1;
+        self.instruction_pointer
+    }
+
+    fn jump(&mut self, target_address: usize) -> usize {
+        self.instruction_pointer = target_address;
         self.instruction_pointer
     }
 
@@ -272,11 +277,24 @@ impl Interpreter {
                         self.advance();
                         self.push_data(self.instructions.get_from_heap(index));
                     },
-
-/*
-                    OpCode::CreateName => {},
-
-*/
+                    OpCode::CreateName => {
+                        self.advance();
+                        let name_string = self.pop_data();
+                        match name_string {
+                            FeelValue::String(s) => {
+                                self.push_data(FeelValue::Name(QName::new(&s)));
+                            },
+                            FeelValue::Name(_) => {
+                                self.push_data(name_string);
+                            },
+                            _ => {
+                                ExecutionLog::log(
+                                    &format!("Cannot create a Qualified name from a {}", name_string.get_type().to_string())
+                                );
+                                self.push_data(FeelValue::Null);
+                            }
+                        }
+                    },
                     OpCode::LoadNumber(wrapped_num) => {
                       self.advance();
                       self.push_data(FeelValue::Number(wrapped_num.into_inner()));
@@ -292,19 +310,44 @@ impl Interpreter {
 /*
                     OpCode::CallFunction => {},
                     OpCode::GetProperty => {},
-                    OpCode::GotoLabel(label) => {},
-                    OpCode::GotoAddress(address) => {},
-                    OpCode::BranchToLabel { true_label, false_label, null_label } => {},
-                    OpCode::BranchToAddress { true_address, false_address, null_address } => {},
-                    OpCode::Label(position) => {},
+*/
+                    // All GotoLabel's should have been replaced with GotoAddress via a call to resolve_jumps.
+                    OpCode::GotoLabel(_label) => unreachable!(),
+
+                    OpCode::GotoAddress(address) => {
+                        self.jump(address);
+                    },
+
+                    // All BranchToLabel's should have been replaced with BranchToAddress via a call to resolve_jumps.
+                    OpCode::BranchToLabel { .. } => unreachable!(),
+
+                    OpCode::BranchToAddress { true_address, false_address, null_address } => {
+                        let condition = self.pop_data();
+                        match condition {
+                            FeelValue::Boolean(true) => { self.jump(true_address); }
+                            FeelValue::Boolean(false) => { self.jump(false_address); }
+                            _ => {
+                                ExecutionLog::log(
+                                    &format!("Taking null branch because condition is not Boolean, but {}", condition.get_type().to_string())
+                                );
+                                self.jump(null_address); 
+                                // The compiler should make sure that the null branch jump goes to a label followed by a CreateNull. 
+                            }
+                        }
+                    },
+
+                    OpCode::Label(_position) => {
+                        self.advance();
+                    },
+/*
                     OpCode::ExitLoopLabel(label) => {},
                     OpCode::ExitLoopAddress(address) => {},
                     OpCode::BranchExitLabel { true_label, false_label, null_label } => {},
                     OpCode::BranchExitAddress { true_address, false_address, null_address } => {},
                     OpCode::HasNext => {},
                     OpCode::PushNext => {},
-                    OpCode::Return  => {},
 */
+                    OpCode::Return  => (),
                     _ => { return false; }
                 }
                 true
@@ -419,12 +462,13 @@ impl Interpreter {
 #[cfg(test)]
 mod tests {
   #![allow(non_snake_case)]
-  use chrono::{ NaiveDate, NaiveTime };
+  use chrono::{ NaiveDate };
   use crate::parsing::feel_value::{FeelValue};
   use super::super::opcode::OpCode;
   use super::super::compiled_expression::CompiledExpression;
   use super::Interpreter;
   use crate::parsing::nested_context::NestedContext;
+  use crate::parsing::qname::QName;
   use std::str::FromStr;
 
   #[test]
@@ -516,6 +560,14 @@ mod tests {
   }
 
   #[test]
+  fn test_create_qname() {
+    let ddg = "duck duck goose";
+    let heap: Vec<String> = vec![ddg.to_string()];
+    let expected = FeelValue::Name(QName::new(&ddg));
+    assert_eq!(expected, parse_and_execute(vec!["string(0)", "name"], heap));
+  }
+
+  #[test]
   fn test_list_push() {
     let duck: FeelValue = "Duck".into();
     let goose: FeelValue = "Goose".into();
@@ -583,6 +635,7 @@ mod tests {
         let op = OpCode::from_str(&op_string).unwrap();
         expr.push(op);
     }
+    expr.resolve_jumps();
     Interpreter::new(expr, ctx)
   }
 

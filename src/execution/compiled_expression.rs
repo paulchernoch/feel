@@ -85,6 +85,7 @@ impl CompiledExpression {
 
     /// Replace any branching operations that refer to Labels by position
     /// with operations that refer to Labels by address (their zero-based position within the operations list). 
+    /// This should be called once after all opcodes have been pushed. 
     pub fn resolve_jumps(&mut self) {
         let range = 0..self.operations.len();
         for index in range {
