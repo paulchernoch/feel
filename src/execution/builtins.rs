@@ -1784,6 +1784,46 @@ impl Builtins {
     }
   }
 
+  /// Support for the "in" operator from DMN 1.3 Spec, Table 55, Grammar Rule 49.c.
+  /// This is not a spec-defined builtin function.
+  /// The first argument is a scalar value, and the second argument may be: 
+  ///   - a list: Test if the value is in the list
+  ///   - a range: Test if the value is in the range
+  ///   - QName that evaluates to a scalar: Test if the value equals the context's item for that QName
+  ///   - QName that evaluates to a list: Test if the value is contained in the list retrieved from the context
+  /// If data types are not valid, return Null, otherwise a Boolean.  
+  pub fn in_operator<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
+    // TODO: Text describing the final case in the spec for the in operator got cut off. 
+    //       Cannot figure out what it means. It involves contexts. 
+    let fname = "in_operator";
+    match Builtins::make_validator(fname, parameters)
+      .arity(2..=2)
+      .validated() {
+      Ok(arguments) => {
+        match (&arguments[0], &arguments[1]) {
+          (a, FeelValue::List(rr_list)) => FeelValue::Boolean(rr_list.borrow().iter().any(|i| i == a)),
+          (a, FeelValue::Range(b)) => FeelValue::Boolean(b.includes(a, contexts)),
+          (a, FeelValue::Name(qname)) => {
+            match contexts.get(qname.clone()) {
+              Some(FeelValue::List(rr_list)) => FeelValue::Boolean(rr_list.borrow().iter().any(|i| i == a)),
+              Some(b) => FeelValue::Boolean(*a == b),
+              None => {
+                ExecutionLog::log(&format!("Second argument to {}() is not a key to a list or scalar in the context", fname));
+                FeelValue::Null
+              }
+            } 
+          },
+          _ => {
+            ExecutionLog::log(&format!("Second argument to {}() is not a list, range or qname", fname));
+            FeelValue::Null
+          } 
+        }
+      },
+      Err(_) => FeelValue::Null
+    }
+
+  }
+
   //// ///////////// END Range functions /////////////////
 
   //// ////////////////////////////////////////////////
@@ -3675,6 +3715,21 @@ mod tests {
       assert!(Builtins::coincides(rng_rng(1.0..=5.0, 1.0..=5.0), &ctx).is_true(), "case 3"); 
       assert!(Builtins::coincides(rng_rng(r_1_to_5, 1.0..=5.0), &ctx).is_false(), "case 4"); 
       assert!(Builtins::coincides(rng_rng(1.0..=5.0, 2.0..=6.0), &ctx).is_false(), "case 5"); 
+    }
+
+    #[test]
+    fn test_in_operator() {
+      let ctx = Context::new();
+      let a_value = FeelValue::Number(3.0);
+      let b_list = FeelValue::new_from_iterator(vec![1,2,3,4]);
+      let args = FeelValue::new_list(vec![a_value.clone(), b_list]);
+      let actual_from_list = Builtins::in_operator(args, &ctx);
+      assert_eq!(FeelValue::Boolean(true), actual_from_list);
+
+      let c_range = FeelValue::Range(Range::new(&1.into(), &10.into(), true, false));
+      let args2 = FeelValue::new_list(vec![a_value, c_range]);
+      let actual_from_range = Builtins::in_operator(args2, &ctx);
+      assert_eq!(FeelValue::Boolean(true), actual_from_range);
     }
 
     #[test]
