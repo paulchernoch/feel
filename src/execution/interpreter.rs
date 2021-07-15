@@ -4,7 +4,7 @@ use super::compiled_expression::CompiledExpression;
 use crate::parsing::feel_value::{FeelValue,FeelType};
 // use crate::parsing::feel_value_ops;
 use crate::execution::builtins::Builtins;
-use crate::parsing::{execution_log::ExecutionLog,nested_context::NestedContext,range::Range,qname::QName,duration::Duration};
+use crate::parsing::{execution_log::ExecutionLog,nested_context::NestedContext,context::ContextReader,range::Range,qname::QName,duration::Duration};
 use crate::execution::value_properties::ValueProperties;
 
 /*
@@ -35,6 +35,7 @@ pub struct Interpreter {
     /// This guards against loop contexts whose cartesian products become immense. 
     pub limit: u64,
 
+    /// Counts how many operations have been executed so far. 
     step_count: u64
 }
 
@@ -252,8 +253,32 @@ impl Interpreter {
                             }
                         };
                     },
+                    OpCode::LoadFromContext => {
+                        self.advance();
+                        let key = self.pop_data();
+                        match key.clone() {
+                            FeelValue::Name(qname) => {
+                                match self.contexts.get(qname) {
+                                    Some(value) => {
+                                        self.push_data(value);
+                                    },
+                                    None => {
+                                        self.error(
+                                            format!("key '{}' not present in context", key.to_string()),
+                                            true
+                                        );   
+                                    }
+                                }
+                            },
+                            _ => {
+                                self.error(
+                                    format!("Cannot load key from context because its type is {}", key.get_type().to_string()),
+                                    true
+                                );   
+                            }
+                        }
+                    },
 /*
-                    OpCode::LoadFromContext => {},
                     OpCode::AddEntryToContext => {},
                     OpCode::PushContext => {},
                     OpCode::PopContext => {},
@@ -534,15 +559,14 @@ impl Interpreter {
 #[cfg(test)]
 mod tests {
   #![allow(non_snake_case)]
+  use std::rc::Rc;
   use chrono::{ NaiveDate };
   use crate::parsing::feel_value::{FeelValue};
   use super::super::opcode::OpCode;
   use super::super::compiled_expression::CompiledExpression;
   use super::Interpreter;
-  use crate::parsing::nested_context::NestedContext;
-  use crate::parsing::qname::QName;
+  use crate::parsing::{nested_context::NestedContext,context::Context,qname::QName,duration::Duration};
   use std::str::FromStr;
-  use crate::parsing::duration::Duration;
 
   #[test]
   fn test_addition() {
@@ -752,10 +776,35 @@ mod tests {
     );
   }
 
-  // Helper methods
+  #[test]
+  fn test_load_from_context() {
+    let heap: Vec<String> = vec!["the answer".to_string(), "missing key".to_string()];
+    assert_eq!(
+        FeelValue::Number(42.0), 
+        exec_string("string(0) name xget", heap.clone())
+    );
+    assert_eq!(
+        FeelValue::Null, 
+        exec_string("string(1) name xget", heap.clone())
+    );
+  }
+
+  // ///////////////////////////////////// //
+  //                                       //
+  //          Test Helper methods          //
+  //                                       //
+  // ///////////////////////////////////// //
+
+  /// Ensure there is a contaxt variable named "the answer".
+  fn setup_test_context(nest: &mut NestedContext) {
+    let ctx = Context::new();
+    ctx.insert("the answer", FeelValue::Number(42.0));
+    nest.push(FeelValue::Context(Rc::new(ctx)));
+  }
 
   fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {
-    let ctx = NestedContext::new();
+    let mut ctx = NestedContext::new();
+    setup_test_context(&mut ctx);
     let mut expr = CompiledExpression::new("test");
     for s in heap {
         expr.find_or_add_to_heap(s);
@@ -767,7 +816,8 @@ mod tests {
   }
 
   fn make_interpreter_from_strings(ops: Vec<String>, heap: Vec<String>) -> Interpreter {
-    let ctx = NestedContext::new();
+    let mut ctx = NestedContext::new();
+    setup_test_context(&mut ctx);
     let mut expr = CompiledExpression::new("test");
     for s in heap {
         expr.find_or_add_to_heap(s);

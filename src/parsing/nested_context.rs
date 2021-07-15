@@ -36,6 +36,18 @@ impl NestedContext {
     self.stack.pop()
   }
 
+  /// Return a clone of the top of the stack, if there is any. 
+  /// Changes made to this clone will affect the original, due to internal mutability. 
+  /// This leaves the stack unchanged - it does not pop the context off. 
+  pub fn peek(&self) -> Option<FeelValue> {
+    if self.stack.len() == 0 {
+      None
+    }
+    else {
+      Some(self.stack.last().unwrap().clone())
+    }
+  }
+
 }
 
 impl ContextReader for NestedContext {
