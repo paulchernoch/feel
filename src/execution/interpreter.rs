@@ -1,14 +1,11 @@
 // use std::cmp::{Ord, PartialOrd, Ordering};
 use super::opcode::{OpCode,RangeBoundType};
 use super::compiled_expression::CompiledExpression;
-use crate::parsing::execution_log::ExecutionLog;
 use crate::parsing::feel_value::{FeelValue,FeelType};
 // use crate::parsing::feel_value_ops;
 use crate::execution::builtins::Builtins;
-use crate::parsing::nested_context::NestedContext;
-use crate::parsing::range::Range;
-use crate::parsing::qname::QName;
-use crate::parsing::duration::Duration;
+use crate::parsing::{execution_log::ExecutionLog,nested_context::NestedContext,range::Range,qname::QName,duration::Duration};
+use crate::execution::value_properties::ValueProperties;
 
 /*
   Execution engine that interprets a stream of OpCodes in the presence of a given context and produces a result.
@@ -227,9 +224,9 @@ impl Interpreter {
                         let result = Builtins::in_operator(self.make_args(2), &self.contexts);
                         self.push_data(result);
                     },
-                    /*
+/*
                     OpCode::Filter => {},
-                    */
+*/
                     OpCode::InstanceOf => {
                         self.advance();
                         let result = Builtins::instance_of(self.make_args(2), &self.contexts);
@@ -255,7 +252,7 @@ impl Interpreter {
                             }
                         };
                     },
-                    /*
+/*
                     OpCode::LoadFromContext => {},
                     OpCode::AddEntryToContext => {},
                     OpCode::PushContext => {},
@@ -264,7 +261,7 @@ impl Interpreter {
                     OpCode::CreatePredicateContext(dimensions) => {},
                     OpCode::CreateFilterContext => {},
                     OpCode::LoadContext => {},
-                    */
+*/
 
                     OpCode::CreateRange { lower, upper } => {
                         self.advance();
@@ -378,8 +375,14 @@ impl Interpreter {
                     },
 /*
                     OpCode::CallFunction => {},
-                    OpCode::GetProperty => {},
 */
+                    OpCode::GetProperty => {
+                        self.advance();
+                        let (target, property) = self.pop_two();
+                        let value = target.get_property(&property, &self.contexts);
+                        self.push_data(value);
+                    },
+
                     // All GotoLabel's should have been replaced with GotoAddress via a call to resolve_jumps.
                     OpCode::GotoLabel(_label) => unreachable!(),
 
@@ -739,6 +742,17 @@ mod tests {
         exec_string("string(0) dt-duration", heap.clone())
     );
   }
+
+  #[test]
+  fn test_get_property() {
+    let heap: Vec<String> = vec!["2021-03-22".to_string(), "year".to_string()];
+    assert_eq!(
+        FeelValue::Number(2021.0), 
+        exec_string("string(0) date string(1) .", heap.clone())
+    );
+  }
+
+  // Helper methods
 
   fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {
     let ctx = NestedContext::new();
