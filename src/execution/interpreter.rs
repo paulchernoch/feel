@@ -8,6 +8,7 @@ use crate::execution::builtins::Builtins;
 use crate::parsing::nested_context::NestedContext;
 use crate::parsing::range::Range;
 use crate::parsing::qname::QName;
+use crate::parsing::duration::Duration;
 
 /*
   Execution engine that interprets a stream of OpCodes in the presence of a given context and produces a result.
@@ -65,11 +66,13 @@ impl Interpreter {
       }
     }
 
+    /// Advance the instruction pointer by a single position.
     fn advance(&mut self) -> usize {
         self.instruction_pointer += 1;
         self.instruction_pointer
     }
 
+    /// Jump the instruction pointer to the given position.
     fn jump(&mut self, target_address: usize) -> usize {
         self.instruction_pointer = target_address;
         self.instruction_pointer
@@ -92,6 +95,15 @@ impl Interpreter {
             },
             _ => FeelValue::Null
         }
+    }
+
+    /// Log an error and optionally push a Null onto the data stack. 
+    fn error(&mut self, error_message: String, do_push: bool) -> FeelValue {
+        ExecutionLog::log(&error_message);
+        if do_push {
+            self.push_data(FeelValue::Null);
+        }
+        FeelValue::Null
     }
 
     /// Execute a single instruction and adjust the instruction_pointer to point to the next instruction.
@@ -147,10 +159,10 @@ impl Interpreter {
                         let result: FeelValue = match (lower.get_type(), higher.get_type()) {
                             (FeelType::Boolean, FeelType::Boolean) => (lower.is_true() || higher.is_true()).into(),
                             _ => {
-                                ExecutionLog::log(
-                                    &format!("Cannot compare {} with {} using logical or", lower.get_type().to_string(), higher.get_type().to_string())
-                                );
-                                FeelValue::Null
+                                self.error(
+                                    format!("Cannot compare {} with {} using logical or", lower.get_type().to_string(), higher.get_type().to_string()),
+                                    false
+                                )
                             }
                         };
                         self.push_data(result);
@@ -161,10 +173,10 @@ impl Interpreter {
                         let result: FeelValue = match (lower.get_type(), higher.get_type()) {
                             (FeelType::Boolean, FeelType::Boolean) => (lower.is_true() && higher.is_true()).into(),
                             _ => {
-                                ExecutionLog::log(
-                                    &format!("Cannot compare {} with {} using logical and", lower.get_type().to_string(), higher.get_type().to_string())
-                                );
-                                FeelValue::Null
+                                self.error(
+                                    format!("Cannot compare {} with {} using logical and", lower.get_type().to_string(), higher.get_type().to_string()),
+                                    false
+                                )
                             }
                         };
                         self.push_data(result);
@@ -236,10 +248,10 @@ impl Interpreter {
                                 self.push_data(list);
                             },
                             _ => {
-                                ExecutionLog::log(
-                                    &format!("Cannot push value onto {}", list.get_type().to_string())
+                                self.error(
+                                    format!("Cannot push value onto {}", list.get_type().to_string()),
+                                    true
                                 );
-                                self.push_data(FeelValue::Null);
                             }
                         };
                     },
@@ -257,6 +269,7 @@ impl Interpreter {
                     OpCode::CreateRange { lower, upper } => {
                         self.advance();
                         self.create_range(lower, upper);
+                        // push_data called by create_range above
                     },
 
                     OpCode::CreateDate => {
@@ -277,11 +290,57 @@ impl Interpreter {
                         let args = self.make_args(1);
                         self.push_data(Builtins::date_and_time(args, &self.contexts));
                     },
-/*
-                    OpCode::CreateYearsAndMonthsDuration => {},
-                    OpCode::CreateDayAndTimeDuration => {},
+                    OpCode::CreateYearsAndMonthsDuration => {
+                        self.advance();
+                        let value = self.pop_data();
+                        match value {
+                            FeelValue::String(duration_string) => {
+                                match Duration::try_year_month(&duration_string) {
+                                    Ok(duration) => {
+                                        self.push_data(FeelValue::YearMonthDuration(duration));
+                                    },
+                                    Err(_) => {
+                                        self.error(
+                                            format!("Cannot create Year Month Duration from {}", duration_string),
+                                            true
+                                        );
+                                    }
+                                };
+                            },
+                            _ => {
+                                self.error(
+                                    format!("Cannot create Year Month Duration from a {}", value.get_type().to_string()),
+                                    true
+                                );
+                            }
+                        };
+                    },
 
-*/
+                    OpCode::CreateDayAndTimeDuration => {
+                        self.advance();
+                        let value = self.pop_data();
+                        match value {
+                            FeelValue::String(duration_string) => {
+                                match Duration::try_day_time(&duration_string) {
+                                    Ok(duration) => {
+                                        self.push_data(FeelValue::DayTimeDuration(duration));
+                                    },
+                                    Err(_) => {
+                                        self.error(
+                                            format!("Cannot create Day Time Duration from {}", duration_string),
+                                            true
+                                        );
+                                    }
+                                };
+                            },
+                            _ => {
+                                self.error(
+                                    format!("Cannot create Day Time Duration from a {}", value.get_type().to_string()),
+                                    true
+                                );
+                            }
+                        };
+                    },
 
                     OpCode::LoadString(index) => {
                         self.advance();
@@ -298,10 +357,10 @@ impl Interpreter {
                                 self.push_data(name_string);
                             },
                             _ => {
-                                ExecutionLog::log(
-                                    &format!("Cannot create a Qualified name from a {}", name_string.get_type().to_string())
+                                self.error(
+                                    format!("Cannot create a Qualified name from a {}", name_string.get_type().to_string()),
+                                    true
                                 );
-                                self.push_data(FeelValue::Null);
                             }
                         }
                     },
@@ -480,6 +539,7 @@ mod tests {
   use crate::parsing::nested_context::NestedContext;
   use crate::parsing::qname::QName;
   use std::str::FromStr;
+  use crate::parsing::duration::Duration;
 
   #[test]
   fn test_addition() {
@@ -659,6 +719,24 @@ mod tests {
     assert_eq!(
         FeelValue::Boolean(true), 
         exec_string("num(6) string(0) is true string(1) is and false string(2) is and", heap.clone())
+    );
+  }
+
+  #[test]
+  fn test_ym_duration() {
+    let heap: Vec<String> = vec!["P2Y8M".to_string()];
+    assert_eq!(
+        FeelValue::YearMonthDuration(Duration::new_year_month(true, 2, 8)), 
+        exec_string("string(0) ym-duration", heap.clone())
+    );
+  }
+
+  #[test]
+  fn test_dt_duration() {
+    let heap: Vec<String> = vec!["P1DT2H".to_string()];
+    assert_eq!(
+        FeelValue::DayTimeDuration(Duration::new_day_time(true, 1, 2, 0, 0.0)), 
+        exec_string("string(0) dt-duration", heap.clone())
     );
   }
 

@@ -291,7 +291,7 @@ impl FromStr for OpCode {
             "time" => OpCode::CreateTime,
             "dt" => OpCode::CreateDateTime,
             "ym-duration" => OpCode::CreateYearsAndMonthsDuration,
-            "dt-durarion" => OpCode::CreateDayAndTimeDuration,
+            "dt-duration" => OpCode::CreateDayAndTimeDuration,
 
             "name" => OpCode::CreateName,
             "true" => OpCode::LoadBoolean(true),

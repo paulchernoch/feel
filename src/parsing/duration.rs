@@ -49,6 +49,24 @@ const NANOSECONDS_PER_SECOND: f64 = 1000000000.0;
 
 impl Duration {
 
+  pub fn try_year_month(duration_string: &str) -> Result<Self, String> {
+    match Duration::from_str(duration_string) {
+      Ok(duration) => {
+        Ok(duration.as_year_month(DAYS_PER_MONTH as f32))
+      },
+      Err(err_string) => Err(err_string)
+    }
+  }
+
+  pub fn try_day_time(duration_string: &str) -> Result<Self, String> {
+    match Duration::from_str(duration_string) {
+      Ok(duration) => {
+        Ok(duration.as_day_time(DAYS_PER_MONTH as f32))
+      },
+      Err(err_string) => Err(err_string)
+    }
+  }
+
   /// Construct a Duration of zero length of the desired variety.
   pub fn new_zero(v: DurationVariety) -> Self {
     Duration {
