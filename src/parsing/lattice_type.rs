@@ -573,6 +573,10 @@ mod tests {
             ).to_string()
         );
         assert_eq!(
+            "context<>", 
+            &LatticeType::context(Vec::new()).to_string()
+        );
+        assert_eq!(
             "function(string, number) -> string", 
             &LatticeType::function(vec![LatticeType::String, LatticeType::Number], LatticeType::String).to_string()
         );

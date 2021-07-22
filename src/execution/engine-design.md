@@ -151,6 +151,291 @@ A compiled expression must be a recursive structure. If one function is defined 
 
 As Strings are discovered, Opcodes are created that point to them by integer index into the Heap. The same is true for CompiledExpressions of inner functions which are linked to their position in Definitions.
 
+## List Indexing and Filtering
+
+Indexing or filtering a list has multiple use cases in Feel:
+
+  - A non-list may be indexed if the index is zero: scalar[0]
+  - A list may be indexed if the index is a positive number: list[+number]
+  - A list may be indexed if the index is a negative number (count from the end of the list): list[-number]
+  - A list may be filtered if the index is a context.
+
+The first case returns the scalar unchanged. 
+
+Because of the different semantics, this logic will be implemented as multiple OpCodes.
+In the "code" below, "left" is the left operand, normally a list, and "right" is the right operand, normally a number,
+but maybe a filter expression.
+
+This will necessitate creating more OpCodes, inspired by the Forth language. 
+In the descriptions below, the rightmost item is the top item on the stack. 
+
+  - swap - swaps the top two items on the stack: (a b -> b a)
+  - over - copies the second item from the top and pushes it: (a b -> a b a') 
+  - rot  - rotates the third item to the top: (a b c -> b c a) 
+  - dup  - duplicates the top of the stack: (a -> a a')
+  - drop - pops one item off the top of the stack
+
+Other OpCodes will be needed for the looping over the list, beyond the original design:
+
+  - item - Gets the next item in the list from the filter context and pushes it onto the value stack. This tracks properties "item", "item index", "item count", and "item list".
+  - items? - Returns True if the list has any more items, False otherwise. 
+  - +filter - Pops a list from the data stack, creates a filter context and pushes that onto the context stack.
+  - type?(t) - Gets the type of the top of the data stack, compares it to the heap string referenced by the opcode using "instance of" and pushes True or False.
+  - len - Gets the length of the next item on the value stack. If it is a list, it is the list length, otherwise 1. Consumes the list.
+
+The "type?(t)" OpCode is equivalent to pushing a string on the data stack and then an "is".
+
+In the cases below, the changes to the stack are shown, and OpCodes that are skipped by branching are indicated by a hyphen.
+"L" means the left argument, usually a List.
+"I" means the right argument, usually a numeric index.
+"S" is a string. In these cases, it is a type LatticeType string.
+"b" is a Boolean.
+"t" is a Boolean True.
+"f" is a Boolean False.
+"F" is a Filter Context.
+"l" is a list.
+"0" is number(0).
+"#" is a number.
+"a", "b", "c" etc are numbers indicating labels.
+"+filter" must be replaced by the the actual filter expression, which consists of multiple opcodes. 
+"c" is a context
+"N" is a Null
+"x" is a complex subexpression compised of many OpCodes that must result in pushing a Boolean or Null onto the value stack.
+
+The code generator must recognize that a filtering operation is intended by searching the AST for:
+  - references to the "item" variable in the subexpression
+  - the top level expression contained in the filtering brackets is a boolean operator (<=, <, =, >=, >, and, or, not)
+  - the top level expression calls a builtin function that returns a Boolean.
+  
+When any is found, it will cause the addition of codes that create an empty context. 
+Of course, if the subexpression contains its own filter operation that 
+references "item", that must be excluded!
+
+Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the values in the lefthand list
+      are contexts that have the key "item", then item must refer to that context's value, not the filter context.
+
+**Case 1: scalar[0]**
+        In this case, L is not a list and I is number(0).
+
+```
+  over               (L I -> L I L')
+  type?(list<Any>)   (L I L' -> L I f)
+  branch(a/b/c)      (L I f -> L I)          Test if left argument is a list.
+
+  label(a)                                   L is a list.
+  type?(number)
+  branch(f/g/c)                              L is a list, test if I is a number
+
+  label(f)                                   L is a list and I is a number: 
+  index                                      Perform a list index operation.
+  goto(d)
+
+  label(g)                                   L is a list and I is not a number: 
+  type?(context<>)                           
+  branch(h/c/c)                              Test if L is a context, indicating a filter operation
+
+  label(h)                                   Assume it is a filter context - insert more opcodes here
+  +filter                                    
+  goto(d)
+
+  label(b)           (L I -> L I)            L is a scalar.
+  dup                (L I -> L I I')
+  number(0)          (L I I' -> L I I' 0)
+  =                  (L I S -> L I t)
+  branch(e/c/c)      (L I t -> L I)          Test if right index argument is a zero.
+
+  label(e)           (L I -> L I)            L is scalar and I = 0 branch.
+  drop               (L I -> L)
+  goto(d)            (L -> L)
+
+  label(c)                                   Many error cases.
+  drop
+  drop
+  null
+
+  label(d)           (L -> L)                Done with indexing/filtering operation.
+
+```
+
+**Case 2: list[number] **
+        In this case, L is a list and I is a number and indexing of the list is performed.
+
+```
+  over               (L I -> L I L')
+  type?(list<Any>)   (L I L' -> L I t)
+  branch(a/b/c)      (L I t -> L I)          Test if left argument is a list.
+
+  label(a)           (L I -> L I)            L is a list.
+  type?(number)      (L I -> L I t)
+  branch(f/g/c)      (L I t -> L I)          L is a list, test if I is a number
+
+  label(f)           (L I -> L I)            L is a list and I is a number: we will perform a list index operation.
+  index              (L I -> A)              
+  goto(d)            (A -> A)
+
+  label(g)                                   L is a list and I is not a number: 
+  type?(context<>)                           
+  branch(h/c/c)                              Test if L is a context, indicating a filter operation
+
+  label(h)                                   Assume it is a filter context - insert more opcodes here
+  +filter                                    
+  goto(d)
+
+  label(b)                                   L is a scalar.
+  dup                
+  number(0)          
+  =                  
+  branch(e/c/c)                              Test if right index argument is a zero.
+
+  label(e)                                   L is scalar and I = 0 branch.
+  drop                   
+  goto(d)             
+
+  label(c)                                   Many error cases.
+  drop
+  drop
+  null
+
+  label(d)           (A -> A)                Done with indexing/filtering operation.
+
+```
+
+**Case 3: list[expression] **
+        In this case, L is a list and I is a context, indicating that we will be 
+        filtering the list and creating a new list of the items that pass the filter test.
+
+
+```
+  over               (L I -> L I L')
+  type?(list<Any>)   (L I L' -> L I f)
+  branch(a/b/c)      (L I t -> L I)          Test if left argument is a list.
+
+  label(a)           (L I -> L I)            L is a list.
+  type?(number)      (L I -> L I f) 
+  branch(f/g/c)      (L I f -> L I)          L is a list, test if I is a number
+
+  label(f)                                   L is a list and I is a number: we will perform a list index operation.
+  index                            
+  goto(d)            
+
+  label(g)           (L I -> L I)            L is a list and I is not a number: 
+  type?(context<>)   (L I -> L I t)          
+  branch(h/c/c)      (L I t -> L I)          Test if L is a context, indicating a filter operation
+
+  label(h)           (L I -> L I)            Assume it is a filter context - insert more opcodes here
+  +filter            (L I -> F)
+  xpush              (_ F -> _)
+  list               (_ -> l)
+  ...more opcodes...
+  goto(d)            (A -> A)
+
+  label(b)                                   L is a scalar.
+  dup                
+  number(0)          
+  =                  
+  branch(e/c/c)                              Test if right index argument is a zero.
+
+  label(e)                                   L is scalar and I = 0 branch.
+  drop                   
+  goto(d)             
+
+  label(c)                                   Many error cases.
+  drop
+  drop
+  null
+
+  label(d)           (A -> A)                Done with indexing/filtering operation.
+
+```
+
+## The item and item? OpCodes
+
+When iterating through a list in a filter operation, two contexts must be pushed.
+
+  - Filter context - has properties "item", "item index", and "item list"
+  - Item as context or empty context
+
+Since the filter expression may reference properties in the list item,
+we need to push each list item onto the contexts stack as it is encountered, but only if it is a context.
+If it is not a context, we will push an empt context.
+
+Thus when "item?" is executed, it must bypass the top context and look in the next context on the stack.
+Likewise, when "item" is executed, it must bypass the top context also.
+
+When the iteration completes, we must "xpop" and "drop" twice, to remove both contexts.
+
+At the beginning of iteration, we need a fake extra context so item? and item do not
+xpop something that is not there.
+
+  - xload
+  - xpush
+
+To accomplish this for "item?":
+
+  - xpop
+  - item?
+  - swap
+  - xpush
+
+To perform "item":
+
+  - xpop
+  - drop
+  - item
+  - type?(context<>)
+  - branch(a/b/b)
+  - label(a)
+  - dup               : Duplicates the item, to prepare for pushing it onto the context stack at the end
+  - goto(c)
+  - label(b)
+  - xload             : Makes an empty context to be pushedat the end
+  - label(c)
+  - xpush
+
+
+**Breaking +filter into smaller operations:**
+
+The work that "+filter" has to perform:
+
+  - Assume that a list and an empty context are already on top of the value stack to start with
+  - Set the "item index" property to zero
+  - Set the "item list" property to the list from the stack
+  - Set the "item count" property to the length of the list from the stack
+  - Set the "item" property to Null
+
+The OpCodes:
+
+  - string(item index)     (l c -> l c s)
+  - number(0)              (l c s -> l c s 0)
+  - xset                   (l c s 0 -> l c)         Sets "item index" in context
+  - over                   (l c -> l c l')
+  - len                    (l c l' -> l c #)
+  - string(item count)     (l c # -> l c # s)
+  - swap                   (l c # s -> l c s #)
+  - xset                   (l c s # -> l c)         Sets "item count" in context                
+  - string(item list)      (l c -> l c s)
+  - rot                    (l c s -> c s l)
+  - xset                   (c s l -> c)             sets "item list" in context
+  - string(item)           (c -> c s)
+  - null                   (c s -> c s N)
+  - xset                   (c s N -> c)             Sets "item" in context
+  - xpush                  (_ c -> _)
+
+**Breaking item into smaller operations:**
+
+The work that "item" has to perform:
+
+  - Get the current "item index" from the context and push a clone on value stack
+  - Get the "item list" from the context and push a clone on value stack 
+  - Get the item from the list at the given index and push a clone on the value stack
+  - Increment index
+  - Store the new index value in "item index"
+
+There will be some swaps or rots involved. Maybe add an "incr" op that performs the read, increment, and write in one go.
+
+The OpCodes:
+
+  
 
 ## Boxed Expression
 

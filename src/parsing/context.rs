@@ -27,6 +27,7 @@ impl Context {
     self.contents.borrow_mut().insert(k.into(), v)
   }
 
+  /// Create a new empty Context.
   pub fn new() -> Self {
     Context { 
       contents: RefCell::new(HashMap::new())
@@ -84,6 +85,7 @@ impl Context {
   }
 }
 
+/// The readonly behavior of a context, including contains_key and get. 
 pub trait ContextReader {
   /// Does the Context contain the given key?
   /// If given a String key, it will be parsed into a QName before checking for the key.
@@ -108,6 +110,20 @@ pub trait ContextReader {
   
 }
 
+/// Ability to increment the value of a key in a context whose value is a number.
+pub trait ContextIncrement {
+  /// Increment the value associated with a key by one if possible. 
+  /// 
+  ///   k ............. Key to increment
+  ///   default ....... Value to set if key is missing from Context. 
+  ///                   If None, do not insert the missing key.
+  /// 
+  /// Returns the incremented value if successful. 
+  /// Returns None if the key is missing and None given as default,
+  /// or the key is present but its current value is not a Number.
+  fn increment<Q: Into<QName>>(&self, k: Q, default: Option<f64>) -> Option<FeelValue>;
+}
+
 impl ContextReader for Context {
   /// Does the Context contain the given key?
   /// If given a String key, it will be parsed into a QName before checking for the key.
@@ -129,6 +145,34 @@ impl ContextReader for Context {
 
   fn length(&self) -> usize {
     1
+  }
+}
+
+impl ContextIncrement for Context {
+  /// Increment the value associated with a key by one if possible. 
+  /// 
+  ///   k ............. Key to increment
+  ///   default ....... Value to set if key is missing from Context. 
+  ///                   If None, do not insert the missing key.
+  /// 
+  /// Returns the incremented value if successful. 
+  /// Returns None if the key is missing and None given as default,
+  /// or the key is present but its current value is not a Number.
+  fn increment<Q: Into<QName>>(&self, k: Q, default: Option<f64>) -> Option<FeelValue> {
+    let key: QName = k.into();
+    match (self.get(key.clone()), default) {
+      (Some(FeelValue::Number(current_value)), _) => {
+        let new_value = FeelValue::Number(current_value + 1.0);
+        self.insert(key, new_value.clone());
+        Some(new_value)
+      },
+      (None, Some(default_value)) => {
+        let new_value = FeelValue::Number(default_value);
+        self.insert(key, new_value.clone());
+        Some(new_value)
+      },
+      _ => None
+    }
   }
 }
 
@@ -167,7 +211,7 @@ impl Display for Context {
 #[cfg(test)]
 mod tests {
   use super::super::feel_value::FeelValue;
-  use super::{Context, ContextReader};
+  use super::{Context, ContextReader, ContextIncrement};
 
   #[test]
   fn test_contains_key() {
@@ -178,6 +222,14 @@ mod tests {
     assert_eq!(previous, Option::None, "insert of new key should return None");
 
     assert!(ctx.contains_key("key"), "contains_key on key that is present");
+  }
+
+  #[test]
+  fn test_increment() {
+    let ctx = Context::new();
+    ctx.insert("count", 0.into());
+    assert_eq!(FeelValue::Number(1.0), ctx.increment("count", None).unwrap());
+    assert_eq!(FeelValue::Number(2.0), ctx.increment("count", None).unwrap());
   }
 
 }

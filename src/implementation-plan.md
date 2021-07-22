@@ -59,11 +59,15 @@ Do not want to pass a logger object around to every function, so I need a way to
 
 ## Execution Engine
 
+The `Interpreter` class will execute the `OpCode`s and return a result.
+
  - [ ] FeelRuntime struct: heap stack (literals like strings), data stack, code stack (opcodes), contexts stack, iterations (IterationContext)
  - [ ] FeelReference enum
- - [ ] `Opcode` enum
+ - [x] `Opcode` enum
+ - [x] `Interpreter` struct
  - [ ] `IterationContext` (for loops)
- - [ ] if - then - else
+ - [x] if - then - else
+ - [ ] Create a `Context` holding all the Builtins as keyed references to `FeelValue::Function`
  - [ ] list access (negative indices are from the end)
  - [ ] filter expressions (using the special variable "item" in lists, or field names without "item" in contexts)
  - [ ] context selection (using dot name after a list of contexts yields a list of values of the name property taken from all the contexts)

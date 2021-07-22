@@ -35,7 +35,7 @@ pub enum RangeBoundType {
 ///   - D is for datetime
 ///   - y is for year month duration
 ///   - z is for day time duration
-///   - ? is for one value of unspefied type
+///   - ? is for one value of unspecified type
 ///   - + is for one or more values of unspecified type
 ///   - <x>+ is for one or more values of a specified type x
 ///   - * is for zero or more values of unspecified type
@@ -50,7 +50,18 @@ pub enum RangeBoundType {
 /// If multiple stacks or stacks other than the value stack are affected,
 /// prefix with "ctx:" for the context stack and "val:" for the data stack. 
 /// 
-/// Note: OrderedFloat is used to box floats for LoadNumber so that we can implement Eq using derive. 
+/// Notes: 
+///    1. OrderedFloat is used to box floats for LoadNumber so that we can implement Eq using derive. 
+/// 
+///    2. Contexts appear in both the value (aka data) and context stacks. 
+///       LoadContext creates a new context with no keys and pushes it on the value stack. 
+///       CreateFilterContext pops a List and a Context from the value stack to make a filter context 
+///       that associates the list with the key "items", plus the key "next item index" is set to zero. 
+///       Then it pushes the new context onto the value stack. 
+///       PushContext pops a context from the value stack and pushes it onto the context stack.
+///       PopContext pops the context from the context stack and pushes it onto the value stack. 
+///       Drop allows you to finally pop the context from the value stack.
+///    
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum OpCode {
   // Arithmetic
@@ -80,6 +91,8 @@ pub enum OpCode {
   Filter,                     //   l -> l
   InstanceOf,                 // ? Q -> b OR ? s -> b
   
+  // TODO: Do we need a separate Index OpCode variant for looking up values in a list? Or should Filter do that?
+
   // Lists
   CreateList,                 //   * -> l
   PushList,                   // l ? -> l
@@ -87,13 +100,13 @@ pub enum OpCode {
   // Contexts
   LoadFromContext,            //     Q -> ? OR s -> ?
   AddEntryToContext,          // _ Q ? -> _
-  PushContext,                // ctx:   _ -> _ c
-  PopContext,                 // ctx: _ c -> _
+  PushContext,                // val: _ c -> _  ctx:   _ -> _ c
+  PopContext,                 // val: _ -> _ c  ctx: _ c -> _
   /// A loop context forms a cartesian product of one or more lists. 
   /// The usize value counts how many lists to include. 
   CreateLoopContext(usize),      // val: _ l+ -> _  ctx: _ -> _ c
   CreatePredicateContext(usize), // val: _ l+ -> _  ctx: _ -> _ c
-  CreateFilterContext,           // val: _ l  -> _  ctx: _ -> _ c
+  CreateFilterContext,           // val:  l c -> c'
   LoadContext,                   // val:    _ -> _ c
 
   // Create Literals and push them onto the value stack

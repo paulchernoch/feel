@@ -19,6 +19,7 @@ use crate::parsing::execution_log::ExecutionLog;
 use crate::parsing::arguments::{Arguments,Validity};
 use crate::parsing::substring::Substring;
 use crate::parsing::lattice_type::LatticeType;
+use crate::parsing::feel_function::FeelFunction;
 use super::statistics::{sample_standard_deviation, mode_with_ties, MedianIndex};
 use super::statistics::median as stats_median;
 
@@ -48,10 +49,207 @@ impl Builtins {
   /// The keys in the Context are the names of the functions (as QNames).
   /// All the values are FeelValue::Function variants.
   pub fn new_context() -> Context {
-    let builtin_context = Context::new();
-
+    let mut builtin_context = Context::new();
+    Builtins::add_not(&mut builtin_context);
+    Builtins::add_substring(&mut builtin_context);
+    Builtins::add_string_length(&mut builtin_context);
+    
     builtin_context
   }
+
+  //// ////////////////////////////////////////////////////////////////
+  ////                                                             ////
+  ////    Create FeelValue::Function wrappers for all Builtins     ////
+  ////                                                             ////
+  //// ////////////////////////////////////////////////////////////////
+   
+  fn add_builtin(ctx: &mut Context, func_name: &str, lattice_type: LatticeType, func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) {
+    let ff = FeelFunction::new_builtin(func_name, lattice_type, func);
+    ctx.insert(func_name, FeelValue::Function(ff));
+  }
+
+  fn add_not(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::not(value.clone(), _ctx) };
+    let lattice_type = LatticeType::homogeneous_function(1, LatticeType::Boolean);
+    Builtins::add_builtin(ctx, "not", lattice_type, f);
+  }
+
+  // TODO: Many more functions to add.
+  
+  fn add_substring(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::substring(value.clone(), _ctx) };
+    let lattice_type = LatticeType::function(vec![LatticeType::String, LatticeType::Number, LatticeType::Number], LatticeType::String);
+    Builtins::add_builtin(ctx, "substring", lattice_type, f);
+  }
+
+  fn add_string_length(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::string_length(value.clone(), _ctx) };
+    let lattice_type = LatticeType::function(vec![LatticeType::String], LatticeType::Number);
+    Builtins::add_builtin(ctx, "string length", lattice_type, f);
+  }
+
+  // fn add_upper_case(ctx: &mut Context)
+
+  // fn add_lower_case(ctx: &mut Context)
+
+  // fn add_substring_before(ctx: &mut Context)
+
+  // fn add_substring_after(ctx: &mut Context)
+
+  // fn add_replace(ctx: &mut Context)
+
+  // fn add_contains(ctx: &mut Context)
+
+  // fn add_starts_with(ctx: &mut Context)
+
+  // fn add_ends_with(ctx: &mut Context)
+
+  // fn add_matches(ctx: &mut Context)
+
+  // fn add_split(ctx: &mut Context)
+
+  // fn add_list_contains(ctx: &mut Context)
+
+  // fn add_count(ctx: &mut Context)
+
+  // fn add_min(ctx: &mut Context)
+
+  // fn add_max(ctx: &mut Context)
+
+  // fn add_sum(ctx: &mut Context)
+
+  // fn add_mean(ctx: &mut Context)
+
+  // fn add_all(ctx: &mut Context)
+
+  // fn add_(ctx: &mut Context)
+
+  // fn add_(ctx: &mut Context)
+
+  // fn add_any(ctx: &mut Context)
+
+  // fn add_sublist(ctx: &mut Context)
+
+  // fn add_append(ctx: &mut Context)
+
+  // fn add_concatenate(ctx: &mut Context)
+
+  // fn add_insert_before(ctx: &mut Context)
+
+  // fn add_remove(ctx: &mut Context)
+
+  // fn add_reverse(ctx: &mut Context)
+
+  // fn add_index_of(ctx: &mut Context)
+
+  // fn add_union(ctx: &mut Context)
+
+  // fn add_distinct_values(ctx: &mut Context)
+
+  // fn add_flatten(ctx: &mut Context)
+
+  // fn add_product(ctx: &mut Context)
+
+  // fn add_median(ctx: &mut Context)
+
+  // fn add_stddev(ctx: &mut Context)
+
+  // fn add_mode(ctx: &mut Context)
+
+  // fn add_decimal(ctx: &mut Context)
+
+  // fn add_floor(ctx: &mut Context)
+
+  // fn add_ceiling(ctx: &mut Context)
+
+  // fn add_abs(ctx: &mut Context)
+
+  // fn add_modulo(ctx: &mut Context)
+
+  // fn add_power(ctx: &mut Context)
+
+  // fn add_sqrt(ctx: &mut Context)
+
+  // fn add_log(ctx: &mut Context)
+
+  // fn add_exp(ctx: &mut Context)
+
+  // fn add_even(ctx: &mut Context)
+
+  // fn add_odd(ctx: &mut Context)
+
+  // fn add_before(ctx: &mut Context)
+
+  // fn add_after(ctx: &mut Context)
+
+  // fn add_meets(ctx: &mut Context)
+
+  // fn add_met_by(ctx: &mut Context)
+
+  // fn add_overlaps(ctx: &mut Context)
+
+  // fn add_overlaps_before(ctx: &mut Context)
+
+  // fn add_overlaps_after(ctx: &mut Context)
+
+  // fn add_finishes(ctx: &mut Context)
+
+  // fn add_finished_by(ctx: &mut Context)
+
+  // fn add_includes(ctx: &mut Context)
+
+  // fn add_during(ctx: &mut Context)
+
+  // fn add_starts(ctx: &mut Context)
+
+  // fn add_started_by(ctx: &mut Context)
+
+  // fn add_coincides(ctx: &mut Context)
+
+  // fn add_in_operator(ctx: &mut Context)
+
+  // fn add_get_value(ctx: &mut Context)
+
+  // fn add_get_entries(ctx: &mut Context)
+
+  // fn add_day_of_week(ctx: &mut Context)
+
+  // fn add_month_of_year(ctx: &mut Context)
+
+  // fn add_week_of_year(ctx: &mut Context)
+
+  // fn add_duration(ctx: &mut Context)
+
+  // fn add_years_and_months_duration(ctx: &mut Context)
+
+  // fn add_is(ctx: &mut Context)
+
+  // fn add_is_not(ctx: &mut Context)
+
+  // fn add_equals(ctx: &mut Context)
+
+  // fn add_date(ctx: &mut Context)
+
+  // fn add_date_and_time(ctx: &mut Context)
+
+  // fn add_time(ctx: &mut Context)
+
+  // fn add_number(ctx: &mut Context)
+
+  // fn add_type_number(ctx: &mut Context)
+
+  // fn add_string(ctx: &mut Context)
+
+  // fn add_instance_of(ctx: &mut Context)
+
+
+
+
+  //// ////////////////////////////////////////////////////////////////
+  ////                                                             ////
+  ////                   Arguments and Validators                  ////
+  ////                                                             ////
+  //// ////////////////////////////////////////////////////////////////
 
   /// Prepare the Arguments object and a validator. 
   /// If the supplied parameters is a single FeelValue::List, it will be flattened into a list of

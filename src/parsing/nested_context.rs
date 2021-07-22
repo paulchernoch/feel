@@ -1,6 +1,6 @@
 use super::feel_value::{FeelValue, FeelType};
 use super::qname::QName;
-use super::context::ContextReader;
+use super::context::{ContextReader,ContextIncrement};
 
 /// In Feel, a scope is a list of contexts, called here a NestedContext.
 /// 
@@ -92,6 +92,44 @@ impl ContextReader for NestedContext {
 
   fn length(&self) -> usize {
     1
+  }
+}
+
+impl ContextIncrement for NestedContext {
+  /// Increment the value associated with a key by one if possible. 
+  /// If default is not None and the key is missing from all child contexts,
+  /// then add the key to the topmost context with the default value. 
+  /// 
+  ///   k ............. Key to increment
+  ///   default ....... Value to set if key is missing from all child Contexts in this NestedContext. 
+  ///                   If None, do not insert the missing key.
+  /// 
+  /// Returns the incremented value if successful. 
+  /// Returns None if the key is missing and None given as default,
+  /// or the key is present but its current value is not a Number.
+  fn increment<Q: Into<QName>>(&self, k: Q, default: Option<f64>) -> Option<FeelValue> {
+    let key: QName = k.into();
+    for item in self.stack.iter().rev() {
+      match item {
+        FeelValue::Context(ctx) => {
+          let value = ctx.increment(key.clone(), None);
+          if value.is_some() {
+            return value;
+          }        
+        },
+        _ => ()
+      };
+    }
+    // Key not found in any child context on the stack. Optionally add a default value to the top
+    // of the stack. 
+    match (default, self.stack.last()) {
+      (Some(default_value), Some(FeelValue::Context(top_ctx))) => {
+        let new_value = FeelValue::Number(default_value);
+        top_ctx.insert(key, new_value.clone());
+        Some(new_value)
+      },
+      _ => None
+    }
   }
 }
 
