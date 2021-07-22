@@ -139,7 +139,7 @@ impl ContextIncrement for NestedContext {
 mod tests {
   use std::rc::Rc;
   use super::super::feel_value::{FeelValue};
-  use super::super::context::{Context,ContextReader};
+  use super::super::context::{Context,ContextReader,ContextIncrement};
   use super::NestedContext;
 
   fn make_test_data() -> NestedContext {
@@ -149,7 +149,7 @@ mod tests {
 
     let ctx2 = Context::new();
     ctx2.insert("Favorite color", "teal".into());
-    ctx1.insert("Favorite number", 42.into());
+    ctx2.insert("Favorite number", 42.into());
 
     let mut stack = NestedContext::new();
     stack.push(FeelValue::Context(Rc::new(ctx1)));
@@ -178,4 +178,12 @@ mod tests {
     assert_eq!(true, actual_value.is_none(), "get of missing key should return None")
   }
 
+
+  #[test]
+  fn test_increment() {
+    let stack = make_test_data();
+    let actual_value = stack.increment("Favorite number", None).unwrap();
+    let expected_value: FeelValue = 43.into();
+    assert_eq!(expected_value, actual_value);
+  }
 }
