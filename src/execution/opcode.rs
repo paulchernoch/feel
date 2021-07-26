@@ -55,15 +55,24 @@ pub enum RangeBoundType {
 /// 
 ///    2. Contexts appear in both the value (aka data) and context stacks. 
 ///       LoadContext creates a new context with no keys and pushes it on the value stack. 
-///       CreateFilterContext pops a List and a Context from the value stack to make a filter context 
+///       create_filter_context (a macro of multiple ops) pops a List and a Context from the value stack to make a filter context 
 ///       that associates the list with the key "items", plus the key "next item index" is set to zero. 
 ///       Then it pushes the new context onto the value stack. 
 ///       PushContext pops a context from the value stack and pushes it onto the context stack.
 ///       PopContext pops the context from the context stack and pushes it onto the value stack. 
 ///       Drop allows you to finally pop the context from the value stack.
 ///    
+///    3. FEEL lists are indexed by one-based indices, 
+///       but the Index OpCode is zero-based.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum OpCode {
+  // Stack manipulation (ala Forth programming language)
+  Swap, // - swaps the top two items on the stack: (a b -> b a)
+  Over, // - copies the second item from the top and pushes it: (a b -> a b a') 
+  Rot,  // - rotates the third item to the top: (a b c -> b c a) 
+  Dup,  // - duplicates the top of the stack: (a -> a a')
+  Drop, // - pops one item off the top of the stack (a b -> a)
+
   // Arithmetic
   Add,                        // ? ? -> ?   Details: n n -> n OR d y -> d OR y d -> d OR t z -> t OR z t -> t
   Subtract,                   // ? ? -> ?   Details: n n -> n OR d y -> d OR t z -> t
@@ -91,11 +100,10 @@ pub enum OpCode {
   Filter,                     //   l -> l
   InstanceOf,                 // ? Q -> b OR ? s -> b
   
-  // TODO: Do we need a separate Index OpCode variant for looking up values in a list? Or should Filter do that?
-
   // Lists
   CreateList,                 //   * -> l
   PushList,                   // l ? -> l
+  Index,                      // l # => ?   Zero-based index of a list.
 
   // Contexts
   LoadFromContext,            //     Q -> ? OR s -> ?
@@ -106,8 +114,16 @@ pub enum OpCode {
   /// The usize value counts how many lists to include. 
   CreateLoopContext(usize),      // val: _ l+ -> _  ctx: _ -> _ c
   CreatePredicateContext(usize), // val: _ l+ -> _  ctx: _ -> _ c
-  CreateFilterContext,           // val:  l c -> c'
   LoadContext,                   // val:    _ -> _ c
+
+  // Filtering
+
+  // NOTE: +filter, item and items? will be macros composed of multiple OpCodes, hence not appear here
+  IsType(usize), // Gets the type of the top of the data stack, compares it to the heap string referenced by the opcode using "instance of" and pushes True or False.
+  ListLength,    // Gets the length of the next item on the value stack. If it is a list, it is the list length, otherwise 1. Consumes the list.
+  Increment,     // Increment the value of the property whose name is atop the value stack in the topmost context that defines it and push the new value onto the value stack.
+  UpdateContext, // Update a key-value pair in the contexts stack. Different from xset, which operates on a context that is on the value stack. 
+
 
   // Create Literals and push them onto the value stack
 
@@ -141,13 +157,6 @@ pub enum OpCode {
   BranchExitLabel { true_label: usize, false_label: usize, null_label: usize },         // Uncertain.
   BranchExitAddress { true_address: usize, false_address: usize, null_address: usize }, // Uncertain.
 
-  /// For iterators, this probes the context to see if there are more items to iterate
-  /// and pushes a True or False onto the data stack. 
-  HasNext,                       // _ -> _ b
-  /// For iterators, this gets the next value from the loop context and pushes it
-  /// onto the data stack.
-  PushNext,                      // _ -> _ ?
-
   Return                         // ? -> <empty>
 }
 
@@ -171,6 +180,12 @@ impl Display for OpCode {
   fn fmt(&self, f: &mut Formatter) -> Result {
     let tmp: String;
     let msg = match self {
+        OpCode::Swap => "swap",
+        OpCode::Over => "over", 
+        OpCode::Rot => "rot", 
+        OpCode::Dup => "dup",
+        OpCode::Drop => "drop",
+
         OpCode::Add => "+",
         OpCode::Subtract => "-",
         OpCode::Negate => "neg",
@@ -191,6 +206,7 @@ impl Display for OpCode {
         OpCode::Filter => "filter",
         OpCode::InstanceOf => "is",
         OpCode::CreateList => "list",
+        OpCode::Index => "index",
         OpCode::PushList => "push",
         OpCode::LoadFromContext => "xget",
         OpCode::AddEntryToContext => "xset",
@@ -198,8 +214,13 @@ impl Display for OpCode {
         OpCode::PopContext => "xpop",
         OpCode::CreateLoopContext(dimensions) => { tmp = format!("+loop({})", dimensions); &tmp },
         OpCode::CreatePredicateContext(dimensions) => { tmp = format!("+pred({})", dimensions); &tmp },
-        OpCode::CreateFilterContext => "+filter",
         OpCode::LoadContext => "xload",
+
+        OpCode::IsType(index) => { tmp = format!("type?({})", index); &tmp }
+        OpCode::ListLength => "len",
+        OpCode::Increment => "incr",
+        OpCode::UpdateContext => "xup", 
+
         OpCode::CreateRange { lower, upper } => {
           match (lower, upper) {
             (RangeBoundType::Exclusive, RangeBoundType::Exclusive) => "(lo,hi)",
@@ -234,8 +255,6 @@ impl Display for OpCode {
         OpCode::ExitLoopAddress(address) => { tmp = format!("exit-addr({})", address); &tmp },  
         OpCode::BranchExitLabel { true_label, false_label, null_label } => { tmp = format!("branch-exit({}/{}/{})", true_label, false_label, null_label); &tmp },
         OpCode::BranchExitAddress { true_address, false_address, null_address } => { tmp = format!("branch-exit#({}/{}/{})", true_address, false_address, null_address); &tmp },
-        OpCode::HasNext => "next?",
-        OpCode::PushNext => "next",
         OpCode::Return  => "return"
       };
     write!(f, "{}", msg)
@@ -259,9 +278,19 @@ impl FromStr for OpCode {
     type Err = OpCodeParseError;
 
     /// Parse an OpCode from a string.
-    /// This is mostly for unit tests, to make it convenient to create test data. 
+    /// This makes it convenient to create test data for unit tests. 
+    /// 
+    /// Note: Not every OpCode can be parsed in this way. Actual strings for use in LoadString require a CompiledEdxpression
+    ///       as part of the parsing, as does "type?(type-string)". 
+    ///       Such codes will be parsed in CompiledExpression if this returns an Err.
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let op = match s {
+            "swap" => OpCode::Swap,
+            "over" => OpCode::Over, 
+            "rot" => OpCode::Rot, 
+            "dup" => OpCode::Dup,
+            "drop" => OpCode::Drop,
+
             "+" => OpCode::Add,
             "-" => OpCode::Subtract,
             "neg" => OpCode::Negate,
@@ -282,13 +311,17 @@ impl FromStr for OpCode {
             "filter" => OpCode::Filter,
             "is" => OpCode::InstanceOf,
             "list" => OpCode::CreateList,
+            "index" => OpCode::Index,
             "push" => OpCode::PushList,
             "xget" => OpCode::LoadFromContext,
             "xset" => OpCode::AddEntryToContext,
             "xpush" => OpCode::PushContext,
             "xpop" => OpCode::PopContext,
-            "+filter" => OpCode::CreateFilterContext,
             "xload" => OpCode::LoadContext,
+
+            "len" => OpCode::ListLength,
+            "incr" => OpCode::Increment,
+            "xup" => OpCode::UpdateContext, 
 
             "(lo,hi)" => OpCode::CreateRange { lower: RangeBoundType::Exclusive, upper: RangeBoundType::Exclusive },
             "(lo,hi]" => OpCode::CreateRange { lower: RangeBoundType::Exclusive, upper: RangeBoundType::Inclusive },
@@ -312,15 +345,12 @@ impl FromStr for OpCode {
             "null" => OpCode::LoadNull,
             "call" => OpCode::CallFunction,
             "." => OpCode::GetProperty,
-
-            "next?" => OpCode::HasNext,
-            "next" => OpCode::PushNext,
             "return" => OpCode::Return,
             _ => {
                 lazy_static! {
                     static ref FANCY_OPCODE_RE: Regex = Regex::new(r"(?x)
                         ^                              # Match start of string
-                        (?P<opname>[-+\#a-zA-Z]+)      # Match abbreviated name of OpCode as 'opname'
+                        (?P<opname>[-+?\#a-zA-Z]+)     # Match abbreviated name of OpCode as 'opname'
                         \(                             # Open parentheses
                         (?P<arg1>-?[0-9]+([.][0-9]+)?) # Match first number as 'arg1'
                         (/                             # Delimiter
@@ -366,6 +396,7 @@ impl FromStr for OpCode {
                     "+loop" => OpCode::CreateLoopContext(arg1),
                     "+pred" => OpCode::CreatePredicateContext(arg1),
                     "string" => OpCode::LoadString(arg1), 
+                    "type?" => OpCode::IsType(arg1),
                     "num" => OpCode::load_number(arg1_float),
                     "goto" => OpCode::GotoLabel(arg1),
                     "goto#" => OpCode::GotoAddress(arg1),

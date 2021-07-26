@@ -1,4 +1,5 @@
 // use std::cmp::{Ord, PartialOrd, Ordering};
+use std::rc::Rc;
 use super::opcode::{OpCode,RangeBoundType};
 use super::compiled_expression::CompiledExpression;
 use crate::parsing::feel_value::{FeelValue,FeelType};
@@ -14,7 +15,7 @@ use crate::execution::value_properties::ValueProperties;
 
     - instruction stack (OpCodes from the CompiledExpression)
     - heap (literal Strings from the CompiledExpression)
-    - contexts (a NestedContext) taht can be pushed an popped
+    - contexts (a NestedContext) that can be pushed an popped
     - data stack (FeelValues that are intermediate valus of calculations)
 
   Execution of the operations is facilitated by an instruction pointer, an index into the instruction stack.
@@ -113,6 +114,39 @@ impl Interpreter {
         match self.next_address() {
             Some(address) => {
                 match self.instructions.operations[address] {
+                    OpCode::Swap => {
+                        self.advance();
+                        let (lower, higher) = self.pop_two();
+                        self.push_data(higher);
+                        self.push_data(lower);
+                    },
+                    OpCode::Over => {
+                        self.advance();
+                        let (lower, higher) = self.pop_two();
+                        self.push_data(lower.clone());
+                        self.push_data(higher);
+                        self.push_data(lower);
+                    },
+                    OpCode::Rot => {
+                        // (a b c => b c a)
+                        self.advance();
+                        let (b, c) = self.pop_two();
+                        let a = self.pop_data();
+                        self.push_data(b);
+                        self.push_data(c);
+                        self.push_data(a);
+                    },
+                    OpCode::Dup => {
+                        self.advance();
+                        let top = self.pop_data();
+                        self.push_data(top.clone());
+                        self.push_data(top);
+                    },                    
+                    OpCode::Drop => {
+                        self.advance();
+                        self.pop_data();
+                    },
+
                     // TODO: Semantics of FEEL addition, subtraction, etc may be tighter than the operator implementation. Verify and adjust.
                     //  - Inequalities and between operator have been adapted to deal with Null properly.
 
@@ -253,6 +287,38 @@ impl Interpreter {
                             }
                         };
                     },
+
+                    OpCode::Index => {
+                        // NOTE: Feel semantics is to treat a scalar first operand as though it were 
+                        //       a list of one element. That will be handled not here but by wrapping
+                        //       OpCodes with conditional logic around the inputs to test their types.
+                        self.advance();
+                        let (list, index) = self.pop_two();
+                        let list_type = list.get_type().to_string();
+                        match (list, index.clone()) {
+                            (FeelValue::List(rr_list), FeelValue::Number(i)) if index.is_integer() && i >= 0.0 => {
+                                let u_index = i as usize;
+                                let size = rr_list.borrow().len();
+                                if size > u_index {
+                                    self.push_data(rr_list.borrow()[u_index].clone());
+                                }
+                                else {
+                                    self.error(
+                                        format!("List index out of range: {}", u_index),
+                                        true
+                                    );
+                                }
+                            },
+                            _ => {
+                                self.error(
+                                    format!("Cannot index {} using given index", list_type),
+                                    true
+                                );
+                            }
+
+                        }
+                    },
+
                     OpCode::LoadFromContext => {
                         self.advance();
                         let key = self.pop_data();
@@ -278,15 +344,95 @@ impl Interpreter {
                             }
                         }
                     },
+
+                    OpCode::AddEntryToContext => {
+                        self.advance();
+                        let (ctx, key, value) = self.pop_three();
+                        match (ctx, key.clone()) {
+                            (FeelValue::Context(rc_ctx), FeelValue::Name(qname)) => {
+                                (*rc_ctx).insert(qname, value);
+                            },
+                            (FeelValue::Context(rc_ctx), FeelValue::String(name)) => {
+                                (*rc_ctx).insert(name, value);
+                            },
+                            _ => {
+                                self.error(
+                                    format!("Cannot add key to context because its type is {}", key.get_type().to_string()),
+                                    true
+                                ); 
+                            }                            
+                        }
+                    },
+
+                    OpCode::PushContext => {
+                        self.advance();
+                        // TODO: Review error handling.
+                        // For now, if top of value stack is not a Context, 
+                        // make an empty Context to push onto the contexts stack.
+                        let ctx = self.pop_data();
+                        match ctx {
+                            FeelValue::Context(_) => { self.contexts.push(ctx); },
+                            _ => { 
+                                self.contexts.push(FeelValue::new_context()); 
+                                self.error(
+                                    format!("Top of value stack is a {} instead of a context", ctx.get_type().to_string()),
+                                    false
+                                ); 
+                            }
+                        };
+                    },
+                    OpCode::PopContext => {
+                        self.advance();
+                        match self.contexts.pop() {
+                            Some(ctx) => {
+                                self.push_data(ctx);
+                            },
+                            None => {
+                                self.push_data(FeelValue::new_context());
+                                self.error(
+                                    format!("Contexts stack is empty"),
+                                    false
+                                ); 
+                            }
+                        };
+                    },
 /*
-                    OpCode::AddEntryToContext => {},
-                    OpCode::PushContext => {},
-                    OpCode::PopContext => {},
                     OpCode::CreateLoopContext(dimensions) => {},
                     OpCode::CreatePredicateContext(dimensions) => {},
-                    OpCode::CreateFilterContext => {},
-                    OpCode::LoadContext => {},
-*/
+*/                    
+                    OpCode::LoadContext => {
+                        self.advance();
+                        self.push_data(FeelValue::new_context());
+                    },
+
+                    OpCode::IsType(index) => {
+                        self.advance();
+                        if index >= self.instructions.heap.len() {
+                            self.error(
+                                format!("String heap index {} is out of range.", index),
+                                true
+                            ); 
+                        }
+                        else {
+                            let type_name = FeelValue::String(self.instructions.heap[index].clone());
+                            self.push_data(type_name);
+                            let result = Builtins::instance_of(self.make_args(2), &self.contexts);
+                            self.push_data(result);
+                        }
+                    },
+
+                    OpCode::ListLength => {
+                        self.advance();
+                        match self.pop_data() {
+                            FeelValue::List(rr_list) => {
+                                let length = rr_list.borrow().len() as f64;
+                                self.push_data(length.into());
+                            },
+                            _ => {
+                                self.push_data(1.0.into());
+                            }
+                        };
+                    },
 
                     OpCode::CreateRange { lower, upper } => {
                         self.advance();
@@ -441,8 +587,6 @@ impl Interpreter {
                     OpCode::ExitLoopAddress(address) => {},
                     OpCode::BranchExitLabel { true_label, false_label, null_label } => {},
                     OpCode::BranchExitAddress { true_address, false_address, null_address } => {},
-                    OpCode::HasNext => {},
-                    OpCode::PushNext => {},
 */
                     OpCode::Return  => (),
                     _ => { return false; }

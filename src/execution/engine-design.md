@@ -166,6 +166,8 @@ Because of the different semantics, this logic will be implemented as multiple O
 In the "code" below, "left" is the left operand, normally a list, and "right" is the right operand, normally a number,
 but maybe a filter expression.
 
+The strings used in this spec are the string representations of the OpCodes, which are more concise and a little cryptic.
+
 This will necessitate creating more OpCodes, inspired by the Forth language. 
 In the descriptions below, the rightmost item is the top item on the stack. 
 
@@ -182,6 +184,8 @@ Other OpCodes will be needed for the looping over the list, beyond the original 
   - +filter - Pops a list from the data stack, creates a filter context and pushes that onto the context stack.
   - type?(t) - Gets the type of the top of the data stack, compares it to the heap string referenced by the opcode using "instance of" and pushes True or False.
   - len - Gets the length of the next item on the value stack. If it is a list, it is the list length, otherwise 1. Consumes the list.
+  - incr - Increment the value of the given property on the topmost context that defines it and push the new value onto the value stack.
+  - xup - Update a key-value pair in the contexts stack. Different from xset, which operates on a context that is on the value stack. 
 
 The "type?(t)" OpCode is equivalent to pushing a string on the data stack and then an "is".
 
@@ -195,12 +199,17 @@ In the cases below, the changes to the stack are shown, and OpCodes that are ski
 "F" is a Filter Context.
 "l" is a list.
 "0" is number(0).
+"1" is number(1).
 "#" is a number.
 "a", "b", "c" etc are numbers indicating labels.
 "+filter" must be replaced by the the actual filter expression, which consists of multiple opcodes. 
 "c" is a context
 "N" is a Null
 "x" is a complex subexpression compised of many OpCodes that must result in pushing a Boolean or Null onto the value stack.
+"+filter" means call create_filter_context to to expand macro and generate these OpCodes:
+     'item index' number(0) xset over len 'item count' swap xset 'item list' rot xset 'item' null xset xpush
+"items?" means call has_next to expand macro
+"item" means call get_next to expand macro
 
 The code generator must recognize that a filtering operation is intended by searching the AST for:
   - references to the "item" variable in the subexpression
@@ -227,7 +236,9 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
   branch(f/g/c)                              L is a list, test if I is a number
 
   label(f)                                   L is a list and I is a number: 
-  index                                      Perform a list index operation.
+  number(1)
+  -                                          Subtract one to go from one-based to zero-based
+  index                                      Perform a zero-based list index operation.
   goto(d)
 
   label(g)                                   L is a list and I is not a number: 
@@ -235,7 +246,8 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
   branch(h/c/c)                              Test if L is a context, indicating a filter operation
 
   label(h)                                   Assume it is a filter context - insert more opcodes here
-  +filter                                    
+  +filter
+  *** MORE ***                                         
   goto(d)
 
   label(b)           (L I -> L I)            L is a scalar.
@@ -270,7 +282,9 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
   branch(f/g/c)      (L I t -> L I)          L is a list, test if I is a number
 
   label(f)           (L I -> L I)            L is a list and I is a number: we will perform a list index operation.
-  index              (L I -> A)              
+  number(1)          (L I -> L I 1)
+  -                  (L I -> L #)            Subtract one to go from one-based to zero-based
+  index              (L # -> A)              
   goto(d)            (A -> A)
 
   label(g)                                   L is a list and I is not a number: 
@@ -278,7 +292,8 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
   branch(h/c/c)                              Test if L is a context, indicating a filter operation
 
   label(h)                                   Assume it is a filter context - insert more opcodes here
-  +filter                                    
+  +filter
+  *** MORE ***                                   
   goto(d)
 
   label(b)                                   L is a scalar.
@@ -315,6 +330,8 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
   branch(f/g/c)      (L I f -> L I)          L is a list, test if I is a number
 
   label(f)                                   L is a list and I is a number: we will perform a list index operation.
+  number(1)
+  -                                          Subtract one to go from one-based to zero-based
   index                            
   goto(d)            
 
@@ -322,19 +339,30 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
   type?(context<>)   (L I -> L I t)          
   branch(h/c/c)      (L I t -> L I)          Test if L is a context, indicating a filter operation
 
-  label(h)           (L I -> L I)            Assume it is a filter context - insert more opcodes here
-  +filter            (L I -> F)
-  xpush              (_ F -> _)
-  list               (_ -> l)
-  ...more opcodes...
-  goto(d)            (A -> A)
-
+  label(h)           (L I -> L I)            Assume "I" is a filter context - insert more opcodes here
+  +filter            (_ L I -> _)
+  list               (_ -> l)                List to hold results
+  label(i)                                   Top of list filter loop
+  items?             (l -> l b)
+  branch(j/k/k)      (l b -> l)
+  label(j)           (l -> l)
+  item               (l -> l ?)
+  ...INSERT FILTER PREDICATE OpCodes HERE...
+  label(l)           (l ? b -> l ? b)
+  branch(m/n/n)      (l ? b -> l ?)
+  label(m)           (l ? -> l ?)            Keep item (passes filter predicate)
+  push               (l ? -> l)             
+  goto(i)            (l -> l)
+  label(n)           (l ? -> l ?)            Skip item (fails filter predicate)
+  drop               (l ? -> l)       
+  label(k)           (l -> l)                End of filter loop
+  goto(d)            (l -> l)                List that holds results
+  
   label(b)                                   L is a scalar.
   dup                
   number(0)          
   =                  
   branch(e/c/c)                              Test if right index argument is a zero.
-
   label(e)                                   L is scalar and I = 0 branch.
   drop                   
   goto(d)             
@@ -352,7 +380,7 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
 
 When iterating through a list in a filter operation, two contexts must be pushed.
 
-  - Filter context - has properties "item", "item index", and "item list"
+  - Filter context - has properties "item", "item index", "item count", and "item list"
   - Item as context or empty context
 
 Since the filter expression may reference properties in the list item,
@@ -364,33 +392,20 @@ Likewise, when "item" is executed, it must bypass the top context also.
 
 When the iteration completes, we must "xpop" and "drop" twice, to remove both contexts.
 
-At the beginning of iteration, we need a fake extra context so item? and item do not
+At the beginning of iteration, we need a fake extra context so items? and item do not
 xpop something that is not there.
 
   - xload
   - xpush
 
-To accomplish this for "item?":
+**To implement "items?" in terms of simpler OpCodes:**
 
-  - xpop
-  - item?
-  - swap
-  - xpush
+  - string(item index)
+  - xget
+  - string(item count)
+  - xget
+  - <
 
-To perform "item":
-
-  - xpop
-  - drop
-  - item
-  - type?(context<>)
-  - branch(a/b/b)
-  - label(a)
-  - dup               : Duplicates the item, to prepare for pushing it onto the context stack at the end
-  - goto(c)
-  - label(b)
-  - xload             : Makes an empty context to be pushedat the end
-  - label(c)
-  - xpush
 
 
 **Breaking +filter into smaller operations:**
@@ -407,35 +422,66 @@ The OpCodes:
 
   - string(item index)     (l c -> l c s)
   - number(0)              (l c s -> l c s 0)
-  - xset                   (l c s 0 -> l c)         Sets "item index" in context
+  - xset                   (l c s 0 -> l c)         Sets "item index" in context on value stack
   - over                   (l c -> l c l')
   - len                    (l c l' -> l c #)
   - string(item count)     (l c # -> l c # s)
   - swap                   (l c # s -> l c s #)
-  - xset                   (l c s # -> l c)         Sets "item count" in context                
+  - xset                   (l c s # -> l c)         Sets "item count" in context on value stack        
   - string(item list)      (l c -> l c s)
   - rot                    (l c s -> c s l)
-  - xset                   (c s l -> c)             sets "item list" in context
+  - xset                   (c s l -> c)             sets "item list" in context on value stack
   - string(item)           (c -> c s)
   - null                   (c s -> c s N)
-  - xset                   (c s N -> c)             Sets "item" in context
+  - xset                   (c s N -> c)             Sets "item" in context on value stack
   - xpush                  (_ c -> _)
 
 **Breaking item into smaller operations:**
 
 The work that "item" has to perform:
 
+  - Assume that the list being iterated over has been removed from the value stack and is in a context already pushed onto the contexts stack.
   - Get the current "item index" from the context and push a clone on value stack
   - Get the "item list" from the context and push a clone on value stack 
   - Get the item from the list at the given index and push a clone on the value stack
   - Increment index
   - Store the new index value in "item index"
+  - Duplicate the item
+  - Store the new item in "item"
 
-There will be some swaps or rots involved. Maybe add an "incr" op that performs the read, increment, and write in one go.
+There will be some swaps or rots involved. Add an "incr" op that performs the read, increment, and write in one go.
 
-The OpCodes:
+The OpCodes for "item":
 
-  
+  - string(item list)
+  - xget
+  - string(item index)
+  - xget
+  - index
+  - string(item)
+  - swap
+  - xup
+  - string(item index)
+  - incr
+
+"item" leaves the value stack unchanged.
+
+## OpCode Macros
+
+Some patterns of OpCodes pop up in multiple contexts. 
+Some complex operations may be broken into a list of simpler operations.
+The following operations will have macros that expand into other opcodes:
+
+  - item   (Performs get_next like an iterator)
+  - items? (Performs has_next like an iterator)
+  - +filter
+
+## Renumbering Labels
+
+Expressions are recursive, with one piece parsed then inserted into another. 
+If a subexpression has labels and gotos and branhes, then the label numbers of 
+the inner expression will conflict with those in the outer expression.
+Thus we need a way to insert a subexpression and have its labels shifted.
 
 ## Boxed Expression
 

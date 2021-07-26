@@ -258,6 +258,10 @@ impl FeelValue {
     }
   }
 
+  pub fn new_context() -> Self {
+    FeelValue::Context(Rc::new(Context::new()))
+  }
+
   pub fn negate(&self) -> Self {
     let type_error = || -> FeelValue {
       ExecutionLog::log(&format!("Cannot negate {:?}", self.get_type()));
