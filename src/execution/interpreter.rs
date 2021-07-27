@@ -335,6 +335,20 @@ impl Interpreter {
                                     }
                                 }
                             },
+                            FeelValue::String(str_name) => {
+                                let qname = QName::new(&str_name);
+                                match self.contexts.get(qname) {
+                                    Some(value) => {
+                                        self.push_data(value);
+                                    },
+                                    None => {
+                                        self.error(
+                                            format!("key '{}' not present in context", key.to_string()),
+                                            true
+                                        );   
+                                    }
+                                }
+                            },
                             _ => {
                                 self.error(
                                     format!("Cannot load key from context because its type is {}", key.get_type().to_string()),
@@ -688,6 +702,7 @@ impl Interpreter {
         // When all operations have been executed, assume that the top of the data stack is the answer. 
         // If the stack has more than one value left, it is an error, so return Null. 
         let popped = self.pop_data();
+        message.push_str(&format!("\nExecution Log:\n  {}", ExecutionLog::get().join("\n  ")));
         if self.data.len() != 0 {
             (FeelValue::Null, message)
         }
