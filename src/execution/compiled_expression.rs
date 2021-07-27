@@ -55,23 +55,26 @@ impl CompiledExpression {
         expr
     }
 
+    /// Remove optional single or double quotes from start and end of string.
+    fn unquote(s: &str) -> String {
+        if s.starts_with("'") && s.ends_with("'") {
+            s[1..s.len()-1].to_string()
+        }
+        else if s.starts_with("\"") && s.ends_with("\"") {
+            s[1..s.len()-1].to_string()
+        }
+        else {
+            s.to_string()
+        }
+    }
+
     fn parse_opcode_with_string(&mut self, op_string: &str) -> OpCode {
         if op_string.starts_with("type?(") && op_string.ends_with(")") {
             let type_string = op_string[6..op_string.len()-1].to_string();
-            let index = self.find_or_add_to_heap(type_string);
+            let index = self.find_or_add_to_heap(Self::unquote(&type_string));
             return OpCode::IsType(index);
         }
-
-        let s = if op_string.starts_with("'") && op_string.ends_with("'") {
-            op_string[1..op_string.len()-1].to_string()
-        }
-        else if op_string.starts_with("\"") && op_string.ends_with("\"") {
-            op_string[1..op_string.len()-1].to_string()
-        }
-        else {
-            op_string.to_string()
-        };
-        let index = self.find_or_add_to_heap(s);
+        let index = self.find_or_add_to_heap(Self::unquote(op_string));
         OpCode::LoadString(index)
     }
 
@@ -87,10 +90,11 @@ impl CompiledExpression {
     /// 
     /// This method is most useful for creating unit tests or macros that expand into numerous OpCodes. 
     pub fn new_from_string(source: &str, should_resolve: bool) -> Self {
+        let source_without_newlines = source.replace("\n", " ").trim().to_string();
         lazy_static! {
             static ref OPCODE_SPLITTER_RE: Regex = Regex::new(r#"[^\s"']+|"([^"]*)"|'([^']*)'"#).unwrap();
         }
-        let matches: Vec<String> = OPCODE_SPLITTER_RE.find_iter(source).map(|m| m.as_str().to_string()).collect();
+        let matches: Vec<String> = OPCODE_SPLITTER_RE.find_iter(&source_without_newlines).map(|m| m.as_str().to_string()).collect();
         Self::new_from_strings(source, matches, should_resolve)
     }
 
@@ -292,11 +296,68 @@ impl CompiledExpression {
     /// Insert after the indicated label a stream of OpCodes that will retrieve the next item 
     /// in the list being iterated over and increment the 'item index' in the filter context. 
     /// This compares the 'item index' to the 'item count' by consulting the contexts.
+    /// This code expects that a filter context has already been created from a list.
     pub fn get_next(&mut self, insert_after_label: usize) {
-        let get_next_macro = "'item list' xget 'item index' xget index 'item' swap xup 'item index' incr";
+        let get_next_macro = "
+'item list' xget
+'item index' xget
+index
+'item'
+swap xup
+'item index' incr
+";
         let mut subexpression  = Self::new_from_string(get_next_macro, false);
         self.insert(&mut subexpression, insert_after_label);
     }
+
+    /// Create a filter expression and insert into it 
+    /// a create filter context expression after label(15) 
+    /// and a predicate subexpression after label(12). 
+    /// The predicate performs the filtering of a list. It must push a Boolean to indicate if the list item
+    /// is to be kept or not. The predicate can load the "item" property from the context
+    /// and refer to it in its formula.
+    pub fn new_filter(predicate: &mut Self) -> Self {
+        let filter_macro = "
+over
+type?(list<Any>) branch(1/2/3) label(1)
+dup
+type?(number) branch(6/7/3) label(6)
+number(1) -
+index
+goto(4)
+label(7)
+type?(context<>) branch(8/3/3) label(8)
+label(15)
+list
+label(9)
+items? branch(10/11/11) label(10)
+item
+label(12)
+branch(13/14/14) label(13)
+push
+goto(9)
+label(14)
+drop
+label(11)
+goto(4)
+label(2)
+dup number(0) = branch(5/3/3) label(5)
+drop
+goto(4)
+label(3)
+drop drop null
+label(4)
+";
+        let mut filter_expression  = Self::new_from_string(filter_macro, false);
+        filter_expression.create_filter_context(15);
+        filter_expression.insert(predicate, 12);
+        filter_expression
+    }
+
+    /*
+
+    */
+
 
     /// Replace any branching operations that refer to Labels by position
     /// with operations that refer to Labels by address (their zero-based position within the operations list). 
@@ -354,6 +415,7 @@ impl Display for CompiledExpression {
         let mut s = String::with_capacity((self.heap.len() + self.operations.len()) * 10 + self.source.len());
         s.push_str(&format!("Compiled Expression:\n  source: {}\n  Operations: [", self.source));
         for op in self.operations.iter() {
+            s.push_str(" ");
             s.push_str(&op.to_string());
         }
         s.push_str(&format!("]\n  heap:[\n"));
@@ -374,6 +436,21 @@ impl Display for CompiledExpression {
 mod tests {
     use super::CompiledExpression;
     use super::super::opcode::OpCode;
+
+    /// Silly, but testing that newline replacement works.
+    #[test]
+    fn test_newline_removal() {
+        let s = "
+swap dup drop
+label(1)
+number(1)
+number(2)
++
+";
+        let expected = "swap dup drop label(1) number(1) number(2) +";
+        let actual = s.replace("\n", " ").trim().to_string();
+        assert_eq!(expected, actual);
+    }
 
     #[test]
     fn test_find_label_address() {

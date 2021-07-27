@@ -107,7 +107,7 @@ pub enum OpCode {
 
   // Contexts
   LoadFromContext,            //     Q -> ? OR s -> ?
-  AddEntryToContext,          // _ Q ? -> _
+  AddEntryToContext,          // c Q ? -> c
   PushContext,                // val: _ c -> _  ctx:   _ -> _ c
   PopContext,                 // val: _ -> _ c  ctx: _ c -> _
   /// A loop context forms a cartesian product of one or more lists. 
@@ -393,6 +393,7 @@ impl FromStr for OpCode {
                     }
                 };
                 match opname {
+                    "number" | "num" => OpCode::load_number(arg1_float),
                     "+loop" => OpCode::CreateLoopContext(arg1),
                     "+pred" => OpCode::CreatePredicateContext(arg1),
                     "string" => OpCode::LoadString(arg1), 
@@ -446,10 +447,12 @@ mod tests {
 
     #[test]
     fn test_from_str() {
-        assert_eq!(OpCode::CreateLoopContext(2), OpCode::from_str("+loop(2)").unwrap());
+        assert_eq!(OpCode::CreateLoopContext(2), OpCode::from_str("+loop(2)").unwrap(), "Parsing +loop");
+        assert_eq!(OpCode::load_number(4.0), OpCode::from_str("number(4)").unwrap(), "Parsing number");
         assert_eq!(
             OpCode::BranchToAddress{ true_address: 0, false_address: 1, null_address: 2 }, 
-            OpCode::from_str("branch#(0/1/2)").unwrap()
+            OpCode::from_str("branch#(0/1/2)").unwrap(),
+            "Parsing branch"
         );
 
     }

@@ -1,5 +1,4 @@
 // use std::cmp::{Ord, PartialOrd, Ordering};
-use std::rc::Rc;
 use super::opcode::{OpCode,RangeBoundType};
 use super::compiled_expression::CompiledExpression;
 use crate::parsing::feel_value::{FeelValue,FeelType};
@@ -54,15 +53,15 @@ impl Interpreter {
 
     /// Zero-based address of the next instruction to be executed, or None if execution has completed. 
     pub fn next_address(&self) -> Option<usize> {
-      if self.instruction_pointer >= self.instructions.operations.len() {
-          None
-      }
-      else if self.instructions.operations[self.instruction_pointer] == OpCode::Return {
-          None
-      }
-      else {
-          Some(self.instruction_pointer)
-      }
+        if self.instruction_pointer >= self.instructions.operations.len() {
+            None
+        }
+        else if self.instructions.operations[self.instruction_pointer] == OpCode::Return {
+            None
+        }
+        else {
+            Some(self.instruction_pointer)
+        }
     }
 
     /// Advance the instruction pointer by a single position.
@@ -346,16 +345,20 @@ impl Interpreter {
                     },
 
                     OpCode::AddEntryToContext => {
+                        // Leaves the context on the data stack when finished.
                         self.advance();
                         let (ctx, key, value) = self.pop_three();
-                        match (ctx, key.clone()) {
+                        match (ctx.clone(), key.clone()) {
                             (FeelValue::Context(rc_ctx), FeelValue::Name(qname)) => {
                                 (*rc_ctx).insert(qname, value);
+                                self.push_data(ctx);
                             },
                             (FeelValue::Context(rc_ctx), FeelValue::String(name)) => {
                                 (*rc_ctx).insert(name, value);
+                                self.push_data(ctx);
                             },
                             _ => {
+                                // TODO: Should we also push the context back on?
                                 self.error(
                                     format!("Cannot add key to context because its type is {}", key.get_type().to_string()),
                                     true
@@ -648,6 +651,48 @@ impl Interpreter {
         }
         else {
             popped
+        }
+    }
+
+    fn next_operation(&self) -> Option<OpCode> {
+        match self.next_address() {
+            Some(address) => Some(self.instructions.operations[address]),
+            None => None
+        }
+    }
+
+    /// Execute the expression and return the result 
+    /// while logging changes to the data stack for diagnostic purposes. 
+    /// Returns a tuple with the computed result and a String message that lists each OpCode executed
+    /// and the changes to the data stack.
+    pub fn trace(&mut self) -> (FeelValue, String) {
+        let mut message = String::new();
+        self.reset();
+        let mut next_op = self.next_operation();
+        while self.step() {
+            let stack: Vec<String> = self.data.iter().rev().map(|val| val.to_string()).collect();
+            let stack_string = if stack.len() <= 1 {
+                format!("[ {}]\n", stack.join(" "))
+            } 
+            else {
+                format!("[\n  TOP-> {}\n]\n", stack.join("\n        "))
+            };
+                
+            message.push_str(&format!("{}. {} {}", self.step_count, next_op.unwrap(), stack_string));
+            self.step_count += 1;
+            if self.step_count >= self.limit {
+                return (FeelValue::Null, message);
+            }
+            next_op = self.next_operation();
+        }
+        // When all operations have been executed, assume that the top of the data stack is the answer. 
+        // If the stack has more than one value left, it is an error, so return Null. 
+        let popped = self.pop_data();
+        if self.data.len() != 0 {
+            (FeelValue::Null, message)
+        }
+        else {
+            (popped, message)
         }
     }
 
@@ -993,5 +1038,31 @@ mod tests {
     let vec: Vec<&str> = split.collect();
     vec
   }
+
+    /// Test an OpCode stream that creates a list, makes a filter context,
+    /// then tests if there is are any more items to iterate over in the list.
+    /// Try for an empty list which should return False.
+    #[test]
+    fn test_has_next_for_empty_list() {
+        let mut expr = CompiledExpression::new_from_string("list xload", false);
+        expr.create_filter_context(100); // Insert at end - there is no label(100).
+        expr.has_next(200);              // Insert at end - there is no label(200).
+        expr.resolve_jumps();
+        let ctx = NestedContext::new();
+        println!("Expression\n{}", expr);
+        let mut interpreter = Interpreter::new(expr, ctx);
+        let (actual, message) = interpreter.trace();
+        println!("{}", message);
+        assert!(actual.is_false());
+    }
+
+    /// Test an OpCode stream that creates a list, makes a filter context,
+    /// then tests if there is are any more items to iterate over in the list.
+    /// Try for a list that is not empty, hence should return True.
+    #[test]
+    fn test_has_next_for_nonempty_list() {
+
+
+    }
 
 }

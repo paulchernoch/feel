@@ -232,7 +232,8 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
   branch(a/b/c)      (L I f -> L I)          Test if left argument is a list.
 
   label(a)                                   L is a list.
-  type?(number)
+  dup                
+  type?(number)      
   branch(f/g/c)                              L is a list, test if I is a number
 
   label(f)                                   L is a list and I is a number: 
@@ -242,7 +243,8 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
   goto(d)
 
   label(g)                                   L is a list and I is not a number: 
-  type?(context<>)                           
+  dup                
+  type?(context<>)                             
   branch(h/c/c)                              Test if L is a context, indicating a filter operation
 
   label(h)                                   Assume it is a filter context - insert more opcodes here
@@ -278,7 +280,8 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
   branch(a/b/c)      (L I t -> L I)          Test if left argument is a list.
 
   label(a)           (L I -> L I)            L is a list.
-  type?(number)      (L I -> L I t)
+  dup                (L I -> L I I')
+  type?(number)      (L I I' -> L I t)
   branch(f/g/c)      (L I t -> L I)          L is a list, test if I is a number
 
   label(f)           (L I -> L I)            L is a list and I is a number: we will perform a list index operation.
@@ -287,8 +290,9 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
   index              (L # -> A)              
   goto(d)            (A -> A)
 
-  label(g)                                   L is a list and I is not a number: 
-  type?(context<>)                           
+  label(g)                                   L is a list and I is not a number:                         
+  dup                
+  type?(context<>)     
   branch(h/c/c)                              Test if L is a context, indicating a filter operation
 
   label(h)                                   Assume it is a filter context - insert more opcodes here
@@ -326,7 +330,8 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
   branch(a/b/c)      (L I t -> L I)          Test if left argument is a list.
 
   label(a)           (L I -> L I)            L is a list.
-  type?(number)      (L I -> L I f) 
+  dup                
+  type?(number)    
   branch(f/g/c)      (L I f -> L I)          L is a list, test if I is a number
 
   label(f)                                   L is a list and I is a number: we will perform a list index operation.
@@ -336,7 +341,8 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
   goto(d)            
 
   label(g)           (L I -> L I)            L is a list and I is not a number: 
-  type?(context<>)   (L I -> L I t)          
+  dup                (L I -> L I I')
+  type?(context<>)   (L I I' -> L I t)          
   branch(h/c/c)      (L I t -> L I)          Test if L is a context, indicating a filter operation
 
   label(h)           (L I -> L I)            Assume "I" is a filter context - insert more opcodes here
@@ -357,7 +363,7 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
   drop               (l ? -> l)       
   label(k)           (l -> l)                End of filter loop
   goto(d)            (l -> l)                List that holds results
-  
+
   label(b)                                   L is a scalar.
   dup                
   number(0)          
