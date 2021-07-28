@@ -586,6 +586,7 @@ mod tests {
     fn test_from_str() {
         assert_eq!(LatticeType::from_str("date and time").unwrap(), LatticeType::DateAndTime);
         assert!(LatticeType::from_str("error").is_err());
+        assert_eq!(LatticeType::from_str("function(string)->number").unwrap(), LatticeType::function(vec![LatticeType::String], LatticeType::Number));
     }
 
 }

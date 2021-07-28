@@ -97,7 +97,6 @@ pub enum OpCode {
   // Miscellaneous operators
   Between,                    // ? ? ? -> b
   In,                         // ? l -> ?
-  Filter,                     //   l -> l
   InstanceOf,                 // ? Q -> b OR ? s -> b
   
   // Lists
@@ -141,7 +140,7 @@ pub enum OpCode {
   LoadNull,                      // _ -> _ 0
 
   /// Call a function 
-  CallFunction,                  // L Q -> ? OR L s -> ?
+  CallFunction,                  // Q L -> ? OR s L -> ?
 
   /// Get the value of a named property
   GetProperty,                   // ? Q -> ?
@@ -203,7 +202,6 @@ impl Display for OpCode {
         OpCode::GreaterThanOrEqual => ">=",
         OpCode::Between => "between",
         OpCode::In => "in ",
-        OpCode::Filter => "filter",
         OpCode::InstanceOf => "is",
         OpCode::CreateList => "list",
         OpCode::Index => "index",
@@ -308,7 +306,6 @@ impl FromStr for OpCode {
             ">=" => OpCode::GreaterThanOrEqual,
             "between" => OpCode::Between,
             "in" => OpCode::In,
-            "filter" => OpCode::Filter,
             "is" => OpCode::InstanceOf,
             "list" => OpCode::CreateList,
             "index" => OpCode::Index,

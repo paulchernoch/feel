@@ -259,9 +259,7 @@ impl Interpreter {
                         let result = Builtins::in_operator(self.make_args(2), &self.contexts);
                         self.push_data(result);
                     },
-/*
-                    OpCode::Filter => {},
-*/
+
                     OpCode::InstanceOf => {
                         self.advance();
                         let result = Builtins::instance_of(self.make_args(2), &self.contexts);
@@ -600,9 +598,44 @@ impl Interpreter {
                       self.advance();
                       self.push_data(FeelValue::Null);
                     },
-/*
-                    OpCode::CallFunction => {},
-*/
+
+                    OpCode::CallFunction => {
+                        self.advance();
+                        let (function_name, argument_list) = self.pop_two();
+                        let mut error_reported = false;
+                        let function_opt = match function_name.clone() {
+                            FeelValue::Name(qname) => self.contexts.get(qname),
+                            FeelValue::String(sname) => self.contexts.get(sname),
+                            _ => {
+                                self.error(
+                                    format!("Cannot call function where name is a {}", function_name.get_type().to_string()),
+                                    true
+                                );
+                                error_reported = true;
+                                None
+                            }
+                        };
+                        match (function_opt, error_reported) {
+                            (Some(FeelValue::Function(function)), _) => {
+                                let result = function(&argument_list, &mut self.contexts);
+                                self.push_data(result);
+                            },
+                            (Some(_), _) => {
+                                self.error(
+                                    format!("Value in context named {} is not a function", function_name),
+                                    true
+                                );
+                            },
+                            (None, true) => {},
+                            (None, false) => {
+                                self.error(
+                                    format!("No function in context named {}", function_name),
+                                    true
+                                );
+                            }
+                        }
+                    },
+
                     OpCode::GetProperty => {
                         self.advance();
                         let (target, property) = self.pop_two();
@@ -799,6 +832,12 @@ impl Interpreter {
     }
 }
 
+// ///////////////////////////////////// //
+//                                       //
+//               Tests                   //
+//                                       //
+// ///////////////////////////////////// //
+
 #[cfg(test)]
 mod tests {
   #![allow(non_snake_case)]
@@ -810,6 +849,10 @@ mod tests {
   use super::Interpreter;
   use crate::parsing::{nested_context::NestedContext,context::Context,qname::QName,duration::Duration};
   use std::str::FromStr;
+
+  fn print_diagnostics() -> bool {
+      false
+  }
 
   #[test]
   fn test_addition() {
@@ -1093,15 +1136,21 @@ mod tests {
     vec
   }
 
+    // ///////////////////////////////////// //
+    //                                       //
+    //      Complex Interpreter tests        //
+    //                                       //
+    // ///////////////////////////////////// //
+
     #[test]
     fn test_type_of_context() {
         let mut expr = CompiledExpression::new_from_string("xload type?(context<>)", false);
         expr.resolve_jumps();
         let ctx = NestedContext::new();
-        // println!("Expression\n{}", expr);
+        if print_diagnostics() { println!("Expression\n{}", expr); } 
         let mut interpreter = Interpreter::new(expr, ctx);
         let (actual, message) = interpreter.trace();
-        // println!("{}", message);
+        if print_diagnostics() { println!("{}", message); }
         assert!(actual.is_true());
     }
 
@@ -1115,10 +1164,10 @@ mod tests {
         expr.has_next(200);              // Insert at end - there is no label(200).
         expr.resolve_jumps();
         let ctx = NestedContext::new();
-        // println!("Expression\n{}", expr);
+        if print_diagnostics() { println!("Expression\n{}", expr); }
         let mut interpreter = Interpreter::new(expr, ctx);
         let (actual, message) = interpreter.trace();
-        // println!("{}", message);
+        if print_diagnostics() { println!("{}", message); }
         assert!(actual.is_false());
     }
 
@@ -1132,10 +1181,10 @@ mod tests {
         expr.has_next(200);              // Insert at end - there is no label(200).
         expr.resolve_jumps();
         let ctx = NestedContext::new();
-        // println!("Expression\n{}", expr);
+        if print_diagnostics() { println!("Expression\n{}", expr); }
         let mut interpreter = Interpreter::new(expr, ctx);
         let (actual, message) = interpreter.trace();
-        // println!("{}", message);
+        if print_diagnostics() { println!("{}", message); }
         assert!(actual.is_true());
     }
 
@@ -1162,12 +1211,12 @@ xload
         expr.insert(&mut filter, 100);
         expr.resolve_jumps();
         let ctx = NestedContext::new();
-        // println!("Expression\n{}", expr);
+        if print_diagnostics() { println!("Expression\n{}", expr); }
         let mut interpreter = Interpreter::new(expr, ctx);
         let (actual, message) = interpreter.trace();
         let numbers: Vec<FeelValue> = vec![12.into(),11.into(),20.into()];
         let expected = FeelValue::new_list(numbers);
-        // println!("{}", message);
+        if print_diagnostics() { println!("{}", message); }
         assert_eq!(expected, actual);
     }
 
@@ -1199,12 +1248,11 @@ num(3)
         expr.insert(&mut filter, 100);
         expr.resolve_jumps();
         let ctx = NestedContext::new();
-        // println!("Expression\n{}", expr);
+        if print_diagnostics() { println!("Expression\n{}", expr); }
         let mut interpreter = Interpreter::new(expr, ctx);
         let (actual, message) = interpreter.trace();
-        let numbers: Vec<FeelValue> = vec![12.into(),11.into(),20.into()];
-        let expected = FeelValue::Number(5.0); // One-based index inot the list
-        // println!("{}", message);
+        let expected = FeelValue::Number(5.0); // One-based index into the list
+        if print_diagnostics() {  println!("{}", message); }
         assert_eq!(expected, actual);
     }
 

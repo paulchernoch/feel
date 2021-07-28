@@ -53,7 +53,18 @@ impl Builtins {
     Builtins::add_not(&mut builtin_context);
     Builtins::add_substring(&mut builtin_context);
     Builtins::add_string_length(&mut builtin_context);
-    
+    Builtins::add_upper_case(&mut builtin_context);
+    Builtins::add_lower_case(&mut builtin_context);
+    Builtins::add_substring_before(&mut builtin_context);
+    Builtins::add_substring_after(&mut builtin_context);
+    Builtins::add_replace(&mut builtin_context);
+    Builtins::add_contains(&mut builtin_context);
+    Builtins::add_starts_with(&mut builtin_context);
+    Builtins::add_ends_with(&mut builtin_context);
+    Builtins::add_matches(&mut builtin_context);
+    Builtins::add_split(&mut builtin_context);
+    Builtins::add_list_contains(&mut builtin_context);
+    Builtins::add_count(&mut builtin_context);
     builtin_context
   }
 
@@ -62,55 +73,95 @@ impl Builtins {
   ////    Create FeelValue::Function wrappers for all Builtins     ////
   ////                                                             ////
   //// ////////////////////////////////////////////////////////////////
-   
-  fn add_builtin(ctx: &mut Context, func_name: &str, lattice_type: LatticeType, func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) {
-    let ff = FeelFunction::new_builtin(func_name, lattice_type, func);
+ 
+  /// Parse a LatticeType from a string. 
+  /// Panics if string is invalid. 
+  fn ltype(lattice_type_sting: &str) -> LatticeType {
+    LatticeType::from_str(lattice_type_sting).unwrap()
+  }
+
+  fn add_builtin(ctx: &mut Context, func_name: &str, lattice_type_string: &str, func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) {
+    let ff = FeelFunction::new_builtin(func_name, Builtins::ltype(lattice_type_string), func);
     ctx.insert(func_name, FeelValue::Function(ff));
   }
 
   fn add_not(ctx: &mut Context) {
     let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::not(value.clone(), _ctx) };
-    let lattice_type = LatticeType::homogeneous_function(1, LatticeType::Boolean);
-    Builtins::add_builtin(ctx, "not", lattice_type, f);
+    Builtins::add_builtin(ctx, "not", "function(boolean)->boolean", f);
   }
 
-  // TODO: Many more functions to add.
-  
   fn add_substring(ctx: &mut Context) {
     let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::substring(value.clone(), _ctx) };
-    let lattice_type = LatticeType::function(vec![LatticeType::String, LatticeType::Number, LatticeType::Number], LatticeType::String);
-    Builtins::add_builtin(ctx, "substring", lattice_type, f);
+    Builtins::add_builtin(ctx, "substring", "function(string,number,number)->string", f);
   }
 
   fn add_string_length(ctx: &mut Context) {
     let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::string_length(value.clone(), _ctx) };
-    let lattice_type = LatticeType::function(vec![LatticeType::String], LatticeType::Number);
-    Builtins::add_builtin(ctx, "string length", lattice_type, f);
+    Builtins::add_builtin(ctx, "string length", "function(string)->number", f);
   }
 
-  // fn add_upper_case(ctx: &mut Context)
+  fn add_upper_case(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::upper_case(value.clone(), _ctx) };
+    Builtins::add_builtin(ctx, "upper case", "function(string)->string", f);
+  }
 
-  // fn add_lower_case(ctx: &mut Context)
+  fn add_lower_case(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::lower_case(value.clone(), _ctx) };
+    Builtins::add_builtin(ctx, "lower case", "function(string)->string", f);
+  }
 
-  // fn add_substring_before(ctx: &mut Context)
+  fn add_substring_before(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::substring_before(value.clone(), _ctx) };
+    Builtins::add_builtin(ctx, "substring before", "function(string,string)->string", f);
+  }
 
-  // fn add_substring_after(ctx: &mut Context)
+  fn add_substring_after(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::substring_after(value.clone(), _ctx) };
+    Builtins::add_builtin(ctx, "substring after", "function(string,string)->string", f);
+  }
 
-  // fn add_replace(ctx: &mut Context)
+  fn add_replace(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::replace(value.clone(), _ctx) };
+    Builtins::add_builtin(ctx, "replace", "function(string,string,string,string)->string", f);
+  }
 
-  // fn add_contains(ctx: &mut Context)
+  fn add_contains(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::contains(value.clone(), _ctx) };
+    Builtins::add_builtin(ctx, "contains", "function(string,string)->boolean", f);
+  }
 
-  // fn add_starts_with(ctx: &mut Context)
+  fn add_starts_with(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::starts_with(value.clone(), _ctx) };
+    Builtins::add_builtin(ctx, "starts with", "function(string,string)->boolean", f);
+  }
 
-  // fn add_ends_with(ctx: &mut Context)
+  fn add_ends_with(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::ends_with(value.clone(), _ctx) };
+    Builtins::add_builtin(ctx, "ends with", "function(string,string)->boolean", f);
+  }
 
-  // fn add_matches(ctx: &mut Context)
+  fn add_matches(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::matches(value.clone(), _ctx) };
+    Builtins::add_builtin(ctx, "matches", "function(string,string,string)->boolean", f);
+  }
 
-  // fn add_split(ctx: &mut Context)
+  fn add_split(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::split(value.clone(), _ctx) };
+    Builtins::add_builtin(ctx, "split", "function(string,string)->list<string>", f);
+  }
 
-  // fn add_list_contains(ctx: &mut Context)
+  fn add_list_contains(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::list_contains(value.clone(), _ctx) };
+    Builtins::add_builtin(ctx, "list contains", "function(list<Any>,Any)->boolean", f);
+  }
 
-  // fn add_count(ctx: &mut Context)
+  fn add_count(ctx: &mut Context) {
+    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::count(value.clone(), _ctx) };
+    Builtins::add_builtin(ctx, "count", "function(list<Any>)->number", f);
+  }
+
+  // TODO: Many more functions to add.
+
 
   // fn add_min(ctx: &mut Context)
 
@@ -433,7 +484,7 @@ impl Builtins {
     )
   }
 
-  // replace(input, pattern, replacement, flags?) Regular expression pattern matching and replacement with optional flags.
+  /// replace(input, pattern, replacement, flags?) Regular expression pattern matching and replacement with optional flags.
   /// The flags are optional. If present, the string may be empty or contain
   /// any or all of the letters i, s, m or x.
   ///   i ... Case insensitive search. 
@@ -689,7 +740,7 @@ impl Builtins {
     }
   }
 
-  /// count(list)**: return size of list, or zero if list is empty
+  /// count(list) returns size of list, or zero if list is empty
   pub fn count<C: ContextReader>(parameters: FeelValue, contexts: &C) -> FeelValue {
     Builtins::list_helper(parameters, contexts, "count", 
       |list| (list.len() as f64).into()
