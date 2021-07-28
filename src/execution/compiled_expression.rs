@@ -68,6 +68,13 @@ impl CompiledExpression {
         }
     }
 
+    fn strip_comments(s: &str) -> String {
+        lazy_static! {
+            static ref COMMENT_RE: Regex = Regex::new(r#"//.*"#).unwrap();
+        }
+        COMMENT_RE.replace_all(s, "").to_string()
+    }
+
     fn parse_opcode_with_string(&mut self, op_string: &str) -> OpCode {
         if op_string.starts_with("type?(") && op_string.ends_with(")") {
             let type_string = op_string[6..op_string.len()-1].to_string();
@@ -90,11 +97,15 @@ impl CompiledExpression {
     /// 
     /// This method is most useful for creating unit tests or macros that expand into numerous OpCodes. 
     pub fn new_from_string(source: &str, should_resolve: bool) -> Self {
-        let source_without_newlines = source.replace("\n", " ").trim().to_string();
+        let uncommented = Self::strip_comments(source);
+        let source_without_newlines = uncommented.replace("\n", " ").trim().to_string();
         lazy_static! {
             static ref OPCODE_SPLITTER_RE: Regex = Regex::new(r#"[^\s"']+|"([^"]*)"|'([^']*)'"#).unwrap();
         }
-        let matches: Vec<String> = OPCODE_SPLITTER_RE.find_iter(&source_without_newlines).map(|m| m.as_str().to_string()).collect();
+        let matches: Vec<String> = OPCODE_SPLITTER_RE.find_iter(&source_without_newlines)
+            .map(|m| m.as_str().trim().to_string())
+            .filter(|i| i.len() > 0) // Discard empty strings
+            .collect();
         Self::new_from_strings(source, matches, should_resolve)
     }
 
@@ -297,25 +308,29 @@ impl CompiledExpression {
     /// in the list being iterated over and increment the 'item index' in the filter context. 
     /// This compares the 'item index' to the 'item count' by consulting the contexts.
     /// This code expects that a filter context has already been created from a list.
+    /// This pushes the next item on top of the data stack.
     pub fn get_next(&mut self, insert_after_label: usize) {
         let get_next_macro = "
 'item list' xget
 'item index' xget
 index
-'item'
-swap xup
+dup 'item' swap xup
 'item index' incr
 ";
         let mut subexpression  = Self::new_from_string(get_next_macro, false);
         self.insert(&mut subexpression, insert_after_label);
     }
 
-    /// Create a filter expression and insert into it 
-    /// a create filter context expression after label(15) 
-    /// and a predicate subexpression after label(12). 
+    /// Create a filter expression and insert into it the following subexpressions:
+    ///   - a create_filter_context expression after label(15) 
+    ///   - a has_next expression after label(9)
+    ///   - a get_item filter expression after label(10)
+    ///   - a predicate subexpression after label(12). 
     /// The predicate performs the filtering of a list. It must push a Boolean to indicate if the list item
     /// is to be kept or not. The predicate can load the "item" property from the context
     /// and refer to it in its formula.
+    /// 
+    /// NOTE: Comments within code are stripped out by parsing. 
     pub fn new_filter(predicate: &mut Self) -> Self {
         let filter_macro = "
 over
@@ -326,30 +341,60 @@ number(1) -
 index
 goto(4)
 label(7)
+dup
 type?(context<>) branch(8/3/3) label(8)
 label(15)
+// insert: create filter context
 list
+
+// top of loop
 label(9)
-items? branch(10/11/11) label(10)
-item
+// insert: has item?
+branch(10/11/11) 
+
+// List does have another item
+label(10)
+// insert: get item
+
+// Filter the value
 label(12)
-branch(13/14/14) label(13)
+// insert: filter expression
+branch(13/14/14) 
+
+// keep item, pushing it onto result list, then back to top of loop
+label(13)
 push
 goto(9)
+
+// Reject item, then back to top of loop
 label(14)
 drop
+goto(9)
+
+// List has no more items
 label(11)
 goto(4)
-label(2)
-dup number(0) = branch(5/3/3) label(5)
-drop
+
+// Indexing of non-list
+label(2)    
+dup number(0) = branch(5/3/3) 
+
+// Non-list with index of zero
+label(5)
+drop        
 goto(4)
+
+// Non-list with non-zero index (or type failure)
 label(3)
 drop drop null
+
+// Exit
 label(4)
 ";
         let mut filter_expression  = Self::new_from_string(filter_macro, false);
         filter_expression.create_filter_context(15);
+        filter_expression.has_next(9);
+        filter_expression.get_next(10); 
         filter_expression.insert(predicate, 12);
         filter_expression
     }
@@ -414,9 +459,11 @@ impl Display for CompiledExpression {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let mut s = String::with_capacity((self.heap.len() + self.operations.len()) * 10 + self.source.len());
         s.push_str(&format!("Compiled Expression:\n  source: {}\n  Operations: [", self.source));
-        for op in self.operations.iter() {
-            s.push_str(" ");
-            s.push_str(&op.to_string());
+        for (address, op) in self.operations.iter().enumerate() {
+            if address % 5 == 0 {
+                s.push_str("\n    ");
+            }
+            s.push_str(&format!(" [{:0>4}] {:20}", address, op.to_string()));
         }
         s.push_str(&format!("]\n  heap:[\n"));
         for (pos, heap_string) in self.heap.iter().enumerate() {

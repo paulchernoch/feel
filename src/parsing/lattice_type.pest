@@ -51,7 +51,10 @@ range = !{ "range" ~ "<" ~ a_type ~ ">" }
 list = !{ "list" ~ "<" ~ a_type ~ ">" }
 
 // Context
-context = !{ "context" ~ "<" ~ context_items ~ ">" }
+context = !{ 
+    "context" ~ "<" ~ context_items ~ ">" 
+  | "context" ~ "<" ~ ">"
+}
 context_items = _{ context_item ~ ("," ~ context_item)* }
 context_item = !{ key ~ ":" ~ a_type }
 key = !{ key_without_space ~ key_with_space* }

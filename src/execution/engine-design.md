@@ -184,7 +184,7 @@ Other OpCodes will be needed for the looping over the list, beyond the original 
   - +filter - Pops a list from the data stack, creates a filter context and pushes that onto the context stack.
   - type?(t) - Gets the type of the top of the data stack, compares it to the heap string referenced by the opcode using "instance of" and pushes True or False.
   - len - Gets the length of the next item on the value stack. If it is a list, it is the list length, otherwise 1. Consumes the list.
-  - incr - Increment the value of the given property on the topmost context that defines it and push the new value onto the value stack.
+  - incr - Increment the value of the given property on the topmost context that defines it. The only change to the value stack is to pop the property name.
   - xup - Update a key-value pair in the contexts stack. Different from xset, which operates on a context that is on the value stack. 
 
 The "type?(t)" OpCode is equivalent to pushing a string on the data stack and then an "is".
@@ -353,7 +353,7 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
   branch(j/k/k)      (l b -> l)
   label(j)           (l -> l)
   item               (l -> l ?)
-  ...INSERT FILTER PREDICATE OpCodes HERE...
+  ...INSERT FILTER PREDICATE OpCodes HERE (after label(l))...
   label(l)           (l ? b -> l ? b)
   branch(m/n/n)      (l ? b -> l ?)
   label(m)           (l ? -> l ?)            Keep item (passes filter predicate)
@@ -454,6 +454,7 @@ The work that "item" has to perform:
   - Store the new index value in "item index"
   - Duplicate the item
   - Store the new item in "item"
+  - This leaves a copy of item on the value stack
 
 There will be some swaps or rots involved. Add an "incr" op that performs the read, increment, and write in one go.
 
@@ -464,13 +465,14 @@ The OpCodes for "item":
   - string(item index)
   - xget
   - index
+  - dup
   - string(item)
   - swap
   - xup
   - string(item index)
   - incr
 
-"item" leaves the value stack unchanged.
+"item" pushes the item on top of the value stack as well as updating the context.
 
 ## OpCode Macros
 

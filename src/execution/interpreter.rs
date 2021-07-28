@@ -4,7 +4,8 @@ use super::compiled_expression::CompiledExpression;
 use crate::parsing::feel_value::{FeelValue,FeelType};
 // use crate::parsing::feel_value_ops;
 use crate::execution::builtins::Builtins;
-use crate::parsing::{execution_log::ExecutionLog,nested_context::NestedContext,context::ContextReader,range::Range,qname::QName,duration::Duration};
+use crate::parsing::{execution_log::ExecutionLog,nested_context::NestedContext,range::Range,qname::QName,duration::Duration};
+use crate::parsing::{context::ContextReader,context::ContextIncrement};
 use crate::execution::value_properties::ValueProperties;
 
 /*
@@ -412,6 +413,44 @@ impl Interpreter {
                                 ); 
                             }
                         };
+                    },
+
+                    OpCode::UpdateContext => {
+                        self.advance();
+                        let (key, value) = self.pop_two();
+                        match key {
+                            FeelValue::Name(qname) => {
+                                self.contexts.update(qname, value);
+                            },
+                            FeelValue::String(sname) => {
+                                self.contexts.update(sname, value);
+                            },
+                            _ => {
+                                self.error(
+                                    format!("Key for context update may not be {}", key.get_type().to_string()),
+                                    false
+                                ); 
+                            }
+                        }
+                    },
+
+                    OpCode::Increment => {
+                        self.advance();
+                        let key = self.pop_data();
+                        match key {
+                            FeelValue::Name(qname) => {
+                                self.contexts.increment(qname, None);
+                            },
+                            FeelValue::String(sname) => {
+                                self.contexts.increment(sname, None);
+                            },
+                            _ => {
+                                self.error(
+                                    format!("Key for increment may not be {}", key.get_type().to_string()),
+                                    false
+                                ); 
+                            }
+                        }
                     },
 /*
                     OpCode::CreateLoopContext(dimensions) => {},
@@ -1054,6 +1093,18 @@ mod tests {
     vec
   }
 
+    #[test]
+    fn test_type_of_context() {
+        let mut expr = CompiledExpression::new_from_string("xload type?(context<>)", false);
+        expr.resolve_jumps();
+        let ctx = NestedContext::new();
+        // println!("Expression\n{}", expr);
+        let mut interpreter = Interpreter::new(expr, ctx);
+        let (actual, message) = interpreter.trace();
+        // println!("{}", message);
+        assert!(actual.is_true());
+    }
+
     /// Test an OpCode stream that creates a list, makes a filter context,
     /// then tests if there is are any more items to iterate over in the list.
     /// Try for an empty list which should return False.
@@ -1064,10 +1115,10 @@ mod tests {
         expr.has_next(200);              // Insert at end - there is no label(200).
         expr.resolve_jumps();
         let ctx = NestedContext::new();
-        println!("Expression\n{}", expr);
+        // println!("Expression\n{}", expr);
         let mut interpreter = Interpreter::new(expr, ctx);
         let (actual, message) = interpreter.trace();
-        println!("{}", message);
+        // println!("{}", message);
         assert!(actual.is_false());
     }
 
@@ -1076,8 +1127,44 @@ mod tests {
     /// Try for a list that is not empty, hence should return True.
     #[test]
     fn test_has_next_for_nonempty_list() {
+        let mut expr = CompiledExpression::new_from_string("list number(3) push xload", false);
+        expr.create_filter_context(100); // Insert at end - there is no label(100).
+        expr.has_next(200);              // Insert at end - there is no label(200).
+        expr.resolve_jumps();
+        let ctx = NestedContext::new();
+        // println!("Expression\n{}", expr);
+        let mut interpreter = Interpreter::new(expr, ctx);
+        let (actual, message) = interpreter.trace();
+        // println!("{}", message);
+        assert!(actual.is_true());
+    }
 
-
+    /// Filter a list of numbers, retaining all values that are over 10.
+    #[test]
+    fn test_filter_list() {
+        let mut expr = CompiledExpression::new_from_string("
+list 
+number(3) push 
+number(12) push 
+number(5) push 
+number(11) push 
+number(10) push 
+number(20) push
+xload
+"
+        , false);
+        let mut predicate = CompiledExpression::new_from_string("dup num(10) >", false);
+        let mut filter = CompiledExpression::new_filter(&mut predicate);
+        expr.insert(&mut filter, 100);
+        expr.resolve_jumps();
+        let ctx = NestedContext::new();
+        // println!("Expression\n{}", expr);
+        let mut interpreter = Interpreter::new(expr, ctx);
+        let (actual, message) = interpreter.trace();
+        let numbers: Vec<FeelValue> = vec![12.into(),11.into(),20.into()];
+        let expected = FeelValue::new_list(numbers);
+        // println!("{}", message);
+        assert_eq!(expected, actual);
     }
 
 }

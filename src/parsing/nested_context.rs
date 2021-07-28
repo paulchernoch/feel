@@ -48,6 +48,24 @@ impl NestedContext {
     }
   }
 
+  /// Update the uppermost context that contains the given key, or none if
+  /// no context contains that key.
+  pub fn update<Q: Into<QName>>(&self, k: Q, value: FeelValue) -> bool {
+    let key: QName = k.into();
+    for item in self.stack.iter().rev() {
+      match item {
+        FeelValue::Context(ctx) => {
+          if (*ctx).contains_key(key.clone()) {
+            (*ctx).insert(key.clone(), value);
+            return true;
+          }    
+        },
+        _ => ()
+      };
+    }
+    false
+  }
+
 }
 
 impl ContextReader for NestedContext {
