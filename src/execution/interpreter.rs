@@ -1140,6 +1140,10 @@ mod tests {
     }
 
     /// Filter a list of numbers, retaining all values that are over 10.
+    /// 
+    /// What makes it a filter operation and not a simple list indexing is
+    /// that the stack is started with a list and a context,
+    /// not a list and an integer.
     #[test]
     fn test_filter_list() {
         let mut expr = CompiledExpression::new_from_string("
@@ -1163,6 +1167,43 @@ xload
         let (actual, message) = interpreter.trace();
         let numbers: Vec<FeelValue> = vec![12.into(),11.into(),20.into()];
         let expected = FeelValue::new_list(numbers);
+        // println!("{}", message);
+        assert_eq!(expected, actual);
+    }
+
+    /// Index a list of numbers, returning a single value.
+    /// FEEL expects one-based indexing, but the "index" op performs
+    /// zero-based indexing, so this checks that the generated code subtracts one from the index beforehand.
+    /// 
+    /// What makes it an index operation and not a filtering operation is
+    /// that the stack is started with a list and a number,
+    /// not a list and a context.
+    #[test]
+    fn test_index_list() {
+        let mut expr = CompiledExpression::new_from_string("
+// Initialize list
+list 
+number(3) push 
+number(12) push 
+number(5) push 
+number(11) push 
+number(10) push 
+number(20) push
+// List index (one-based)
+num(3)
+"
+        , false);
+        // The predicate will be ignored, so use true.
+        let mut predicate = CompiledExpression::new_from_string("true", false);
+        let mut filter = CompiledExpression::new_filter(&mut predicate);
+        expr.insert(&mut filter, 100);
+        expr.resolve_jumps();
+        let ctx = NestedContext::new();
+        // println!("Expression\n{}", expr);
+        let mut interpreter = Interpreter::new(expr, ctx);
+        let (actual, message) = interpreter.trace();
+        let numbers: Vec<FeelValue> = vec![12.into(),11.into(),20.into()];
+        let expected = FeelValue::Number(5.0); // One-based index inot the list
         // println!("{}", message);
         assert_eq!(expected, actual);
     }

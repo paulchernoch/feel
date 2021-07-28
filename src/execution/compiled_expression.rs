@@ -337,6 +337,7 @@ over
 type?(list<Any>) branch(1/2/3) label(1)
 dup
 type?(number) branch(6/7/3) label(6)
+// Decrement index to convert from one-based to zero-based (as expected by index op)
 number(1) -
 index
 goto(4)
