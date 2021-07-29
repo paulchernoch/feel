@@ -22,6 +22,7 @@ use crate::parsing::lattice_type::LatticeType;
 use crate::parsing::feel_function::FeelFunction;
 use super::statistics::{sample_standard_deviation, mode_with_ties, MedianIndex};
 use super::statistics::median as stats_median;
+use super::builtin_adders::BuiltinAdders;
 
 pub enum RangeCase {
   PointRange,
@@ -50,21 +51,86 @@ impl Builtins {
   /// All the values are FeelValue::Function variants.
   pub fn new_context() -> Context {
     let mut builtin_context = Context::new();
-    Builtins::add_not(&mut builtin_context);
-    Builtins::add_substring(&mut builtin_context);
-    Builtins::add_string_length(&mut builtin_context);
-    Builtins::add_upper_case(&mut builtin_context);
-    Builtins::add_lower_case(&mut builtin_context);
-    Builtins::add_substring_before(&mut builtin_context);
-    Builtins::add_substring_after(&mut builtin_context);
-    Builtins::add_replace(&mut builtin_context);
-    Builtins::add_contains(&mut builtin_context);
-    Builtins::add_starts_with(&mut builtin_context);
-    Builtins::add_ends_with(&mut builtin_context);
-    Builtins::add_matches(&mut builtin_context);
-    Builtins::add_split(&mut builtin_context);
-    Builtins::add_list_contains(&mut builtin_context);
-    Builtins::add_count(&mut builtin_context);
+
+    BuiltinAdders::not(&mut builtin_context);
+    BuiltinAdders::substring(&mut builtin_context);
+    BuiltinAdders::string_length(&mut builtin_context);
+    BuiltinAdders::upper_case(&mut builtin_context);
+    BuiltinAdders::lower_case(&mut builtin_context);
+    BuiltinAdders::substring_before(&mut builtin_context);
+    BuiltinAdders::substring_after(&mut builtin_context);
+    BuiltinAdders::replace(&mut builtin_context);
+    BuiltinAdders::contains(&mut builtin_context);
+    BuiltinAdders::starts_with(&mut builtin_context);
+    BuiltinAdders::ends_with(&mut builtin_context);
+    BuiltinAdders::matches(&mut builtin_context);
+    BuiltinAdders::split(&mut builtin_context);
+    BuiltinAdders::list_contains(&mut builtin_context);
+    BuiltinAdders::count(&mut builtin_context);
+    BuiltinAdders::min(&mut builtin_context);
+    BuiltinAdders::max(&mut builtin_context);
+    BuiltinAdders::sum(&mut builtin_context);
+    BuiltinAdders::mean(&mut builtin_context);
+    BuiltinAdders::all(&mut builtin_context);
+    BuiltinAdders::any(&mut builtin_context);
+    BuiltinAdders::sublist(&mut builtin_context);
+    BuiltinAdders::append(&mut builtin_context);
+    BuiltinAdders::concatenate(&mut builtin_context);
+    BuiltinAdders::insert_before(&mut builtin_context);
+    BuiltinAdders::remove(&mut builtin_context);
+    BuiltinAdders::reverse(&mut builtin_context);
+    BuiltinAdders::index_of(&mut builtin_context);
+    BuiltinAdders::union(&mut builtin_context);
+    BuiltinAdders::distinct_values(&mut builtin_context);
+    BuiltinAdders::flatten(&mut builtin_context);
+    BuiltinAdders::product(&mut builtin_context);
+    BuiltinAdders::median(&mut builtin_context);
+    BuiltinAdders::stddev(&mut builtin_context);
+    BuiltinAdders::mode(&mut builtin_context);
+    BuiltinAdders::decimal(&mut builtin_context);
+    BuiltinAdders::floor(&mut builtin_context);
+    BuiltinAdders::ceiling(&mut builtin_context);
+    BuiltinAdders::abs(&mut builtin_context);
+    BuiltinAdders::modulo(&mut builtin_context);
+    BuiltinAdders::power(&mut builtin_context);
+    BuiltinAdders::sqrt(&mut builtin_context);
+    BuiltinAdders::log(&mut builtin_context);
+    BuiltinAdders::exp(&mut builtin_context);
+    BuiltinAdders::even(&mut builtin_context);
+    BuiltinAdders::odd(&mut builtin_context);
+    BuiltinAdders::before(&mut builtin_context);
+    BuiltinAdders::after(&mut builtin_context);
+    BuiltinAdders::meets(&mut builtin_context);
+    BuiltinAdders::met_by(&mut builtin_context);
+    BuiltinAdders::overlaps(&mut builtin_context);
+    BuiltinAdders::overlaps_before(&mut builtin_context);
+    BuiltinAdders::overlaps_after(&mut builtin_context);
+    BuiltinAdders::finishes(&mut builtin_context);
+    BuiltinAdders::finished_by(&mut builtin_context);
+    BuiltinAdders::includes(&mut builtin_context);
+    BuiltinAdders::during(&mut builtin_context);
+    BuiltinAdders::starts(&mut builtin_context);
+    BuiltinAdders::started_by(&mut builtin_context);
+    BuiltinAdders::coincides(&mut builtin_context);
+    BuiltinAdders::in_operator(&mut builtin_context);
+    BuiltinAdders::get_value(&mut builtin_context);
+    BuiltinAdders::get_entries(&mut builtin_context);
+    BuiltinAdders::day_of_week(&mut builtin_context);
+    BuiltinAdders::month_of_year(&mut builtin_context);
+    BuiltinAdders::week_of_year(&mut builtin_context);
+    BuiltinAdders::duration(&mut builtin_context);
+    BuiltinAdders::years_and_months_duration(&mut builtin_context);
+    BuiltinAdders::is(&mut builtin_context);
+    BuiltinAdders::is_not(&mut builtin_context);
+    BuiltinAdders::equals(&mut builtin_context);
+    BuiltinAdders::date(&mut builtin_context);
+    BuiltinAdders::date_and_time(&mut builtin_context);
+    BuiltinAdders::time(&mut builtin_context);
+    BuiltinAdders::number(&mut builtin_context);
+    BuiltinAdders::type_name(&mut builtin_context);
+    BuiltinAdders::string(&mut builtin_context);
+    BuiltinAdders::instance_of(&mut builtin_context);
+
     builtin_context
   }
 
@@ -80,220 +146,10 @@ impl Builtins {
     LatticeType::from_str(lattice_type_sting).unwrap()
   }
 
-  fn add_builtin(ctx: &mut Context, func_name: &str, lattice_type_string: &str, func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) {
+  pub fn add_builtin(ctx: &mut Context, func_name: &str, lattice_type_string: &str, func: impl Fn(&FeelValue, &mut NestedContext) -> FeelValue + 'static) {
     let ff = FeelFunction::new_builtin(func_name, Builtins::ltype(lattice_type_string), func);
     ctx.insert(func_name, FeelValue::Function(ff));
   }
-
-  fn add_not(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::not(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "not", "function(boolean)->boolean", f);
-  }
-
-  fn add_substring(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::substring(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "substring", "function(string,number,number)->string", f);
-  }
-
-  fn add_string_length(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::string_length(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "string length", "function(string)->number", f);
-  }
-
-  fn add_upper_case(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::upper_case(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "upper case", "function(string)->string", f);
-  }
-
-  fn add_lower_case(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::lower_case(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "lower case", "function(string)->string", f);
-  }
-
-  fn add_substring_before(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::substring_before(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "substring before", "function(string,string)->string", f);
-  }
-
-  fn add_substring_after(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::substring_after(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "substring after", "function(string,string)->string", f);
-  }
-
-  fn add_replace(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::replace(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "replace", "function(string,string,string,string)->string", f);
-  }
-
-  fn add_contains(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::contains(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "contains", "function(string,string)->boolean", f);
-  }
-
-  fn add_starts_with(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::starts_with(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "starts with", "function(string,string)->boolean", f);
-  }
-
-  fn add_ends_with(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::ends_with(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "ends with", "function(string,string)->boolean", f);
-  }
-
-  fn add_matches(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::matches(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "matches", "function(string,string,string)->boolean", f);
-  }
-
-  fn add_split(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::split(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "split", "function(string,string)->list<string>", f);
-  }
-
-  fn add_list_contains(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::list_contains(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "list contains", "function(list<Any>,Any)->boolean", f);
-  }
-
-  fn add_count(ctx: &mut Context) {
-    let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::count(value.clone(), _ctx) };
-    Builtins::add_builtin(ctx, "count", "function(list<Any>)->number", f);
-  }
-
-  // TODO: Many more functions to add.
-
-
-  // fn add_min(ctx: &mut Context)
-
-  // fn add_max(ctx: &mut Context)
-
-  // fn add_sum(ctx: &mut Context)
-
-  // fn add_mean(ctx: &mut Context)
-
-  // fn add_all(ctx: &mut Context)
-
-  // fn add_(ctx: &mut Context)
-
-  // fn add_(ctx: &mut Context)
-
-  // fn add_any(ctx: &mut Context)
-
-  // fn add_sublist(ctx: &mut Context)
-
-  // fn add_append(ctx: &mut Context)
-
-  // fn add_concatenate(ctx: &mut Context)
-
-  // fn add_insert_before(ctx: &mut Context)
-
-  // fn add_remove(ctx: &mut Context)
-
-  // fn add_reverse(ctx: &mut Context)
-
-  // fn add_index_of(ctx: &mut Context)
-
-  // fn add_union(ctx: &mut Context)
-
-  // fn add_distinct_values(ctx: &mut Context)
-
-  // fn add_flatten(ctx: &mut Context)
-
-  // fn add_product(ctx: &mut Context)
-
-  // fn add_median(ctx: &mut Context)
-
-  // fn add_stddev(ctx: &mut Context)
-
-  // fn add_mode(ctx: &mut Context)
-
-  // fn add_decimal(ctx: &mut Context)
-
-  // fn add_floor(ctx: &mut Context)
-
-  // fn add_ceiling(ctx: &mut Context)
-
-  // fn add_abs(ctx: &mut Context)
-
-  // fn add_modulo(ctx: &mut Context)
-
-  // fn add_power(ctx: &mut Context)
-
-  // fn add_sqrt(ctx: &mut Context)
-
-  // fn add_log(ctx: &mut Context)
-
-  // fn add_exp(ctx: &mut Context)
-
-  // fn add_even(ctx: &mut Context)
-
-  // fn add_odd(ctx: &mut Context)
-
-  // fn add_before(ctx: &mut Context)
-
-  // fn add_after(ctx: &mut Context)
-
-  // fn add_meets(ctx: &mut Context)
-
-  // fn add_met_by(ctx: &mut Context)
-
-  // fn add_overlaps(ctx: &mut Context)
-
-  // fn add_overlaps_before(ctx: &mut Context)
-
-  // fn add_overlaps_after(ctx: &mut Context)
-
-  // fn add_finishes(ctx: &mut Context)
-
-  // fn add_finished_by(ctx: &mut Context)
-
-  // fn add_includes(ctx: &mut Context)
-
-  // fn add_during(ctx: &mut Context)
-
-  // fn add_starts(ctx: &mut Context)
-
-  // fn add_started_by(ctx: &mut Context)
-
-  // fn add_coincides(ctx: &mut Context)
-
-  // fn add_in_operator(ctx: &mut Context)
-
-  // fn add_get_value(ctx: &mut Context)
-
-  // fn add_get_entries(ctx: &mut Context)
-
-  // fn add_day_of_week(ctx: &mut Context)
-
-  // fn add_month_of_year(ctx: &mut Context)
-
-  // fn add_week_of_year(ctx: &mut Context)
-
-  // fn add_duration(ctx: &mut Context)
-
-  // fn add_years_and_months_duration(ctx: &mut Context)
-
-  // fn add_is(ctx: &mut Context)
-
-  // fn add_is_not(ctx: &mut Context)
-
-  // fn add_equals(ctx: &mut Context)
-
-  // fn add_date(ctx: &mut Context)
-
-  // fn add_date_and_time(ctx: &mut Context)
-
-  // fn add_time(ctx: &mut Context)
-
-  // fn add_number(ctx: &mut Context)
-
-  // fn add_type_number(ctx: &mut Context)
-
-  // fn add_string(ctx: &mut Context)
-
-  // fn add_instance_of(ctx: &mut Context)
-
-
 
 
   //// ////////////////////////////////////////////////////////////////
@@ -4507,5 +4363,17 @@ mod tests {
       let sort_args = FeelValue::new_list(vec![unsorted, precedes]);
       let actual = Builtins::sort(sort_args, &mut nested_ctx);
       assert_eq!(expected, actual);
+    }
+
+    macro_rules! test_macro {
+      ($builtin: ident) => {
+        let $builtin = stringify!($builtin).replace("_", " ");
+      };
+    }
+
+    #[test]
+    fn test_macro() {
+      test_macro!(hello_world);
+      assert_eq!(hello_world, "hello world");
     }
 }

@@ -1,4 +1,5 @@
 pub mod builtins;
+pub mod builtin_adders;
 pub mod statistics;
 pub mod value_properties;
 pub mod opcode;

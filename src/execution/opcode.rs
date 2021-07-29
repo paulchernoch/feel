@@ -395,7 +395,6 @@ impl FromStr for OpCode {
                     "+pred" => OpCode::CreatePredicateContext(arg1),
                     "string" => OpCode::LoadString(arg1), 
                     "type?" => OpCode::IsType(arg1),
-                    "num" => OpCode::load_number(arg1_float),
                     "goto" => OpCode::GotoLabel(arg1),
                     "goto#" => OpCode::GotoAddress(arg1),
                     "branch" => OpCode::BranchToLabel { true_label: arg1, false_label: arg2, null_label: arg3 },
