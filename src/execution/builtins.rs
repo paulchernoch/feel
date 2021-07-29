@@ -115,6 +115,7 @@ impl Builtins {
     BuiltinAdders::in_operator(&mut builtin_context);
     BuiltinAdders::get_value(&mut builtin_context);
     BuiltinAdders::get_entries(&mut builtin_context);
+    BuiltinAdders::day_of_year(&mut builtin_context);
     BuiltinAdders::day_of_week(&mut builtin_context);
     BuiltinAdders::month_of_year(&mut builtin_context);
     BuiltinAdders::week_of_year(&mut builtin_context);
@@ -127,7 +128,8 @@ impl Builtins {
     BuiltinAdders::date_and_time(&mut builtin_context);
     BuiltinAdders::time(&mut builtin_context);
     BuiltinAdders::number(&mut builtin_context);
-    BuiltinAdders::type_name(&mut builtin_context);
+    // Exceptional: "type_name" Adds a function to the context named "type", not "type_name"
+    BuiltinAdders::type_name(&mut builtin_context); 
     BuiltinAdders::string(&mut builtin_context);
     BuiltinAdders::instance_of(&mut builtin_context);
 
@@ -1006,7 +1008,6 @@ impl Builtins {
       }
     )
   }
-
 
   /// median(list or varargs) computes the median of a list of numbers, which is the average of the
   /// two numbers in the middle if the length of the list is even, or the middle of the list

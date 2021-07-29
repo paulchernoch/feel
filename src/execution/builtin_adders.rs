@@ -40,63 +40,78 @@ impl BuiltinAdders {
     make_adder!(mean, "function(list<number>)->number");
     make_adder!(all, "function(list<Any>)->boolean");
     make_adder!(any, "function(list<Any>)->boolean");
-    make_adder!(sublist, "");
-    make_adder!(append, "");
-    make_adder!(concatenate, "");
-    make_adder!(insert_before, "");
-    make_adder!(remove, "");
-    make_adder!(reverse, "");
-    make_adder!(index_of, "");
-    make_adder!(union, "");
-    make_adder!(distinct_values, "");
-    make_adder!(flatten, "");
-    make_adder!(product, "");
-    make_adder!(median, "");
-    make_adder!(stddev, "");
-    make_adder!(mode, "");
-    make_adder!(decimal, "");
-    make_adder!(floor, "");
-    make_adder!(ceiling, "");
-    make_adder!(abs, "");
-    make_adder!(modulo, "");
-    make_adder!(power, "");
-    make_adder!(sqrt, "");
-    make_adder!(log, "");
-    make_adder!(exp, "");
-    make_adder!(even, "");
-    make_adder!(odd, "");
-    make_adder!(before, "");
-    make_adder!(after, "");
-    make_adder!(meets, "");
-    make_adder!(met_by, "");
-    make_adder!(overlaps, "");
-    make_adder!(overlaps_before, "");
-    make_adder!(overlaps_after, "");
-    make_adder!(finishes, "");
-    make_adder!(finished_by, "");
-    make_adder!(includes, "");
-    make_adder!(during, "");
-    make_adder!(starts, "");
-    make_adder!(started_by, "");
-    make_adder!(coincides, "");
-    make_adder!(in_operator, "");
-    make_adder!(get_value, "");
-    make_adder!(get_entries, "");
-    make_adder!(day_of_week, "");
-    make_adder!(month_of_year, "");
-    make_adder!(week_of_year, "");
-    make_adder!(duration, "");
-    make_adder!(years_and_months_duration, "");
-    make_adder!(is, "");
-    make_adder!(is_not, "");
-    make_adder!(equals, "");
-    make_adder!(date, "");
-    make_adder!(date_and_time, "");
-    make_adder!(time, "");
-    make_adder!(number, "");
-    make_adder!(type_name, "");
-    make_adder!(string, "");
-    make_adder!(instance_of, "");
-    
 
+    // TODO: Add the function lattice_type string for remaining functions
+
+    make_adder!(sublist, "function(list<Any>,number,number)->list<Any>");
+    make_adder!(append, "function(list<Any>,Any)->list<Any>");  // varargs may cause issues
+    make_adder!(concatenate, "function(list<Any>)->list<Any>"); // varargs may cause issues
+    make_adder!(insert_before, "function(list<Any>,number,Any)->list<Any>");
+    make_adder!(remove, "function(list,number)->list<Any>");
+    make_adder!(reverse, "function(list<Any>)->list<Any>");
+    make_adder!(index_of, "function(list<Any>,Any)->list<Any>");
+    make_adder!(union, "function(list<Any>)->list<Any>");       // varargs may cause issues
+    make_adder!(distinct_values, "function(list<Any>)->list<Any>");
+    make_adder!(flatten, "function(list<Any>)->list<Any>");
+    make_adder!(product, "function(list<number>)->number");
+    make_adder!(median, "function(list<number>)->number");
+    make_adder!(stddev, "function(list<number>)->number");
+    make_adder!(mode, "function(list<Any>)->list<Any>");
+    make_adder!(decimal, "function(number,number)->number");
+    make_adder!(floor, "function(number)->number");
+    make_adder!(ceiling, "function(number)->number");
+    make_adder!(abs, "function(Any)->Any");
+    make_adder!(modulo, "function(number,number)->number");
+    make_adder!(power, "function(number,number)->number");
+    make_adder!(sqrt, "function(number)->number");
+    make_adder!(log, "function(number)->number");
+    make_adder!(exp, "function(number)->number");
+    make_adder!(even, "function(number)->boolean");
+    make_adder!(odd, "function(number)->boolean");
+    make_adder!(before, "function(Any,Any)->boolean");
+    make_adder!(after, "function(Any,Any)->boolean");
+    make_adder!(meets, "function(Any,Any)->boolean");
+    make_adder!(met_by, "function(Any,Any)->boolean");
+    make_adder!(overlaps, "function(Any,Any)->boolean");
+    make_adder!(overlaps_before, "function(Any,Any)->boolean");
+    make_adder!(overlaps_after, "function(Any,Any)->boolean");
+    make_adder!(finishes, "function(Any,Any)->boolean");
+    make_adder!(finished_by, "function(Any,Any)->boolean");
+    make_adder!(includes, "function(Any,Any)->boolean");
+    make_adder!(during, "function(Any,Any)->boolean");
+    make_adder!(starts, "function(Any,Any)->boolean");
+    make_adder!(started_by, "function(Any,Any)->boolean");
+    make_adder!(coincides, "function(Any,Any)->boolean");
+    make_adder!(in_operator, "function(Any,Any)->boolean");
+    make_adder!(get_value, "function(context<>,Any)->Any"); // Second argument is string or name
+    make_adder!(get_entries, "function(context<>)->list(context<key:name,value:Any>)");
+    make_adder!(day_of_year, "function(Any)->number");
+    make_adder!(day_of_week, "function(Any)->string");
+    make_adder!(month_of_year, "function(Any)->string");
+    make_adder!(week_of_year, "function(Any)->number");
+    make_adder!(duration, "function(string)->Any");
+    make_adder!(years_and_months_duration, "function(Any,Any)->years and months duration");
+    make_adder!(is, "function(Any,Any)->boolean");
+    make_adder!(is_not, "function(Any,Any)->boolean");
+    make_adder!(equals, "function(Any,Any)->boolean");
+    make_adder!(date, "function(Any)->date"); // Three different function signatures permitted!
+    make_adder!(date_and_time, "function(Any)->date and time");
+    make_adder!(time, "function(Any)->time");
+    make_adder!(number, "function(string,string,string)->number");
+
+    /// Add a builtin to the context that calls "Builtins::type_name" 
+    /// but is accessed by the key "type".  
+    pub fn type_name(ctx: &mut Context) {
+        // NOTE: This method could not be generated by the make_adder macro
+        // because it would have to create a method named "type", which
+        // is a reserved word in Rust. Thius this method is called "type_name"
+        // but is stored in the context under the name "type",
+        // unlike all the other builtins, whose names may be generated by
+        // simply replacing underscores by spaces. 
+        let f = move |value: &FeelValue, _ctx: &mut NestedContext| -> FeelValue { Builtins::type_name(value.clone(), _ctx) };
+        Builtins::add_builtin(ctx, "type", "function(Any)->string", f);
+    }
+
+    make_adder!(string, "function(Any)->string");
+    make_adder!(instance_of, "function(Any,Any)->boolean");
 }
