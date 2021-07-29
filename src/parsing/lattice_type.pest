@@ -58,8 +58,8 @@ context = !{
 context_items = _{ context_item ~ ("," ~ context_item)* }
 context_item = !{ key ~ ":" ~ a_type }
 key = !{ key_without_space ~ key_with_space* }
-// key_without_space and key_with_space exclude colon and double quotes
-key_without_space = _{ "!" | '#'..'/' | '0'..'9' | ';'..'@' | 'A'..'Z' | '['..'`' | 'a'..'z' | '{'..'~' }
+// key_without_space and key_with_space exclude right angle bracket, colon, comma and double quotes
+key_without_space = _{ "!" | '#'..'+' | '-'..'/' | '0'..'9' | ';'..'=' | '?'..'@' | 'A'..'Z' | '['..'`' | 'a'..'z' | '{'..'~' }
 key_with_space = _{ " " | key_without_space }
 
 // function

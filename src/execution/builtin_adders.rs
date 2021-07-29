@@ -35,19 +35,15 @@ impl BuiltinAdders {
     make_adder!(count, "function(list<Any>)->number");
     make_adder!(min, "function(list<Any>)->Any");
     make_adder!(max, "function(list<Any>)->Any");
-
     make_adder!(sum, "function(list<number>)->number");
     make_adder!(mean, "function(list<number>)->number");
     make_adder!(all, "function(list<Any>)->boolean");
     make_adder!(any, "function(list<Any>)->boolean");
-
-    // TODO: Add the function lattice_type string for remaining functions
-
     make_adder!(sublist, "function(list<Any>,number,number)->list<Any>");
     make_adder!(append, "function(list<Any>,Any)->list<Any>");  // varargs may cause issues
     make_adder!(concatenate, "function(list<Any>)->list<Any>"); // varargs may cause issues
     make_adder!(insert_before, "function(list<Any>,number,Any)->list<Any>");
-    make_adder!(remove, "function(list,number)->list<Any>");
+    make_adder!(remove, "function(list<Any>,number)->list<Any>");
     make_adder!(reverse, "function(list<Any>)->list<Any>");
     make_adder!(index_of, "function(list<Any>,Any)->list<Any>");
     make_adder!(union, "function(list<Any>)->list<Any>");       // varargs may cause issues
@@ -84,7 +80,7 @@ impl BuiltinAdders {
     make_adder!(coincides, "function(Any,Any)->boolean");
     make_adder!(in_operator, "function(Any,Any)->boolean");
     make_adder!(get_value, "function(context<>,Any)->Any"); // Second argument is string or name
-    make_adder!(get_entries, "function(context<>)->list(context<key:name,value:Any>)");
+    make_adder!(get_entries, "function(context<>)->list<context<key:name,value:Any>>");
     make_adder!(day_of_year, "function(Any)->number");
     make_adder!(day_of_week, "function(Any)->string");
     make_adder!(month_of_year, "function(Any)->string");

@@ -160,6 +160,18 @@ mod tests {
             LatticeType::context(vec![("first name".to_string(), LatticeType::String), ("age".to_string(), LatticeType::Number)]),
             parse_lattice_type("context<age: number, first name: string>").unwrap()
         );
+
+        // This tests the actual lattice type for the builting function get_entries.
+        assert_eq!(
+            LatticeType::function(
+                vec![LatticeType::Context(Vec::new())], 
+                LatticeType::list(LatticeType::Context(vec![
+                    ("key".to_string(), LatticeType::Name), 
+                    ("value".to_string(),  LatticeType::Any)
+                ]))
+            ),
+            parse_lattice_type("function(context<>)->list<context<key:name,value:Any>>").unwrap()
+        );
     }
 
 }

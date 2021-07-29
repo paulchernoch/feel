@@ -609,6 +609,11 @@ impl<S: Into<String> + Clone + Stringlike> From<&Vec<S>> for FeelValue {
   }
 }
       
+impl From<Context> for FeelValue {
+  fn from(c: Context) -> Self {
+    FeelValue::Context(Rc::new(c))
+  }
+}
 
 impl Hash for FeelValue {
   fn hash<H: Hasher>(&self, state: &mut H) {

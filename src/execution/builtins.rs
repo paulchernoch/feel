@@ -52,6 +52,8 @@ impl Builtins {
   pub fn new_context() -> Context {
     let mut builtin_context = Context::new();
 
+    // NOTE: A few of the functions added are not FEEL standard builtin functions,
+    //       but instead functions that perform the work of an operator.
     BuiltinAdders::not(&mut builtin_context);
     BuiltinAdders::substring(&mut builtin_context);
     BuiltinAdders::string_length(&mut builtin_context);

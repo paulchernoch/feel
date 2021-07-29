@@ -1,6 +1,7 @@
 use super::feel_value::{FeelValue, FeelType};
 use super::qname::QName;
 use super::context::{ContextReader,ContextIncrement};
+use crate::execution::builtins::Builtins;
 
 /// In Feel, a scope is a list of contexts, called here a NestedContext.
 /// 
@@ -14,10 +15,21 @@ pub struct NestedContext {
 }
 
 impl NestedContext {
+
+  /// Create a NestedContext that contains no contexts, hence no references
+  /// to the standard FEEL builtin functions.
   pub fn new() -> Self {
     NestedContext {
       stack: Vec::new()
     }
+  }
+
+  /// Create a NestedContext that contains a Context that holds references to
+  /// all the standard FEEL builtin functions. 
+  pub fn new_with_builtins() -> Self {
+    let mut nested_ctx = NestedContext::new();
+    nested_ctx.push(Builtins::new_context().into());
+    nested_ctx
   }
 
   /// Push a new Context onto the stack, returning true if successful, false if the value given is not a context.

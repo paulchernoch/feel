@@ -1075,67 +1075,6 @@ mod tests {
     );
   }
 
-  // ///////////////////////////////////// //
-  //                                       //
-  //          Test Helper methods          //
-  //                                       //
-  // ///////////////////////////////////// //
-
-  /// Ensure there is a contaxt variable named "the answer".
-  fn setup_test_context(nest: &mut NestedContext) {
-    let ctx = Context::new();
-    ctx.insert("the answer", FeelValue::Number(42.0));
-    nest.push(FeelValue::Context(Rc::new(ctx)));
-  }
-
-  fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {
-    let mut ctx = NestedContext::new();
-    setup_test_context(&mut ctx);
-    let mut expr = CompiledExpression::new("test");
-    for s in heap {
-        expr.find_or_add_to_heap(s);
-    }
-    for op in ops {
-        expr.push(op);
-    }
-    Interpreter::new(expr, ctx)
-  }
-
-  fn make_interpreter_from_strings(ops: Vec<String>, heap: Vec<String>) -> Interpreter {
-    let mut ctx = NestedContext::new();
-    setup_test_context(&mut ctx);
-    let mut expr = CompiledExpression::new("test");
-    for s in heap {
-        expr.find_or_add_to_heap(s);
-    }
-    for op_string in ops {
-        let op = OpCode::from_str(&op_string).unwrap();
-        expr.push(op);
-    }
-    expr.resolve_jumps();
-    Interpreter::new(expr, ctx)
-  }
-
-  fn parse_and_execute(ops: Vec<&str>, heap: Vec<String>) -> FeelValue {
-    let op_strings: Vec<String> = ops
-      .iter()
-      .map(|s| s.to_string())
-      .collect();
-    let mut interpreter = make_interpreter_from_strings(op_strings, heap);
-    interpreter.execute()
-  }
-
-  fn exec_string(op_string: &str, heap: Vec<String>) -> FeelValue {
-      let ops = split_into_ops(op_string);
-      parse_and_execute(ops, heap)
-  }
-
-  fn split_into_ops(op_string: &str) -> Vec<&str> {
-    let split = op_string.split(" ");
-    let vec: Vec<&str> = split.collect();
-    vec
-  }
-
     // ///////////////////////////////////// //
     //                                       //
     //      Complex Interpreter tests        //
@@ -1256,4 +1195,86 @@ num(3)
         assert_eq!(expected, actual);
     }
 
+    #[test]
+    fn test_function_call() {
+        let expr = CompiledExpression::new_from_string(
+            "'sum' list num(1) push num(2) push num(3) push call", 
+            true // resolve the jumps
+        );
+
+        // We need the builtins added so that we have functions to call.
+        let ctx = NestedContext::new_with_builtins();
+
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+        let mut interpreter = Interpreter::new(expr, ctx);
+        let (actual, message) = interpreter.trace();
+        if print_diagnostics() { println!("{}", message); }
+        let expected: FeelValue = 6.0.into();
+        assert_eq!(expected, actual);
+    }
+
+
+  // ///////////////////////////////////// //
+  //                                       //
+  //          Test Helper methods          //
+  //                                       //
+  // ///////////////////////////////////// //
+
+  /// Ensure there is a contaxt variable named "the answer".
+  fn setup_test_context(nest: &mut NestedContext) {
+    let ctx = Context::new();
+    ctx.insert("the answer", FeelValue::Number(42.0));
+    nest.push(FeelValue::Context(Rc::new(ctx)));
+  }
+
+  fn make_interpreter(ops: Vec<OpCode>, heap: Vec<String>) -> Interpreter {
+    let mut ctx = NestedContext::new();
+    setup_test_context(&mut ctx);
+    let mut expr = CompiledExpression::new("test");
+    for s in heap {
+        expr.find_or_add_to_heap(s);
+    }
+    for op in ops {
+        expr.push(op);
+    }
+    Interpreter::new(expr, ctx)
+  }
+
+  fn make_interpreter_from_strings(ops: Vec<String>, heap: Vec<String>) -> Interpreter {
+    let mut ctx = NestedContext::new();
+    setup_test_context(&mut ctx);
+    let mut expr = CompiledExpression::new("test");
+    for s in heap {
+        expr.find_or_add_to_heap(s);
+    }
+    for op_string in ops {
+        let op = OpCode::from_str(&op_string).unwrap();
+        expr.push(op);
+    }
+    expr.resolve_jumps();
+    Interpreter::new(expr, ctx)
+  }
+
+  fn parse_and_execute(ops: Vec<&str>, heap: Vec<String>) -> FeelValue {
+    let op_strings: Vec<String> = ops
+      .iter()
+      .map(|s| s.to_string())
+      .collect();
+    let mut interpreter = make_interpreter_from_strings(op_strings, heap);
+    interpreter.execute()
+  }
+
+  fn exec_string(op_string: &str, heap: Vec<String>) -> FeelValue {
+      let ops = split_into_ops(op_string);
+      parse_and_execute(ops, heap)
+  }
+
+  fn split_into_ops(op_string: &str) -> Vec<&str> {
+    let split = op_string.split(" ");
+    let vec: Vec<&str> = split.collect();
+    vec
+  }
+
+
 }
+
