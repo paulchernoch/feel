@@ -60,7 +60,7 @@ Do not want to pass a logger object around to every function, so I need a way to
 
  - [x] A thread-based contextual logger
 
-## Execution Engine
+## Execution Engine (a VM)
 
 The `Interpreter` class will execute the `OpCode`s and return a result.
 
@@ -71,20 +71,20 @@ The `Interpreter` class will execute the `OpCode`s and return a result.
  - [x] Create a `Context` holding all the Builtins as keyed references to `FeelValue::Function`
  - [x] list access with positive index
  - [x] list access with negative index (counts from the end)
- - [ ] filter expressions using the special variable "item" in lists
+ - [x] filter expressions using the special variable "item" in lists
  - [x] filter expressions using field names without "item" to access properties of the current item, if it is a context
- - [ ] context selection (using dot name after a list of contexts yields a list of values of the name property taken from all the contexts)
+ - [x] context selection (using dot name after a list of contexts yields a list of values of the name property taken from all the contexts)
  - [ ] quantified expressions (some name in expression satisfies expression, every name in expression satisfies expression),
  - [x] expression between expression and expression
  - [ ] expression in positive unary test
  - [ ] expression in ( positive unary tests )
- - [ ] instance of expression
+ - [x] instance of expression
  - [ ] function definition
  - [x] Function calls
- - [ ] context key lookup
+ - [x] context key lookup
  - [ ] automatic conversions (§ 10.3.2.9.4) to and from singleton lists.
  - [ ] Serialization (Send/Receive)
- - [ ] Convert FeelOpcode to FeelValue
+ - [x] Convert FeelOpcode to FeelValue
  - [x] Execute method
 
 ## Simple Expression Tree Walk

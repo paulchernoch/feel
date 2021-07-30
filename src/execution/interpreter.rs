@@ -652,10 +652,14 @@ impl Interpreter {
                         }
                     },
 
+                    // Get the property value, with three main cases, based on the type of the source: 
+                    //   1. Scalar: Usually a date/time/datetime/duration. Get the special property value. 
+                    //   2. List: Return a list that maps the result of get property to each element of the list. 
+                    //   3. Context: Use the property name as a key and get the corresponding value from the context.
                     OpCode::GetProperty => {
                         self.advance();
-                        let (target, property) = self.pop_two();
-                        let value = target.get_property(&property, &self.contexts);
+                        let (source, property) = self.pop_two();
+                        let value = self.map_by_property(&source, &property);
                         self.push_data(value);
                     },
 
@@ -845,6 +849,65 @@ impl Interpreter {
         };
         self.push_data(FeelValue::Range(r));
         true
+    }
+
+    // Get the source's property value, with three main cases, based on the type of the source: 
+    //   1. Scalar: Usually a date/time/datetime/duration. Get the special property value. 
+    //   2. List: Return a list that maps the result of get_property to each element of the list. 
+    //   3. Context: Use the property name as a key and get the corresponding value from the context.
+    fn map_by_property(&self, source: &FeelValue, property: &FeelValue) -> FeelValue {
+        let qname: QName = match property {
+            FeelValue::String(s) => {
+                 match (&s).parse() {
+                     Ok(q) => q,
+                     Err(_) => {
+                        ExecutionLog::log(&format!("String {} is not a valid property Name", property.to_string()));
+                        return FeelValue::Null;
+                     }
+                 }
+            },
+            FeelValue::Name(q) => q.clone(),
+            _ => {
+                ExecutionLog::log(&format!("Property is {}, not a name or a string", property.get_type().to_string()));
+                return FeelValue::Null;
+            }
+        };
+        
+        match source {
+            FeelValue::List(rr_list) => {
+                // List. Map each item to its key or property value.
+                let list: Vec<FeelValue> = rr_list
+                    .borrow()
+                    .iter()
+                    .map(|item| -> FeelValue
+                        {
+                            match item {
+                                FeelValue::Context(rc_ctx) => {
+                                    // TODO: Bad: cloning in a loop. Should change signature of get to expect something else. 
+                                    match (*rc_ctx).get(qname.clone()) {
+                                        Some(value) => value,
+                                        None => FeelValue::Null
+                                    }
+                                },
+                                _ => item.get_property(property, &self.contexts)
+                            }
+                        }
+                    )
+                    .collect();
+                FeelValue::new_list(list)
+            },
+            FeelValue::Context(rc_ctx) => {
+                // Context. Get value of key.
+                match (*rc_ctx).get(qname) {
+                    Some(value) => value,
+                    None => FeelValue::Null
+                }
+            },
+            _ => {
+                // Scalar. Use get_value.
+                source.get_property(property, &self.contexts)
+            }
+        }
     }
 }
 
@@ -1279,6 +1342,94 @@ mod tests {
         let expected = FeelValue::new_list(contexts);
 
         if print_diagnostics() { println!("{}", message); }
+        assert_eq!(expected, actual);
+    }
+
+    /// Extract the 'score' property from a list of contexts to create a list of score values.
+    #[test]
+    fn test_map_property_to_list_of_contexts() {
+        let expr = CompiledExpression::new_from_string("
+            list 
+                xload
+                    'name'  'Sam'   xset
+                    'score' num(75) xset
+                    push
+                xload
+                    'name'  'Jill'  xset
+                    'score' num(90) xset
+                    push
+                xload
+                    'name'  'Sal'   xset
+                    'score' num(85) xset
+                    push
+            'score'
+            .
+        "
+        , true);
+
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+
+        let mut interpreter = Interpreter::new(expr, NestedContext::new());
+        let (actual, message) = interpreter.trace();
+        let expected = FeelValue::new_list(vec![75.0.into(), 90.0.into(), 85.0.into()]);
+
+        if print_diagnostics() { println!("{}", message); }
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_instance_of_complex_case() {
+        let expr = CompiledExpression::new_from_string("
+            list 
+                xload
+                    'name'  'Sam'   xset
+                    'score' num(75) xset
+                    push
+                xload
+                    'name'  'Jill'  xset
+                    'score' num(90) xset
+                    push
+                xload
+                    'name'  'Sal'   xset
+                    'score' num(85) xset
+                    push
+            'list<context<name:string,score:number>>'
+            is
+        "
+        , true);
+
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+
+        let mut interpreter = Interpreter::new(expr, NestedContext::new());
+        let (actual, message) = interpreter.trace();
+        let expected = FeelValue::Boolean(true);
+
+        if print_diagnostics() { println!("{}", message); }
+
+        assert_eq!(expected, actual);
+    }
+
+    /// Get the 'score' property from a single context.
+    #[test]
+    fn test_context_key_lookup() {
+        let expr = CompiledExpression::new_from_string("
+            xload
+                'name'  'Sam'   xset
+                'score' num(75) xset
+            'score'
+            .
+        "
+        , true);
+
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+
+        let mut interpreter = Interpreter::new(expr, NestedContext::new());
+        let (actual, message) = interpreter.trace();
+        let expected: FeelValue = 75.0.into();
+
+        if print_diagnostics() { println!("{}", message); }
+
         assert_eq!(expected, actual);
     }
 

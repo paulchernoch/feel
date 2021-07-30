@@ -105,9 +105,14 @@ pub enum OpCode {
   Index,                      // l # => ?   Zero-based index of a list.
 
   // Contexts
+
+  /// Get property value from a context on the contexts stack and push it onto the data stack.
   LoadFromContext,            //     Q -> ? OR s -> ?
+  /// Set property value in context on data stack
   AddEntryToContext,          // c Q ? -> c
+  /// Pop a context from the data stack and push it onto the contexts stack
   PushContext,                // val: _ c -> _  ctx:   _ -> _ c
+  /// Pop a context off the contexts stack and push it onto the data stack
   PopContext,                 // val: _ -> _ c  ctx: _ c -> _
   /// A loop context forms a cartesian product of one or more lists. 
   /// The usize value counts how many lists to include. 
@@ -142,8 +147,11 @@ pub enum OpCode {
   /// Call a function 
   CallFunction,                  // Q L -> ? OR s L -> ?
 
-  /// Get the value of a named property
-  GetProperty,                   // ? Q -> ?
+  /// Get the value of a named property from a value on top of the data stack.
+  ///   - If the source is a context, the result will be a value from that context. 
+  ///   - If the source is a list of contexts, the result will be a list of values taken from each corresponding context.  
+  ///   - If the source is a scalar (usually a date/time/datetime/duration), the result will be the value of a special property. 
+  GetProperty,                   // ? Q -> ? OR ? s -> ?
 
   // Branching and labels
   GotoLabel(usize),              // _ -> _
