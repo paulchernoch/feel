@@ -338,7 +338,10 @@ type?(list<Any>) branch(1/2/3) label(1)
 dup
 type?(number) branch(6/7/3) label(6)
 // Decrement index to convert from one-based to zero-based (as expected by index op)
+// but do not decrement a negative index, used as a relative index from the end of the list.
+dup num(0) >= branch(16/17/17) label(16)
 number(1) -
+label(17)
 index
 goto(4)
 label(7)
@@ -357,9 +360,18 @@ branch(10/11/11)
 label(10)
 // insert: get item
 
+// Push a copy of the item onto contexts, because filter expression 
+// may refer to item properties without the item keyword.
+dup xpush
+
 // Filter the value
 label(12)
 // insert: filter expression
+
+// Pop the item copy from contexts and discard it. 
+xpop drop
+
+// Test result of filter expression
 branch(13/14/14) 
 
 // keep item, pushing it onto result list, then back to top of loop

@@ -382,6 +382,12 @@ Note: Section 10.3.2.5 of the DMN FEEL 1.3 spec identifies an edge case. If the 
 
 ```
 
+Note: The above OpCode streams do not include code to push the current item being iterated over onto the Interpreter's contexts and popping it off when done. 
+That must be done so that filter expressions can reference "item.property" as "property".
+
+Note: As additional edge cases are addressed, the above OpCode streams will be
+obsoleted. Refer to the code in compiled_expressioms.rs for the real streams.
+
 ## The item and item? OpCodes
 
 When iterating through a list in a filter operation, two contexts must be pushed.

@@ -307,6 +307,19 @@ impl Interpreter {
                                     );
                                 }
                             },
+                            (FeelValue::List(rr_list), FeelValue::Number(i)) if index.is_integer() && i < 0.0 => {
+                                // A negative index means relative to the end of the list.
+                                let i_index: i32 = rr_list.borrow().len() as i32 + (i as i32);
+                                if i_index >= 0 {
+                                    self.push_data(rr_list.borrow()[i_index as usize].clone());
+                                }
+                                else {
+                                    self.error(
+                                        format!("List index out of range: {}", i),
+                                        true
+                                    );
+                                }
+                            },
                             _ => {
                                 self.error(
                                     format!("Cannot index {} using given index", list_type),
@@ -385,6 +398,9 @@ impl Interpreter {
                         // TODO: Review error handling.
                         // For now, if top of value stack is not a Context, 
                         // make an empty Context to push onto the contexts stack.
+                        // This makes it easier to deal with filtering by expressions
+                        // that use a property name of the "item" and do not 
+                        // reference "item" at by name.
                         let ctx = self.pop_data();
                         match ctx {
                             FeelValue::Context(_) => { self.contexts.push(ctx); },
@@ -1135,15 +1151,17 @@ mod tests {
     #[test]
     fn test_filter_list() {
         let mut expr = CompiledExpression::new_from_string("
-list 
-number(3) push 
-number(12) push 
-number(5) push 
-number(11) push 
-number(10) push 
-number(20) push
-xload
-"
+            list 
+            number(3) push 
+            number(12) push 
+            number(5) push 
+            number(11) push 
+            number(10) push 
+            number(20) push
+            // This xload is to create a blank context. 
+            // Some use cases will supply a real context. 
+            xload
+        "
         , false);
         let mut predicate = CompiledExpression::new_from_string("dup num(10) >", false);
         let mut filter = CompiledExpression::new_filter(&mut predicate);
@@ -1159,7 +1177,112 @@ xload
         assert_eq!(expected, actual);
     }
 
-    /// Index a list of numbers, returning a single value.
+    /// Test that a filter of a list of contexts that refers to a property of the
+    /// item works. The keyword "item" is not part of the expression.
+    #[test]
+    fn test_filter_list_of_contexts_without_item() {
+        let mut expr = CompiledExpression::new_from_string("
+            list 
+                xload
+                    'name'  'Sam'   xset
+                    'score' num(75) xset
+                    push
+                xload
+                    'name'  'Jill'  xset
+                    'score' num(90) xset
+                    push
+                xload
+                    'name'  'Sal'   xset
+                    'score' num(85) xset
+                    push
+                // Obligatory blank context
+                xload
+        "
+        , false);
+
+        // Predicate will filter based on score property of items being over 80
+        let mut predicate = CompiledExpression::new_from_string(
+            "'score' xget num(80) >", 
+            false
+        );
+        let mut filter = CompiledExpression::new_filter(&mut predicate);
+        expr.insert(&mut filter, 100);
+        expr.resolve_jumps();
+        let ctx = NestedContext::new();
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+        let mut interpreter = Interpreter::new(expr, ctx);
+        let (actual, message) = interpreter.trace();
+
+        // Compose the expected result
+        let ctx1 = Context::new();
+        ctx1.insert("name", "Jill".into());
+        ctx1.insert("score", 90.0.into());
+        let ctx2 = Context::new();
+        ctx2.insert("name", "Sal".into());
+        ctx2.insert("score", 85.0.into());
+        let contexts: Vec<FeelValue> = vec![
+            ctx1.into(),
+            ctx2.into()
+        ];
+        let expected = FeelValue::new_list(contexts);
+
+        if print_diagnostics() { println!("{}", message); }
+        assert_eq!(expected, actual);
+    }
+
+    /// Test that a filter of a list of contexts that refers to the keyword "item" and one of its properties.
+    #[test]
+    fn test_filter_list_of_contexts_using_item() {
+        let mut expr = CompiledExpression::new_from_string("
+            list 
+                xload
+                    'name'  'Sam'   xset
+                    'score' num(75) xset
+                    push
+                xload
+                    'name'  'Jill'  xset
+                    'score' num(90) xset
+                    push
+                xload
+                    'name'  'Sal'   xset
+                    'score' num(85) xset
+                    push
+                // Obligatory blank context
+                xload
+        "
+        , false);
+
+        // Predicate will filter based on score property of items being over 80
+        let mut predicate = CompiledExpression::new_from_string(
+            "'item' xget xpush 'score' xget num(80) > xpop drop", 
+            false
+        );
+        let mut filter = CompiledExpression::new_filter(&mut predicate);
+        expr.insert(&mut filter, 100);
+        expr.resolve_jumps();
+        let ctx = NestedContext::new();
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+        let mut interpreter = Interpreter::new(expr, ctx);
+        let (actual, message) = interpreter.trace();
+
+        // Compose the expected result
+        let ctx1 = Context::new();
+        ctx1.insert("name", "Jill".into());
+        ctx1.insert("score", 90.0.into());
+        let ctx2 = Context::new();
+        ctx2.insert("name", "Sal".into());
+        ctx2.insert("score", 85.0.into());
+        let contexts: Vec<FeelValue> = vec![
+            ctx1.into(),
+            ctx2.into()
+        ];
+        let expected = FeelValue::new_list(contexts);
+
+        if print_diagnostics() { println!("{}", message); }
+        assert_eq!(expected, actual);
+    }
+
+    /// Index a list of numbers using a positive index, returning a single value.
     /// FEEL expects one-based indexing, but the "index" op performs
     /// zero-based indexing, so this checks that the generated code subtracts one from the index beforehand.
     /// 
@@ -1167,7 +1290,7 @@ xload
     /// that the stack is started with a list and a number,
     /// not a list and a context.
     #[test]
-    fn test_index_list() {
+    fn test_index_list_positive() {
         let mut expr = CompiledExpression::new_from_string("
 // Initialize list
 list 
@@ -1195,6 +1318,39 @@ num(3)
         assert_eq!(expected, actual);
     }
 
+    /// Index a list of numbers using a negative index, returning a single value.
+    /// Negative index means relative to the end of the list.
+    /// What makes it an index operation and not a filtering operation is
+    /// that the stack is started with a list and a number,
+    /// not a list and a context.
+    #[test]
+    fn test_index_list_negative() {
+        let mut expr = CompiledExpression::new_from_string("
+// Initialize list
+list 
+    num(1) push 
+    num(2) push 
+    num(3) push 
+    num(4) push 
+
+// List index (relative to end)
+num(-2)
+"
+        , false);
+        // The predicate will be ignored, so use true.
+        let mut predicate = CompiledExpression::new_from_string("true", false);
+        let mut filter = CompiledExpression::new_filter(&mut predicate);
+        expr.insert(&mut filter, 100);
+        expr.resolve_jumps();
+        let ctx = NestedContext::new();
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+        let mut interpreter = Interpreter::new(expr, ctx);
+        let (actual, message) = interpreter.trace();
+        let expected = FeelValue::Number(3.0);
+        if print_diagnostics() {  println!("{}", message); }
+        assert_eq!(expected, actual);
+    }
+
     #[test]
     fn test_function_call() {
         let expr = CompiledExpression::new_from_string(
@@ -1213,6 +1369,18 @@ num(3)
         assert_eq!(expected, actual);
     }
 
+    #[test]
+    fn test_between2() {
+        let expr = CompiledExpression::new_from_string(
+            "num(5) num(1) num(10) between", 
+            true // resolve the jumps
+        );
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+        let mut interpreter = Interpreter::new(expr, NestedContext::new_with_builtins());
+        let (actual, message) = interpreter.trace();
+        if print_diagnostics() { println!("{}", message); }
+        assert!(actual.is_true());
+    }
 
   // ///////////////////////////////////// //
   //                                       //
