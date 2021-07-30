@@ -1433,6 +1433,91 @@ mod tests {
         assert_eq!(expected, actual);
     }
 
+    #[test]
+    fn test_in_operator_for_list_of_scalars() {
+        let expr = CompiledExpression::new_from_string("
+            num(5)
+            list num(3) push num(4) push num(5) push
+            in  
+        "
+        , true);
+
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+
+        let mut interpreter = Interpreter::new(expr, NestedContext::new());
+        let (actual, message) = interpreter.trace();
+
+        if print_diagnostics() { println!("{}", message); }
+
+        assert!(actual.is_true());
+    }
+
+    #[test]
+    fn test_in_operator_for_qname_pointing_to_scalar() {
+        let expr = CompiledExpression::new_from_string("
+            xload
+                'name'  'Sam'   xset
+                'score' num(75) xset
+            xpush
+            num(75)
+            'score' name
+            in  
+        "
+        , true);
+
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+
+        let mut interpreter = Interpreter::new(expr, NestedContext::new());
+        let (actual, message) = interpreter.trace();
+
+        if print_diagnostics() { println!("{}", message); }
+
+        assert!(actual.is_true());
+    }
+
+    #[test]
+    fn test_in_operator_for_qname_pointing_to_list() {
+        let expr = CompiledExpression::new_from_string("
+            xload
+                'name'  'Sam'   xset
+                'scores' list num(75) push num(80) push num(90) push xset
+            xpush
+            num(80)
+            'scores' name
+            in  
+        "
+        , true);
+
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+
+        let mut interpreter = Interpreter::new(expr, NestedContext::new());
+        let (actual, message) = interpreter.trace();
+
+        if print_diagnostics() { println!("{}", message); }
+
+        assert!(actual.is_true());
+    }
+
+    #[test]
+    fn test_in_operator_for_range() {
+        let expr = CompiledExpression::new_from_string("
+            num(10)
+            num(0) num(10) [lo,hi]
+            in  
+        "
+        , true);
+
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+
+        let mut interpreter = Interpreter::new(expr, NestedContext::new());
+        let (actual, message) = interpreter.trace();
+
+        if print_diagnostics() { println!("{}", message); }
+
+        assert!(actual.is_true());
+    }
+
+
     /// Index a list of numbers using a positive index, returning a single value.
     /// FEEL expects one-based indexing, but the "index" op performs
     /// zero-based indexing, so this checks that the generated code subtracts one from the index beforehand.

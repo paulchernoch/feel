@@ -74,8 +74,10 @@ The `Interpreter` class will execute the `OpCode`s and return a result.
  - [x] filter expressions using the special variable "item" in lists
  - [x] filter expressions using field names without "item" to access properties of the current item, if it is a context
  - [x] context selection (using dot name after a list of contexts yields a list of values of the name property taken from all the contexts)
- - [ ] quantified expressions (some name in expression satisfies expression, every name in expression satisfies expression),
+ - [ ] quantified expressions: some (some name in expression satisfies expression),
+ - [ ] quantified expressions: every (every name in expression satisfies expression),
  - [x] expression between expression and expression
+ - [x] in operator (not involving positive unary tests)
  - [ ] expression in positive unary test
  - [ ] expression in ( positive unary tests )
  - [x] instance of expression
@@ -86,6 +88,9 @@ The `Interpreter` class will execute the `OpCode`s and return a result.
  - [ ] Serialization (Send/Receive)
  - [x] Convert FeelOpcode to FeelValue
  - [x] Execute method
+
+Positive unary tests look like they can be converted into half-open ranges. 
+If so, then the existing implementation of the "in" operator will be sufficient.
 
 ## Simple Expression Tree Walk
 

@@ -1895,7 +1895,8 @@ impl Builtins {
   /// Support for the "in" operator from DMN 1.3 Spec, Table 55, Grammar Rule 49.c.
   /// This is not a spec-defined builtin function.
   /// The first argument is a scalar value, and the second argument may be: 
-  ///   - a list: Test if the value is in the list
+  ///   - a list of scalars: Test if the value is in the list
+  ///   - a list of ranges: Test if the value falls within at least one of the ranges in the list
   ///   - a range: Test if the value is in the range
   ///   - QName that evaluates to a scalar: Test if the value equals the context's item for that QName
   ///   - QName that evaluates to a list: Test if the value is contained in the list retrieved from the context
@@ -1909,7 +1910,19 @@ impl Builtins {
       .validated() {
       Ok(arguments) => {
         match (&arguments[0], &arguments[1]) {
-          (a, FeelValue::List(rr_list)) => FeelValue::Boolean(rr_list.borrow().iter().any(|i| i == a)),
+          (a, FeelValue::List(rr_list)) => FeelValue::Boolean(rr_list.borrow().iter().any(
+            |item| {
+              // If the item is a Range, test as a Range, otherwise, test equality
+              match item {
+                FeelValue::Range(range) => {
+                  range.includes(a, contexts)
+                },
+                _ => {
+                  item == a
+                }
+              }
+            }
+          )),
           (a, FeelValue::Range(b)) => FeelValue::Boolean(b.includes(a, contexts)),
           (a, FeelValue::Name(qname)) => {
             match contexts.get(qname.clone()) {
