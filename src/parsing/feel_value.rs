@@ -14,6 +14,7 @@ use super::range::Range;
 use super::feel_function::FeelFunction;
 use super::execution_log::ExecutionLog;
 use super::lattice_type::LatticeType;
+use super::range_access::RangeAccess;
 
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -646,6 +647,41 @@ impl TryFrom<&FeelValue> for f64 {
         FeelValue::Number(n) => Ok(*n),
         _ => Err(())
       }
+  }
+}
+
+impl RangeAccess for FeelValue {
+
+  fn range_length<C: ContextReader>(&self, contexts: &C) -> usize {
+      match self {
+        FeelValue::Range(r) => {
+            match r.get_integer_loop_bounds(contexts) {
+              Some((_, _, count, _)) => count,
+              None => 0_usize
+            } 
+        },
+        _ => 0_usize
+      }
+  }
+
+  fn index<C: ContextReader>(&self, position: usize, contexts: &C) -> FeelValue {
+    match self {
+      FeelValue::Range(r) => {
+          match r.get_integer_loop_bounds(contexts) {
+            Some((start, _stop, count, step)) => {
+              if position >= count {
+                // TODO: Log error
+                FeelValue::Null
+              }
+              else {
+                FeelValue::Number(start as f64 + (position as f64) * (step as f64))
+              }
+            },
+            None => 0_.0.into()
+          }
+      },
+      _ => FeelValue::Null
+    }
   }
 }
 

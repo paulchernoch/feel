@@ -7,6 +7,7 @@ pub mod feel_function;
 pub mod feel_value_ops;
 pub mod context;
 pub mod range;
+pub mod range_access;
 pub mod nested_context;
 pub mod arguments;
 pub mod execution_log;

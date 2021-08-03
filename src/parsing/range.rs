@@ -18,7 +18,8 @@ pub struct Range {
   low: Box<Option<FeelValue>>,
   high: Box<Option<FeelValue>>,
   low_inclusive: bool,
-  high_inclusive: bool
+  high_inclusive: bool,
+  reversed: bool
 }
 
 impl Range {
@@ -31,12 +32,29 @@ impl Range {
     if low.get_type() != high.get_type() && low.get_type() != FeelType::Name && high.get_type() != FeelType::Name {
       panic!("Range low and high values must be of the same type");
     }
-    Range {
-      low: Box::new(Option::Some(low.clone())),
-      high: Box::new(Option::Some(high.clone())),
-      low_inclusive: low_inclusive,
-      high_inclusive: high_inclusive
+    let is_reversed = match (low.get_type(), high.get_type()) {
+      (FeelType::Number, FeelType::Number) => low > high,
+      _ => false
+    };
+    if !is_reversed {
+      Range {
+        low: Box::new(Option::Some(low.clone())),
+        high: Box::new(Option::Some(high.clone())),
+        low_inclusive: low_inclusive,
+        high_inclusive: high_inclusive,
+        reversed: false
+      }
     }
+    else {
+      Range {
+        low: Box::new(Option::Some(high.clone())),
+        high: Box::new(Option::Some(low.clone())),
+        low_inclusive: high_inclusive,
+        high_inclusive: low_inclusive,
+        reversed: true
+      }
+    }
+
   }
 
 
@@ -46,7 +64,8 @@ impl Range {
       low: Box::new(Option::Some(low.clone())),
       high: Box::new(None),
       low_inclusive: inclusive,
-      high_inclusive: true
+      high_inclusive: true,
+      reversed: false
     }
   }
 
@@ -56,7 +75,18 @@ impl Range {
       low: Box::new(None),
       high: Box::new(Option::Some(high.clone())),
       low_inclusive: true,
-      high_inclusive: inclusive
+      high_inclusive: inclusive,
+      reversed: false
+    }
+  }
+
+  pub fn reverse(&self) -> Self {
+    Range {
+      low: self.low.clone(),
+      high: self.high.clone(),
+      low_inclusive: self.low_inclusive,
+      high_inclusive: self.high_inclusive,
+      reversed: !self.reversed
     }
   }
 
@@ -127,6 +157,75 @@ impl Range {
         }
       }
     }
+  }
+
+  /// If the range is over Numbers that are non-negative integers, express as an option with the following values:
+  ///   - loop start (inclusive)
+  ///   - loop stop (inclusive)
+  ///   - loop length 
+  ///   - step size (+1 for forward and -1 for reverse)
+  pub fn get_integer_loop_bounds<C: ContextReader>(&self, contexts: &C) -> Option<(usize,usize,usize,i32)> {
+    let mut start: usize = 0;
+    let mut stop: usize = 0;
+    let count: usize;
+    let step: i32 = if self.reversed { -1 } else { 1 };
+    match self.start_bound(contexts) {
+      Bound::Included(FeelValue::Number(n)) => {
+        if n >= 0.0 && n.fract() == 0.0 && n <= usize::MAX as f64 {
+          if !self.reversed { start = n as usize; }
+          else { stop = n as usize; }
+        }
+        else {
+          return None;
+        }
+      },
+      Bound::Excluded(FeelValue::Number(n)) => {
+        if n >= 0.0 && n.fract() == 0.0 && n < usize::MAX as f64 {
+          if !self.reversed { start = (n + 1.0) as usize; }
+          else { stop = (n + 1.0) as usize; }
+        }
+        else {
+          return None;
+        }
+      },
+      Bound::Unbounded => { 
+        if !self.reversed { start = 0_usize; }
+        else { stop = usize::MAX; }
+      },
+      _ => { return None; }
+    }
+    match self.end_bound(contexts) {
+      Bound::Included(FeelValue::Number(n)) => {
+        if n >= 0.0 && n.fract() == 0.0 && n <= usize::MAX as f64 {
+          if !self.reversed { stop = n as usize; }
+          else { start = n as usize; }
+        }
+        else {
+          return None;
+        }
+      },
+      Bound::Excluded(FeelValue::Number(n)) => {
+        if n > 0.0 && n.fract() == 0.0 && n <= usize::MAX as f64 {
+          if !self.reversed { stop = (n - 1.0) as usize; }
+          else { start = (n - 1.0) as usize; }
+        }
+        else {
+          return None;
+        }
+      },
+      Bound::Unbounded => { 
+        if !self.reversed { stop = usize::MAX; }
+        else { start = usize::MAX; }
+      },
+      _ => { return None; }
+    }
+    if !self.reversed {
+      count = stop - start + 1_usize;
+    }
+    else {
+      count = start - stop + 1_usize;
+    }
+    Some((start, stop, count, step))
   }
 
   /// Identify the non-generic type of items that may be tested against this range.
@@ -209,6 +308,10 @@ impl Range {
       (true, true) => Ordering::Equal,
       _ => Ordering::Greater
     }
+  }
+
+  pub fn is_reversed(&self) -> bool {
+    self.reversed
   }
 
 }
@@ -328,6 +431,7 @@ impl<R: RangeBounds<f64>> From<R> for Range {
 mod tests {
   use std::cmp::{Ord, PartialOrd, Ordering};
   use std::ops::Range as OpsRange;
+  use std::ops::RangeInclusive;
   use super::super::feel_value::{FeelValue};
   use super::super::context::{Context};
   use super::Range;
@@ -440,6 +544,43 @@ mod tests {
     assert_eq!(false, feel_range.includes(& (5.into()), &ctx), "excluded number (too low)");
     assert_eq!(false, feel_range.includes(& (25.into()), &ctx), "excluded number (too high)");
     assert_eq!(false, feel_range.includes(& (20.into()), &ctx), "excluded number (exclusive upper bound)");
+  }
+
+  #[test]
+  fn test_get_integer_loop_bounds_exclusive_forward() {
+    let ctx = Context::new();
+    let rust_range: OpsRange<f64> = 10.0..20.0; // Exclusive upper bound
+    let feel_range: Range = rust_range.into();
+    match feel_range.get_integer_loop_bounds(&ctx) {
+      Some((start, stop, count, step)) => {
+        assert_eq!(start, 10_usize);
+        assert_eq!(stop, 19_usize);
+        assert_eq!(count, 10_usize);
+        assert_eq!(step, 1);
+      },
+      None => {
+        assert!(false);
+      }
+    }
+  }
+
+  #[test]
+  fn test_get_integer_loop_bounds_inclusive_reverse() {
+    let ctx = Context::new();
+    let rust_range: RangeInclusive<f64> = 10.0..=20.0; // Inclusive upper bound
+    let feel_range: Range = rust_range.into();
+    let feel_range_reversed = feel_range.reverse();
+    match feel_range_reversed.get_integer_loop_bounds(&ctx) {
+      Some((start, stop, count, step)) => {
+        assert_eq!(start, 20_usize);
+        assert_eq!(stop, 10_usize);
+        assert_eq!(count, 11_usize);
+        assert_eq!(step, -1);
+      },
+      None => {
+        assert!(false);
+      }
+    }
   }
 }
 
