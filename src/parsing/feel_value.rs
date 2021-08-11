@@ -664,25 +664,64 @@ impl RangeAccess for FeelValue {
       }
   }
 
-  fn index<C: ContextReader>(&self, position: usize, contexts: &C) -> FeelValue {
-    match self {
-      FeelValue::Range(r) => {
-          match r.get_integer_loop_bounds(contexts) {
-            Some((start, _stop, count, step)) => {
-              if position >= count {
-                // TODO: Log error
-                FeelValue::Null
-              }
-              else {
-                FeelValue::Number(start as f64 + (position as f64) * (step as f64))
-              }
-            },
-            None => 0_.0.into()
-          }
-      },
-      _ => FeelValue::Null
-    }
+  fn loop_bounds<C: ContextReader>(&self, contexts: &C) -> (FeelValue,FeelValue,FeelValue,FeelValue) {
+      let z = FeelValue::Number(0.0);
+      match self {
+          FeelValue::Range(r) => {
+              match r.get_integer_loop_bounds(contexts) {
+                Some((start, stop, count, step)) => (
+                  (start as f64).into(),
+                  (stop as f64).into(),
+                  (count as f64).into(),
+                  (step as f64).into()
+                ),
+                None => (z.clone(), z.clone(), z.clone(), 1.0.into())
+              } 
+          },
+          FeelValue::List(rr_list) => {
+            let length = rr_list.borrow().len() as f64;
+            let stop = if length > 0.0 { length - 1.0 } else { 0.0 };
+            (
+              z.clone(),
+              stop.into(),
+              length.into(),
+              1.0.into()
+            )
+          },
+          _ => (z.clone(), z.clone(), z.clone(), 1.0.into())
+      }
   }
+
+  fn range_index<C: ContextReader>(&self, position: usize, contexts: &C) -> FeelValue {
+      match self {
+          FeelValue::Range(r) => {
+              match r.get_integer_loop_bounds(contexts) {
+                Some((start, _stop, count, step)) => {
+                  if position >= count {
+                    // TODO: Log error
+                    FeelValue::Null
+                  }
+                  else {
+                    FeelValue::Number(start as f64 + (position as f64) * (step as f64))
+                  }
+                },
+                None => 0_.0.into()
+              }
+          },
+          FeelValue::List(rr_list) => {
+            let length = rr_list.borrow().len();
+            if position >= length {
+              // TODO: Log error
+              FeelValue::Null
+            }
+            else {
+              rr_list.borrow()[position].clone()
+            }
+          },
+          _ => FeelValue::Null
+      }
+  }
+
 }
 
 /////////////// TESTS /////////////////

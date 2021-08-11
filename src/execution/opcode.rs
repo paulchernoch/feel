@@ -29,6 +29,7 @@ pub enum RangeBoundType {
 ///   - r is for range
 ///   - l is for list
 ///   - E is for end of list
+///   - R is for Range
 ///   - c is for context
 ///   - d is for date
 ///   - t is for time
@@ -72,6 +73,9 @@ pub enum OpCode {
   Rot,  // - rotates the third item to the top: (a b c -> b c a) 
   Dup,  // - duplicates the top of the stack: (a -> a a')
   Drop, // - pops one item off the top of the stack (a b -> a)
+  Pick, // - Pick things deeper on the stack
+  Roll, // - Rotate things deeper on the stack
+  Store, // Like xup, but the key is on top: (value key -> _)
 
   // Arithmetic
   Add,                        // ? ? -> ?   Details: n n -> n OR d y -> d OR y d -> d OR t z -> t OR z t -> t
@@ -114,9 +118,9 @@ pub enum OpCode {
   PushContext,                // val: _ c -> _  ctx:   _ -> _ c
   /// Pop a context off the contexts stack and push it onto the data stack
   PopContext,                 // val: _ -> _ c  ctx: _ c -> _
-  /// A loop context forms a cartesian product of one or more lists. 
-  /// The usize value counts how many lists to include. 
-  CreateLoopContext(usize),      // val: _ l+ -> _  ctx: _ -> _ c
+  /// Get seven values needed for the loop variables and push them onto the value stack 
+  /// The expected initial value on the stack is a list or Range and it remains there.
+  LoopBounds,                    // l -> l # # # # # OR R -> R # # # # #
   CreatePredicateContext(usize), // val: _ l+ -> _  ctx: _ -> _ c
   LoadContext,                   // val:    _ -> _ c
 
@@ -192,6 +196,9 @@ impl Display for OpCode {
         OpCode::Rot => "rot", 
         OpCode::Dup => "dup",
         OpCode::Drop => "drop",
+        OpCode::Pick => "pick",
+        OpCode::Roll => "roll",
+        OpCode::Store => "!",
 
         OpCode::Add => "+",
         OpCode::Subtract => "-",
@@ -199,7 +206,7 @@ impl Display for OpCode {
         OpCode::Multiply => "*",
         OpCode::Divide => "/",
         OpCode::Exponentiate => "^",
-        OpCode::Not => "!",
+        OpCode::Not => "not",
         OpCode::Or => "or",
         OpCode::And => "and",
         OpCode::LessThan => "<",
@@ -218,7 +225,7 @@ impl Display for OpCode {
         OpCode::AddEntryToContext => "xset",
         OpCode::PushContext => "xpush",
         OpCode::PopContext => "xpop",
-        OpCode::CreateLoopContext(dimensions) => { tmp = format!("+loop({})", dimensions); &tmp },
+        OpCode::LoopBounds => "+loop",
         OpCode::CreatePredicateContext(dimensions) => { tmp = format!("+pred({})", dimensions); &tmp },
         OpCode::LoadContext => "xload",
 
@@ -296,6 +303,9 @@ impl FromStr for OpCode {
             "rot" => OpCode::Rot, 
             "dup" => OpCode::Dup,
             "drop" => OpCode::Drop,
+            "pick" => OpCode::Pick,
+            "roll" => OpCode::Roll,
+            "!"    => OpCode::Store, // Not logical not!!! Arguments are in the reverse order of xup: value key.
 
             "+" => OpCode::Add,
             "-" => OpCode::Subtract,
@@ -303,7 +313,7 @@ impl FromStr for OpCode {
             "*" => OpCode::Multiply,
             "/" => OpCode::Divide,
             "^" => OpCode::Exponentiate,
-            "!" => OpCode::Not,
+            "not" => OpCode::Not,
             "or" => OpCode::Or,
             "and" => OpCode::And,
             "<" => OpCode::LessThan,
@@ -318,6 +328,7 @@ impl FromStr for OpCode {
             "list" => OpCode::CreateList,
             "index" => OpCode::Index,
             "push" => OpCode::PushList,
+            "@" => OpCode::LoadFromContext, // Synonym for xget
             "xget" => OpCode::LoadFromContext,
             "xset" => OpCode::AddEntryToContext,
             "xpush" => OpCode::PushContext,
@@ -327,6 +338,7 @@ impl FromStr for OpCode {
             "len" => OpCode::ListLength,
             "incr" => OpCode::Increment,
             "xup" => OpCode::UpdateContext, 
+            "+loop" => OpCode::LoopBounds,
 
             "(lo,hi)" => OpCode::CreateRange { lower: RangeBoundType::Exclusive, upper: RangeBoundType::Exclusive },
             "(lo,hi]" => OpCode::CreateRange { lower: RangeBoundType::Exclusive, upper: RangeBoundType::Inclusive },
@@ -368,7 +380,7 @@ impl FromStr for OpCode {
                 }
 
                 let opname: &str; 
-                let mut arg1_float = 0.0_f64;
+                let arg1_float: f64;
                 let arg1: usize;
                 let arg2: usize;
                 let arg3: usize;
@@ -391,15 +403,26 @@ impl FromStr for OpCode {
                         arg3 = parse_number(get_named_match("arg3", &cap, "0"));
                     },
                     None => {
-                      opname = "";
-                      arg1 = 0;
-                      arg2 = 0;
-                      arg3 = 0;
+                        match s.parse::<f64>() {
+                            Ok(num) => {
+                                opname = "number";
+                                arg1_float = num;
+                                arg1 = 0;
+                                arg2 = 0;
+                                arg3 = 0;
+                            },
+                            _ => {
+                                opname = "";
+                                arg1_float = 0.0;
+                                arg1 = 0;
+                                arg2 = 0;
+                                arg3 = 0;
+                            }
+                        }
                     }
                 };
                 match opname {
                     "number" | "num" => OpCode::load_number(arg1_float),
-                    "+loop" => OpCode::CreateLoopContext(arg1),
                     "+pred" => OpCode::CreatePredicateContext(arg1),
                     "string" => OpCode::LoadString(arg1), 
                     "type?" => OpCode::IsType(arg1),
@@ -437,7 +460,7 @@ mod tests {
         assert_eq!(OpCode::Add.to_string(), "+".to_string());
         assert_eq!(OpCode::CreateRange { lower: RangeBoundType::Exclusive, upper: RangeBoundType::Inclusive }.to_string(), "(lo,hi]".to_string());
         assert_eq!(OpCode::CreateRange { lower: RangeBoundType::Inclusive, upper: RangeBoundType::Exclusive }.to_string(), "[lo,hi)".to_string());
-        assert_eq!(OpCode::CreateLoopContext(2).to_string(), "+loop(2)".to_string());
+        assert_eq!(OpCode::LoopBounds.to_string(), "+loop".to_string());
         assert_eq!(OpCode::load_number(3.14_f64).to_string(), "num(3.14)".to_string());
         assert_eq!(OpCode::LoadBoolean(true).to_string(), "true".to_string());
     }
@@ -451,7 +474,7 @@ mod tests {
 
     #[test]
     fn test_from_str() {
-        assert_eq!(OpCode::CreateLoopContext(2), OpCode::from_str("+loop(2)").unwrap(), "Parsing +loop");
+        assert_eq!(OpCode::LoopBounds, OpCode::from_str("+loop").unwrap(), "Parsing +loop");
         assert_eq!(OpCode::load_number(4.0), OpCode::from_str("number(4)").unwrap(), "Parsing number");
         assert_eq!(
             OpCode::BranchToAddress{ true_address: 0, false_address: 1, null_address: 2 }, 

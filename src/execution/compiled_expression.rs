@@ -231,6 +231,23 @@ impl CompiledExpression {
         None
     }
 
+    /// Append the given subexpression to the end of the this expression and renumber the labels of subexpression 
+    /// as necessary so as not to introduce duplicate labels with the same number.
+    /// 
+    /// See insert for additional semantics.
+    /// 
+    /// NOTE: subexpression must not have had resolve_jumps called on it, as that replaces labels with addresses 
+    /// which will no longer be valid after an insert. 
+    pub fn append(&mut self, subexpression: &mut CompiledExpression) {
+        let insert_after_label: usize = self.max_label() + 1;
+        self.insert(subexpression, insert_after_label)
+    }
+
+    pub fn append_str(&mut self, source: &str) {
+        let mut new_expr = Self::new_from_string(source, false);
+        self.append(&mut new_expr);
+    }
+
     /// Insert one subexpression into an enclosing expression, renumbering OpCodes as necessary.
     /// The insertion point is after the given label. If no matching label can be found, insert at the end.
     /// 
@@ -311,12 +328,12 @@ impl CompiledExpression {
     /// This pushes the next item on top of the data stack.
     pub fn get_next(&mut self, insert_after_label: usize) {
         let get_next_macro = "
-'item list' xget
-'item index' xget
-index
-dup 'item' swap xup
-'item index' incr
-";
+            'item list' xget
+            'item index' xget
+            index
+            dup 'item' swap xup
+            'item index' incr
+        ";
         let mut subexpression  = Self::new_from_string(get_next_macro, false);
         self.insert(&mut subexpression, insert_after_label);
     }
@@ -333,77 +350,77 @@ dup 'item' swap xup
     /// NOTE: Comments within code are stripped out by parsing. 
     pub fn new_filter(predicate: &mut Self) -> Self {
         let filter_macro = "
-over
-type?(list<Any>) branch(1/2/3) label(1)
-dup
-type?(number) branch(6/7/3) label(6)
-// Decrement index to convert from one-based to zero-based (as expected by index op)
-// but do not decrement a negative index, used as a relative index from the end of the list.
-dup num(0) >= branch(16/17/17) label(16)
-number(1) -
-label(17)
-index
-goto(4)
-label(7)
-dup
-type?(context<>) branch(8/3/3) label(8)
-label(15)
-// insert: create filter context
-list
+            over
+            type?(list<Any>) branch(1/2/3) label(1)
+            dup
+            type?(number) branch(6/7/3) label(6)
+            // Decrement index to convert from one-based to zero-based (as expected by index op)
+            // but do not decrement a negative index, used as a relative index from the end of the list.
+            dup num(0) >= branch(16/17/17) label(16)
+            number(1) -
+            label(17)
+            index
+            goto(4)
+            label(7)
+            dup
+            type?(context<>) branch(8/3/3) label(8)
+            label(15)
+            // insert: create filter context
+            list
 
-// top of loop
-label(9)
-// insert: has item?
-branch(10/11/11) 
+            // top of loop
+            label(9)
+            // insert: has item?
+            branch(10/11/11) 
 
-// List does have another item
-label(10)
-// insert: get item
+            // List does have another item
+            label(10)
+            // insert: get item
 
-// Push a copy of the item onto contexts, because filter expression 
-// may refer to item properties without the item keyword.
-dup xpush
+            // Push a copy of the item onto contexts, because filter expression 
+            // may refer to item properties without the item keyword.
+            dup xpush
 
-// Filter the value
-label(12)
-// insert: filter expression
+            // Filter the value
+            label(12)
+            // insert: filter expression
 
-// Pop the item copy from contexts and discard it. 
-xpop drop
+            // Pop the item copy from contexts and discard it. 
+            xpop drop
 
-// Test result of filter expression
-branch(13/14/14) 
+            // Test result of filter expression
+            branch(13/14/14) 
 
-// keep item, pushing it onto result list, then back to top of loop
-label(13)
-push
-goto(9)
+            // keep item, pushing it onto result list, then back to top of loop
+            label(13)
+            push
+            goto(9)
 
-// Reject item, then back to top of loop
-label(14)
-drop
-goto(9)
+            // Reject item, then back to top of loop
+            label(14)
+            drop
+            goto(9)
 
-// List has no more items
-label(11)
-goto(4)
+            // List has no more items
+            label(11)
+            goto(4)
 
-// Indexing of non-list
-label(2)    
-dup number(0) = branch(5/3/3) 
+            // Indexing of non-list
+            label(2)    
+            dup number(0) = branch(5/3/3) 
 
-// Non-list with index of zero
-label(5)
-drop        
-goto(4)
+            // Non-list with index of zero
+            label(5)
+            drop        
+            goto(4)
 
-// Non-list with non-zero index (or type failure)
-label(3)
-drop drop null
+            // Non-list with non-zero index (or type failure)
+            label(3)
+            drop drop null
 
-// Exit
-label(4)
-";
+            // Exit
+            label(4)
+        ";
         let mut filter_expression  = Self::new_from_string(filter_macro, false);
         filter_expression.create_filter_context(15);
         filter_expression.has_next(9);
@@ -412,9 +429,229 @@ label(4)
         filter_expression
     }
 
-    /*
+    /// Generate the OpCodes for a series of nested for loops that build up a list of results,
+    /// one per iteration of the innermost loop. 
+    /// This function does not expect that a context is on the data stack to start, hence will create one.
+    /// It will add properties to that context necessary to perform the iterations. 
+    /// The final result of loop execution is the pushing onto the data stack of "partial"
+    /// once it is completely filled with all results from each iteration of the loop. 
+    /// 
+    ///    loops ........ Each pair of values represents one loop. 
+    ///                   The FeelValue must be a FeelValue::Name to use as the loop variable. 
+    ///                   The CompiledExpression must either resolve to a list or a range over integers. 
+    ///                   If a Range, then the range may be a reversed Range, causing the iteration to be descendent.
+    ///    innermost .... This expression may reference any or all of the loop variables. 
+    ///                   It will be executed once per iteration.
+    ///                   The result of this expression will be pushed into the special variable "partial",
+    ///                   a list of results frmo all the iterations. 
+    ///                   "innermost" may lookup values from previous iterations of the loop in "partial"
+    ///                   and use them in computations. 
+    /// 
+    /// Scratch variables will be added to the context to keep track of each loop.
+    /// Most variables (excluding partial) will be suffixed by a number corresponding to the loop.
+    /// The outermost loop will be designated as 1, the one inside that as 2, etc.
+    ///     partial ................... List of partial results from all preceding iterations. 
+    ///     <variable name> ........... Holds the value of the variable for the current iteration,
+    ///                                 taken from the current position in the loop context.
+    ///     loop context # ............ Holds the list or range to be iterated over.
+    ///     loop position # ........... Current zero-based position of the iteration for the given loop. 
+    ///                                 This ranges from zero to loop count # - 1.
+    ///                                 For lists, this varies from zero to length - 1. 
+    ///                                 For Ranges, this varies from loop start index # to loop stop index # by loop step #.
+    ///     loop start index # ........ For lists, this is always zero. 
+    ///                                 For Ranges, this is either the lowest value of the range (for ascendent ranges)
+    ///                                 or the highest (for descendent ranges).
+    ///     loop stop index # ......... For lists, this is always loop count # - 1. 
+    ///                                 For Ranges, this is either the highest value of the range (for ascendent ranges)
+    ///                                 or the lowest (for descendent ranges).
+    ///     loop count # .............. Number of items in the list or length of the range. 
+    ///     loop step # ............... How much to add to the position per iteration. 
+    ///                                 This is either one (for all lists and ascendant ranges)
+    ///                                 or negative one (for descendent ranges). 
+    /// The names of the first two context entries (partial and <variable name>) are dictated by the spec. 
+    /// The remaining names are internal. 
+    pub fn for_loops(loops: &mut Vec<(&FeelValue, &mut CompiledExpression)>, innermost: &mut CompiledExpression) -> CompiledExpression {
+        // Because it is tedious to reference items on the stack other than the top three and we need to 
+        // set the values of eight context entries, we will initialize all eight properties to Null
+        // and store the context in contexts.
+        // Subsequent access will be mediated through contexts, instead of against a context near the top of the data stack.
+        //
+        // Tricky: There will be two Context values in play that point to the same underlying dictionary. 
+        //         One will be at or near the top of the data stack and the other inside "contexts". 
+        //         This is because you can call xset only against items on the data stack, 
+        //         since contexts is a NestedContext and we would not know which of its several contexts 
+        //         to store the key-value pair in. 
+        //         Once a variable is initialized to something via xset, it can be subsequently updated
+        //         with xup, which acts against contexts and can find where the variable is defined. 
+        let loop_count = loops.len();
+        let innermost_label = 1_usize;
+        let mut expr = CompiledExpression::new_from_string("
+                // Create a single context to hold variables for all loops.
+                xload 'partial' list xset
+                // Make a duplicate context and push it to contexts.
+                // The duplicate will share the same storage of key-value pairs as the original.
+                dup xpush
+        ", false);
 
-    */
+        for loop_number in 1..=loop_count {
+            // "iteration_context" below is normally an expression that yields a List or Range, not a context.
+            // This is terminology borrowed from the DMN spec.
+            let (param_name, &mut ref mut iteration_context) = loops[loop_number - 1];
+            let null_vars = format!("
+                // Initialize loop variables for {name} (loop #{num}) to null
+                '{name}' null xset
+                'loop context {num}' null xset
+                'loop position {num}' null xset
+                'loop start index {num}' null xset
+                'loop stop index {num}' null xset
+                'loop count {num}' null xset
+                'loop step {num}' null xset
+                ", 
+                name = param_name.to_string(),
+                num = loop_number
+            );
+
+            expr.append_str(&null_vars);
+
+            // Add in the iteration context expression, from which we will extract values
+            // about how many loop iterations to expect, start and stop positions, and iteration values. 
+            expr.append(iteration_context);
+
+            // Note that we need to store values returned by OpCode::LoopBounds (+loop) 
+            // in reverse order because of the stack semantics. 
+            let set_vars = format!("
+                // Set loop variables for {name} (loop #{num}) to initial values.
+                +loop
+                'loop step {num}' !
+                'loop count {num}' !
+                'loop stop index {num}' !
+                'loop start index {num}' !
+                'loop position {num}' !
+                'loop context {num}' !
+                ", 
+                name = param_name.to_string(),
+                num = loop_number
+            );
+            expr.append_str(&set_vars);
+        }
+        // Drop the context atop the data stack - no longer needed for initialization. 
+        // It is not lost as a clone was previously pushed onto contexts.
+        expr.append_str(" drop ");
+
+        // Now insert opcodes that perform the looping, 
+        // altering 'loop position' and the named loop variable at each level of looping.
+        let mut loop_start_ops = String::new();
+        let mut loop_end_ops = String::new();
+        for loop_number in 1..=loop_count {
+            let (param_name, _) = loops[loop_number - 1];
+            let a = loop_number * 20;
+            // The logic will distinguish between iteration contexts that are Ranges versus Lists. 
+            //   - For Ranges, all the information we need is already stored in the loop variables. 
+            //   - For Lists, we use the "index" op. 
+            // ops_before is all the operations at the top of the loop, before the start of the next loop
+            // or the main body that holds innermost.
+            let ops_before = format!("
+                    // Top of loop {num} over variable {name}
+                    // Exit loop if list or range is empty. 
+                    'loop count {num}' @ 0 <= branch({exit_loop}/{loop_init}/{loop_init})
+
+                    // Grab iteration variables from context
+                    label({loop_init})
+                    'loop context {num}' @                  // _ -> ctx
+                    'loop stop index {num}' @               // ctx -> ctx stop
+                    'loop step {num}' @                     // ctx stop -> ctx stop step
+                    'loop position {num}' @                 // ctx stop step -> ctx stop step pos
+                    label({loop_top})
+                        // Increment the position in the correct direction, according to step.
+                        // Store in contexts but also keep on data stack. 
+                        over + dup 'loop position {num}' !  // ctx stop step pos -> ctx stop step newpos
+
+                        // Treat range contexts separate from lists
+                        3 pick type?(range<Any>) branch({is_range}/{is_list}/{is_list})         // ctx stop step newpos -> ctx stop step newpos
+                            label({is_range})
+                                // Use loop step to assess if ascending
+                                over 0 > branch({is_ascending}/{is_descending}/{is_descending}) // ctx stop step newpos -> ctx stop step newpos
+                                    label({is_ascending})
+                                        // See if new position is higher than stop and copy newpos to be item.
+                                        2 pick over <= over swap // ctx stop step newpos -> ctx stop step newpos item in-range?
+                                        branch({set_variable}/{exceeds_range}/{exceeds_range}) // ctx stop step newpos item in-range? -> ctx stop step newpos item
+                                    label({is_descending})
+                                        // See if new position is lower than stop and copy newpos to be item.
+                                        2 pick over >= over swap // ctx stop step newpos -> ctx stop step newpos item in-range?
+                                        branch({set_variable}/{exceeds_range}/{exceeds_range}) // ctx stop step newpos item in-range? -> ctx stop step newpos item
+                                    label({exceeds_range})
+                                        drop drop drop drop drop // ctx stop step newpos item -> _
+                                        goto({exit_loop})
+                            label({is_list})  // ctx stop step newpos
+                                2 pick over >= branch({get_list}/{exceeds_list}/{exceeds_list}) // ctx stop step newpos => ctx stop step newpos
+                                    label({get_list})
+                                        // Get the item from the list at newpos.
+                                        3 pick over index // ctx stop step newpos -> ctx stop step newpos item
+                                        goto({set_variable})
+                                    label({exceeds_list})
+                                        drop drop drop drop // ctx stop step newpos -> _
+                                        goto({exit_loop})
+                            label({set_variable})
+                                // Sets the named loop variable. 
+                                '{name}' !  // ctx stop step newpos item -> ctx stop step newpos
+                            label({inside})
+                            // Next loop inserted here, or the innermost expression.
+                ",
+                name = param_name.to_string(),
+                num = loop_number,
+                loop_init = a,
+                loop_top = a + 1,
+                is_range = a + 2,
+                is_ascending = a + 3,
+                is_descending = a + 4,
+                is_list = a + 5,
+                exceeds_range = a + 6,
+                get_list = a + 7,
+                exceeds_list = a + 8,
+                set_variable = a + 9,
+                inside = a + 10,
+                exit_loop = a + 11
+            );
+            loop_start_ops.push_str(&ops_before);
+
+            // ops_after is all the operations at the bottom of the loop, after the end of the next inner loop
+            // or the main body that holds innermost.
+            let mut ops_after = format!("
+                    goto({loop_top})
+                    label({exit_loop})
+                ",
+                // Parameters below must equal values used above in ops_before format! statement.
+                loop_top = a + 1,  
+                exit_loop = a + 11
+            );
+            // Push the loop ending operations on in reverse order. 
+            ops_after.push_str(&loop_end_ops);
+            loop_end_ops = ops_after;
+        }
+
+        let mut loop_ops = String::new();
+        loop_ops.push_str(&loop_start_ops);
+        loop_ops.push_str(&format!("
+                label({innermost})
+                // Assume that the innermost expression creates a value and leaves it on the stack. 
+                // Retrieve partial, add that value to the list, and set partial to the new list.
+                'partial' @ swap push 'partial' !  // value -> _
+            ",
+            innermost = innermost_label
+        ));
+        loop_ops.push_str(&loop_end_ops);
+        let mut loop_expr = CompiledExpression::new_from_string(&loop_ops, false);
+        loop_expr.insert(innermost, innermost_label);
+        expr.append(&mut loop_expr);
+
+        // The last thing to be done is pull out the result and ditch the context.
+        expr.append_str(" 
+            'partial' @
+            xpop drop
+        ");
+
+        expr
+    }
 
 
     /// Replace any branching operations that refer to Labels by position

@@ -2,6 +2,7 @@
 use super::opcode::{OpCode,RangeBoundType};
 use super::compiled_expression::CompiledExpression;
 use crate::parsing::feel_value::{FeelValue,FeelType};
+use crate::parsing::range_access::RangeAccess;
 // use crate::parsing::feel_value_ops;
 use crate::execution::builtins::Builtins;
 use crate::parsing::{execution_log::ExecutionLog,nested_context::NestedContext,range::Range,qname::QName,duration::Duration};
@@ -145,6 +146,76 @@ impl Interpreter {
                     OpCode::Drop => {
                         self.advance();
                         self.pop_data();
+                    }, 
+                    OpCode::Pick => {
+                        // 0 pick is a dup:    a -> a a' 
+                        // 1 pick is an over:  a b -> a b a'
+                        // 2 pick does this:   a b c -> a b c a'
+                        self.advance();
+                        match self.pop_data() {
+                            FeelValue::Number(n) if n >= 0.0 => {
+                                let position: i32 = self.data.len() as i32 - (n as i32) - 1;
+                                if position < 0 {
+                                    // TODO: Log error
+                                    self.push_data(FeelValue::Null);
+                                }
+                                else {
+                                    self.push_data(self.data[position as usize].clone());
+                                }
+                            },
+                            _ => {
+                                // TODO: Log error
+                                self.push_data(FeelValue::Null);
+                            }
+                        }
+                    },
+                    OpCode::Roll => {
+                        // 0 roll is a no-op: a -> a 
+                        // 1 roll is a swap:  a b -> b a
+                        // 2 roll is a rot:   a b c -> b c a
+                        // 3 roll does this:  a b c d -> b c d a
+                        self.advance();
+                        match self.pop_data() {
+                            FeelValue::Number(n) if n == 0.0 => {
+                                // 0 roll does nothing.
+                                ()
+                            },
+                            FeelValue::Number(n) if n >= 0.0 => {
+                                let position: i32 = self.data.len() as i32 - (n as i32) - 1;
+                                if position < 0 {
+                                    // TODO: Log error
+                                    self.push_data(FeelValue::Null);
+                                }
+                                else {
+                                    let value = self.data.remove(position as usize);
+                                    self.push_data(value);
+                                }
+                            },
+                            _ => {
+                                // TODO: Log error
+                                self.push_data(FeelValue::Null);
+                            }
+                        }
+                    },
+
+                    OpCode::Store => {
+                        // Arguments in the reverse order from xup.
+                        self.advance();
+                        let (value, key) = self.pop_two();
+                        match key {
+                            FeelValue::Name(qname) => {
+                                self.contexts.update(qname, value);
+                            },
+                            FeelValue::String(sname) => {
+                                self.contexts.update(sname, value);
+                            },
+                            _ => {
+                                self.error(
+                                    format!("Key for context update may not be {}", key.get_type().to_string()),
+                                    false
+                                ); 
+                            }
+                        }
                     },
 
                     // TODO: Semantics of FEEL addition, subtraction, etc may be tighter than the operator implementation. Verify and adjust.
@@ -386,7 +457,8 @@ impl Interpreter {
                             _ => {
                                 // TODO: Should we also push the context back on?
                                 self.error(
-                                    format!("Cannot add key to context because its type is {}", key.get_type().to_string()),
+                                    format!("Cannot add key to context because the key type is {} and context type is {}", 
+                                        key.get_type().to_string(), ctx.get_type().to_string()),
                                     true
                                 ); 
                             }                            
@@ -466,8 +538,48 @@ impl Interpreter {
                             }
                         }
                     },
+                    OpCode::LoopBounds => {
+                        self.advance();
+                        // Iteration_context should be a list or a Range, not a context!
+                        // The term "iteration context" is used in the DMN spec to describe
+                        // the object that a loop iterates over.
+                        // However, FEEL is lenient in that in some places
+                        // where a list is expected, a scalar may be used
+                        // and it is automatically wrapped in a list in order to facilitate further processing. 
+                        // We will do that here, even for Nulls. 
+
+                        // Order of values that are pushed (from nearer to stack bottom to stack top): 
+                        //    loop context #
+                        //    loop position # 
+                        //    loop start index # 
+                        //    loop stop index #
+                        //    loop count # 
+                        //    loop step #
+                        // (Those variable names are not set here - the loop initialization code will 
+                        // call xup for each of the variables.)
+                        let iteration_context = self.pop_data();
+                        let (start, stop, count, step) = iteration_context.loop_bounds(&self.contexts);
+                        match iteration_context.get_type() {
+                            FeelType::List => {
+                                self.push_data(iteration_context);
+                            },
+                            FeelType::Range => {
+                                self.push_data(iteration_context);
+                            },
+                            _ => {
+                                // Promote to a list
+                                let list_context = FeelValue::new_list(vec![iteration_context]);
+                                self.push_data(list_context);
+                            }
+                        }
+                        // Loop position will start out such that by adding step to it, you are at the beginning of iteration. 
+                        self.push_data(&start - &step); // loop position
+                        self.push_data(start); // loop start index
+                        self.push_data(stop); // loop stop index - is inclusive
+                        self.push_data(count); // loop count
+                        self.push_data(step); // loop step - for ascending order
+                    },
 /*
-                    OpCode::CreateLoopContext(dimensions) => {},
                     OpCode::CreatePredicateContext(dimensions) => {},
 */                    
                     OpCode::LoadContext => {
@@ -930,7 +1042,7 @@ mod tests {
   use std::str::FromStr;
 
   fn print_diagnostics() -> bool {
-      false
+      true
   }
 
   #[test]
@@ -1616,6 +1728,65 @@ num(-2)
         let (actual, message) = interpreter.trace();
         if print_diagnostics() { println!("{}", message); }
         assert!(actual.is_true());
+    }
+
+    #[test]
+    fn test_pick() {
+        let expr = CompiledExpression::new_from_string(
+            "1 2 3 4 3 pick swap drop swap drop swap drop swap drop", 
+            true // resolve the jumps
+        );
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+        let mut interpreter = Interpreter::new(expr, NestedContext::new_with_builtins());
+        let (actual, message) = interpreter.trace();
+        if print_diagnostics() { println!("{}", message); }
+        assert_eq!(FeelValue::Number(1.0), actual);
+    }
+
+    #[test]
+    fn test_for_loop_over_single_list() {
+        let expected = FeelValue::new_list(vec![1.0.into(), 4.0.into(), 9.0.into(), 16.0.into()]);
+
+        let mut square = CompiledExpression::new_from_string(" 'n' @ 'n' @ * ", false);
+        let loop_variable = FeelValue::Name(QName::from_str("n").unwrap());
+        let mut loop_context = CompiledExpression::new_from_string(" list 1 push 2 push 3 push 4 push ", false);
+        let mut loops: Vec<(&FeelValue, &mut CompiledExpression)> = vec![(&loop_variable, &mut loop_context)];
+        let mut for_expression = CompiledExpression::for_loops(&mut loops, &mut square);
+        for_expression.resolve_jumps();
+
+        if print_diagnostics() { println!("Expression\n{}", for_expression); }
+        let mut interpreter = Interpreter::new(for_expression, NestedContext::new_with_builtins());
+        let (actual, message) = interpreter.trace();
+        if print_diagnostics() { println!("{}", message); }
+        assert_eq!(expected, actual);        
+    }
+
+    #[test]
+    fn test_for_loop_over_two_lists() {
+        let expected = FeelValue::new_list(vec![
+            1.0.into(), 2.0.into(), 
+            4.0.into(), 8.0.into(), 
+            9.0.into(), 18.0.into(), 
+            16.0.into(), 32.0.into()]
+        );
+
+        let mut square_times = CompiledExpression::new_from_string(" 'n' @ 'n' @ * 'm' @ *", false);
+        let outer_loop_variable = FeelValue::Name(QName::from_str("n").unwrap());
+        let inner_loop_variable = FeelValue::Name(QName::from_str("m").unwrap());
+        let mut outer_loop_context = CompiledExpression::new_from_string(" list 1 push 2 push 3 push 4 push ", false);
+        let mut inner_loop_context = CompiledExpression::new_from_string(" list 1 push 2 push ", false);
+        let mut loops: Vec<(&FeelValue, &mut CompiledExpression)> = vec![
+            (&outer_loop_variable, &mut outer_loop_context),
+            (&inner_loop_variable, &mut inner_loop_context)
+        ];
+        let mut for_expression = CompiledExpression::for_loops(&mut loops, &mut square_times);
+        for_expression.resolve_jumps();
+
+        if print_diagnostics() { println!("Expression\n{}", for_expression); }
+        let mut interpreter = Interpreter::new(for_expression, NestedContext::new_with_builtins());
+        let (actual, message) = interpreter.trace();
+        if print_diagnostics() { println!("{}", message); }
+        assert_eq!(expected, actual);        
     }
 
   // ///////////////////////////////////// //
