@@ -619,8 +619,12 @@ impl CompiledExpression {
             let mut ops_after = format!("
                     goto({loop_top})
                     label({exit_loop})
+                    // Reset loop position to start - step
+                    'loop start index {num}' @ 'loop step {num}' @ -
+                    'loop position {num}' !
                 ",
                 // Parameters below must equal values used above in ops_before format! statement.
+                num = loop_number,
                 loop_top = a + 1,  
                 exit_loop = a + 11
             );

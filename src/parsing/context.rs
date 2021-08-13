@@ -17,7 +17,7 @@ use super::lattice_type::{LatticeType,ContextTypeBuilder};
 /// No values may be mutated unless they are FeelValue::Context or FeelValue::List values.
 #[derive(Eq, Clone, Debug)]
 pub struct Context {
-  contents: RefCell<HashMap<QName, FeelValue>>
+  pub contents: RefCell<HashMap<QName, FeelValue>>
 }
 
 impl Context {

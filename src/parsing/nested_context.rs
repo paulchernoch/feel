@@ -1,3 +1,4 @@
+use std::fmt::{Debug,Display,Formatter,Result};
 use super::feel_value::{FeelValue, FeelType};
 use super::qname::QName;
 use super::context::{ContextReader,ContextIncrement};
@@ -9,6 +10,7 @@ use crate::execution::builtins::Builtins;
 /// from first to last, with the last context being the builtin context.
 /// This structure evaluates them from last to first, but stores the contexts in
 /// a stack that holds the values in reverse order, so the end result is the same.
+#[derive(Debug)]
 pub struct NestedContext {
   /// The stack holds FeelValues that must all be Contexts.
   stack: Vec<FeelValue>
@@ -160,6 +162,31 @@ impl ContextIncrement for NestedContext {
       },
       _ => None
     }
+  }
+}
+
+impl Display for NestedContext {
+  // This trait requires `fmt` with this exact signature.
+  fn fmt(&self, f: &mut Formatter) -> Result {
+    let mut s = String::with_capacity(5000);
+    let mut i = 0_usize;
+    let indent = "        ";
+    for ctx in self.stack.iter() {
+      i += 1;
+      s.push_str(&format!("Context #{cnum}:\n", cnum=i));
+      match ctx {
+        FeelValue::Context(rc_ctx) => {
+          for (key, val) in (*rc_ctx).contents.borrow().iter() {
+            s.push_str(&format!("\n{indent}{key} : {val},", indent=indent, key=key, val=val));
+          }
+        },
+        _ => {
+          s.push_str(&format!("{}", ctx));
+        }
+      }
+
+    }
+    write!(f, "{{ {} }}", s)
   }
 }
 

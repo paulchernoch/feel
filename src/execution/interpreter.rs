@@ -890,7 +890,7 @@ impl Interpreter {
         while self.step() {
             let stack: Vec<String> = self.data.iter().rev().map(|val| val.to_string()).collect();
             let stack_string = if stack.len() <= 1 {
-                format!("[ {}]\n", stack.join(" "))
+                format!("[ {} ]\n", stack.join(" "))
             } 
             else {
                 format!("[\n  TOP-> {}\n]\n", stack.join("\n        "))
@@ -900,6 +900,17 @@ impl Interpreter {
             self.step_count += 1;
             if self.step_count >= self.limit {
                 return (FeelValue::Null, message);
+            }
+            match next_op {
+                Some(OpCode::UpdateContext) => {
+                    message.push_str(&format!("    Contexts:\n      {}\n", self.contexts));
+                },
+                Some(OpCode::Store) => {
+                    message.push_str(&format!("    Contexts:\n      {}\n", self.contexts));
+                }
+                _ => {
+                    ()
+                }
             }
             next_op = self.next_operation();
         }
@@ -1783,7 +1794,7 @@ num(-2)
         for_expression.resolve_jumps();
 
         if print_diagnostics() { println!("Expression\n{}", for_expression); }
-        let mut interpreter = Interpreter::new(for_expression, NestedContext::new_with_builtins());
+        let mut interpreter = Interpreter::new(for_expression, NestedContext::new());
         let (actual, message) = interpreter.trace();
         if print_diagnostics() { println!("{}", message); }
         assert_eq!(expected, actual);        
