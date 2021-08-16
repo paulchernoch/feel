@@ -1818,9 +1818,48 @@ num(-2)
             ", false
         );
         let loop_variable = FeelValue::Name(QName::from_str("n").unwrap());
+
+        // Create a range from 1 to 4 (inclusive)
         let mut loop_context = CompiledExpression::new_from_string(" 1 4 [lo,hi] ", false);
+
         let mut loops: Vec<(&FeelValue, &mut CompiledExpression)> = vec![(&loop_variable, &mut loop_context)];
         let mut for_expression = CompiledExpression::for_loops(&mut loops, &mut factorial);
+        for_expression.resolve_jumps();
+
+        if print_diagnostics() { println!("Expression\n{}", for_expression); }
+        let mut interpreter = Interpreter::new(for_expression, NestedContext::new());
+        let (actual, message) = interpreter.trace();
+        if print_diagnostics() { println!("{}", message); }
+        assert_eq!(expected, actual);        
+    }
+
+    /// Two for-loops, one over an ascending range, the other over a descending range.
+    #[test]
+    fn test_for_loops_over_ascending_and_descending_ranges() {
+        let f = |x: i32| FeelValue::Number(x as f64);
+
+        let expected = FeelValue::new_list(vec![
+            f(4), f(3), f(2), f(5), f(4), f(3), f(6), f(5), f(4)
+        ]);
+
+        let mut sum = CompiledExpression::new_from_string("
+                'n' @ 
+                'm' @
+                +
+            ", false
+        );
+        let outer_loop_variable = FeelValue::Name(QName::from_str("n").unwrap());
+        let inner_loop_variable = FeelValue::Name(QName::from_str("m").unwrap());
+
+        // Create ranges from 1 to 3 (inclusive), one ascending, one descending
+        let mut outer_loop_context = CompiledExpression::new_from_string(" 1 3 [lo,hi] ", false);
+        let mut inner_loop_context = CompiledExpression::new_from_string(" 3 1 [lo,hi] ", false);
+        
+        let mut loops: Vec<(&FeelValue, &mut CompiledExpression)> = vec![
+            (&outer_loop_variable, &mut outer_loop_context),
+            (&inner_loop_variable, &mut inner_loop_context)
+        ];
+        let mut for_expression = CompiledExpression::for_loops(&mut loops, &mut sum);
         for_expression.resolve_jumps();
 
         if print_diagnostics() { println!("Expression\n{}", for_expression); }
