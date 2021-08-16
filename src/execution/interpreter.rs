@@ -890,13 +890,13 @@ impl Interpreter {
         while self.step() {
             let stack: Vec<String> = self.data.iter().rev().map(|val| val.to_string()).collect();
             let stack_string = if stack.len() <= 1 {
-                format!("[ {} ]\n", stack.join(" "))
+                format!(" TOP-> {}\n", stack.join(" "))
             } 
             else {
-                format!("[\n  TOP-> {}\n]\n", stack.join("\n        "))
+                format!("\n        TOP-> {}\n", stack.join("\n              ")) 
             };
                 
-            message.push_str(&format!("{}. {} {}", self.step_count, next_op.unwrap(), stack_string));
+            message.push_str(&format!("{}. @ [{:0>4}]   {} {}", self.step_count, self.instruction_pointer - 1, next_op.unwrap(), stack_string));
             self.step_count += 1;
             if self.step_count >= self.limit {
                 return (FeelValue::Null, message);
@@ -1772,6 +1772,8 @@ num(-2)
         assert_eq!(expected, actual);        
     }
 
+    /// Test a nested for-loop, where the outer loop is over the list n = [1,2,3,4]
+    /// and the inner loop is over m = [1,2], and the mapping formula is n * n * m. 
     #[test]
     fn test_for_loop_over_two_lists() {
         let expected = FeelValue::new_list(vec![
@@ -1791,6 +1793,34 @@ num(-2)
             (&inner_loop_variable, &mut inner_loop_context)
         ];
         let mut for_expression = CompiledExpression::for_loops(&mut loops, &mut square_times);
+        for_expression.resolve_jumps();
+
+        if print_diagnostics() { println!("Expression\n{}", for_expression); }
+        let mut interpreter = Interpreter::new(for_expression, NestedContext::new());
+        let (actual, message) = interpreter.trace();
+        if print_diagnostics() { println!("{}", message); }
+        assert_eq!(expected, actual);        
+    }
+
+    /// Test a single for-loop over an ascending range where reference is made to the special variable "partial" 
+    /// of previous results in order to generate a series of factorials.
+    #[test]
+    fn test_ranged_for_loop_with_partial() {
+        let expected = FeelValue::new_list(vec![1.0.into(), 2.0.into(), 6.0.into(), 24.0.into()]);
+
+        let mut factorial = CompiledExpression::new_from_string("
+                'n' @ 1
+                'partial' @ len 0 > branch(1/2/2)
+                label(1)
+                'partial' @ -1 index *
+                label(2)
+                *
+            ", false
+        );
+        let loop_variable = FeelValue::Name(QName::from_str("n").unwrap());
+        let mut loop_context = CompiledExpression::new_from_string(" 1 4 [lo,hi] ", false);
+        let mut loops: Vec<(&FeelValue, &mut CompiledExpression)> = vec![(&loop_variable, &mut loop_context)];
+        let mut for_expression = CompiledExpression::for_loops(&mut loops, &mut factorial);
         for_expression.resolve_jumps();
 
         if print_diagnostics() { println!("Expression\n{}", for_expression); }

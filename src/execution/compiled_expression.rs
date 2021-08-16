@@ -573,11 +573,11 @@ impl CompiledExpression {
                                 over 0 > branch({is_ascending}/{is_descending}/{is_descending}) // ctx stop step newpos -> ctx stop step newpos
                                     label({is_ascending})
                                         // See if new position is higher than stop and copy newpos to be item.
-                                        2 pick over <= over swap // ctx stop step newpos -> ctx stop step newpos item in-range?
+                                        2 pick over >= over swap // ctx stop step newpos -> ctx stop step newpos item in-range?
                                         branch({set_variable}/{exceeds_range}/{exceeds_range}) // ctx stop step newpos item in-range? -> ctx stop step newpos item
                                     label({is_descending})
                                         // See if new position is lower than stop and copy newpos to be item.
-                                        2 pick over >= over swap // ctx stop step newpos -> ctx stop step newpos item in-range?
+                                        2 pick over <= over swap // ctx stop step newpos -> ctx stop step newpos item in-range?
                                         branch({set_variable}/{exceeds_range}/{exceeds_range}) // ctx stop step newpos item in-range? -> ctx stop step newpos item
                                     label({exceeds_range})
                                         drop drop drop drop drop // ctx stop step newpos item -> _
