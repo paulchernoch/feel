@@ -23,6 +23,7 @@ The goal of this project is to:
  - All FEEL data types are implemented.
  - Date and DateTime data types **do not** support Time zones.
  - All standard library functions have been implemented.
+ - All special date, time and duration properties have been implemented.
  - Contexts and nested contexts are functional.
  - The syntax recognizer (built using the PEST parser generator, with a PEG grammar) can recognize most features. It is based on a grammar for an earlier version of FEEL, hence is missing a few features, like time and date literals. These will be added eventually.
  - Most of the OpCodes for the Virtual machine are implemented.
