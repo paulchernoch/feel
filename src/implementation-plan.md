@@ -66,7 +66,7 @@ The `Interpreter` class will execute the `OpCode`s and return a result.
 
  - [x] `Opcode` enum
  - [x] `Interpreter` struct heap stack (literals like strings), data stack, code stack (opcodes), contexts stack, iterations (IterationContext)
- - [ ] `IterationContext` (for loops)
+ - [x] `IterationContext` (for-loops)
  - [x] if - then - else
  - [x] Create a `Context` holding all the Builtins as keyed references to `FeelValue::Function`
  - [x] list access with positive index
@@ -78,8 +78,8 @@ The `Interpreter` class will execute the `OpCode`s and return a result.
  - [ ] quantified expressions: every (every name in expression satisfies expression),
  - [x] expression between expression and expression
  - [x] in operator (not involving positive unary tests)
- - [ ] expression in positive unary test
- - [ ] expression in ( positive unary tests )
+ - [x] expression in positive unary test
+ - [x] expression in ( positive unary tests )
  - [x] instance of expression
  - [ ] function definition
  - [x] Function calls
@@ -89,8 +89,8 @@ The `Interpreter` class will execute the `OpCode`s and return a result.
  - [x] Convert FeelOpcode to FeelValue
  - [x] Execute method
 
-Positive unary tests look like they can be converted into half-open ranges. 
-If so, then the existing implementation of the "in" operator will be sufficient.
+Positive unary tests have been implemented as half-open ranges. 
+Thus the existing implementation of the "in" operator is sufficient.
 
 ## Simple Expression Tree Walk
 

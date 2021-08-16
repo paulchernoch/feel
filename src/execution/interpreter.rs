@@ -1640,6 +1640,34 @@ mod tests {
         assert!(actual.is_true());
     }
 
+    #[test]
+    fn test_in_operator_for_openended_range() {
+        let expr = CompiledExpression::new_from_string("7 10 [..,hi) in", true);
+
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+
+        let mut interpreter = Interpreter::new(expr, NestedContext::new());
+        let (actual, message) = interpreter.trace();
+
+        if print_diagnostics() { println!("{}", message); }
+
+        assert!(actual.is_true());
+    }
+
+    #[test]
+    fn test_in_operator_for_list_of_openended_ranges() {
+        // The ranges are >=-4 and <10
+        let expr = CompiledExpression::new_from_string("7 list -4 [lo,..] push 10 [..,hi) push in", true);
+
+        if print_diagnostics() { println!("Expression\n{}", expr); }
+
+        let mut interpreter = Interpreter::new(expr, NestedContext::new());
+        let (actual, message) = interpreter.trace();
+
+        if print_diagnostics() { println!("{}", message); }
+
+        assert!(actual.is_true());
+    }
 
     /// Index a list of numbers using a positive index, returning a single value.
     /// FEEL expects one-based indexing, but the "index" op performs
