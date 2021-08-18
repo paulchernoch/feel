@@ -1093,7 +1093,7 @@ mod tests {
   use std::str::FromStr;
 
   fn print_diagnostics() -> bool {
-      true
+      false
   }
 
   #[test]
@@ -1944,6 +1944,62 @@ num(-2)
         assert_eq!(expected, actual);        
     }
 
+    #[test]
+    fn test_every_loop_over_single_list() {
+        satisfies_loop_over_single_list_test_case(
+            " 'n' @ 10 > ", 
+            "n", 
+            " list 11 push 12 push 13 push 14 push ", 
+            true, // an "every x satisfies y" loop
+            true, // Expected result
+            "every x in [11,12,13,14] satisfies x > 10 -> should be true"
+        );
+        satisfies_loop_over_single_list_test_case(
+            " 'n' @ 10 > ", 
+            "n", 
+            " list 11 push 9 push 13 push 14 push ", 
+            true, // an "every x satisfies y" loop
+            false, // Expected result
+            "every x in [11,9,13,14] satisfies x > 10 -> should be false"
+        );
+        satisfies_loop_over_single_list_test_case(
+            " 'n' @ 10 > ", 
+            "n", 
+            " list 11 push 12 push 13 push null push ", 
+            true, // an "every x satisfies y" loop
+            false, // Expected result
+            "every x in [11,12,13,null] satisfies x > 10 -> should be false"
+        );
+    }
+
+    #[test]
+    fn test_some_loop_over_single_list() {
+        satisfies_loop_over_single_list_test_case(
+            " 'n' @ 10 > ", 
+            "n", 
+            " list 11 push 12 push 13 push 14 push ", 
+            false, // a "some x satisfies y" loop
+            true, // Expected result
+            "some x in [11,12,13,14] satisfies x > 10 -> should be true"
+        );
+        satisfies_loop_over_single_list_test_case(
+            " 'n' @ 10 > ", 
+            "n", 
+            " list 1 push 2 push 3 push 4 push ", 
+            false, // a "some x satisfies y" loop
+            false, // Expected result
+            "some x in [1,2,3,4] satisfies x > 10 -> should be false"
+        );
+        satisfies_loop_over_single_list_test_case(
+            " 'n' @ 10 > ", 
+            "n", 
+            " list null push 2 push 3 push 11 push ", 
+            false, // a "some x satisfies y" loop
+            true, // Expected result
+            "some x in [null,2,3,11] satisfies x > 10 -> should be true"
+        );
+    }
+
   // ///////////////////////////////////// //
   //                                       //
   //          Test Helper methods          //
@@ -2004,6 +2060,22 @@ num(-2)
     let vec: Vec<&str> = split.collect();
     vec
   }
+
+  fn satisfies_loop_over_single_list_test_case(predicate: &str, variable: &str, loop_context: &str, is_every_loop: bool, expected: bool, case_description: &str) {
+    let mut over_ten = CompiledExpression::new_from_string(predicate, false);
+    let loop_variable = FeelValue::Name(QName::from_str(variable).unwrap());
+    let mut loop_context = CompiledExpression::new_from_string(loop_context, false);
+    let mut loops: Vec<(&FeelValue, &mut CompiledExpression)> = vec![(&loop_variable, &mut loop_context)];
+    let mut expression = CompiledExpression::satisfies_loops(&mut loops, &mut over_ten, is_every_loop);
+    expression.resolve_jumps();
+
+    if print_diagnostics() { println!("Expression\n{}", expression); }
+    let mut interpreter = Interpreter::new(expression, NestedContext::new());
+    let (actual, message) = interpreter.trace();
+    if print_diagnostics() { println!("{}", message); }
+    let message = format!("Failed case {}", case_description);
+    assert_eq!(FeelValue::Boolean(expected), actual, "{}", message);        
+}
 
 
 }

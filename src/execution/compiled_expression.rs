@@ -799,6 +799,7 @@ impl CompiledExpression {
 
                         // If a previous iteration was able to short-circuit, break from the loop
                         {sc_check} branch({sc_break}/{select_context}/{select_context})
+                        label({sc_break})
                             drop drop drop drop
                             goto({exit_loop})
                         label({select_context})
