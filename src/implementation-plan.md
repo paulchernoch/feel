@@ -3,7 +3,8 @@
 ## Grammar Recognizer
 
 Add grammar rules for new features not supported by the Javascript PEG Grammar 
-that was the basis of this project.
+that was the basis of this project. 
+That grammar was for FEEL version 1.1 or 1.2, hence is missing fatures found in 1.3.
 
  - [ ] Duration literals like @"PT5H"
  - [ ] Date literals
@@ -16,12 +17,11 @@ that was the basis of this project.
  - [x] Enum Defined
  - [x] Equality
  - [x] Add, Sub, Mul, Div
- - [ ] Contexts
+ - [x] Contexts
     - [x] Context
     - [x] NestedContext
-    - [ ] LoopIterationContext (for one or more nested for-loops)
-    - [ ] PredicateIterationContext (for "every" and "some", which exits as soon 
-          as predicate is known to be true or false) 
+    - [x] for-loop contexts (for one or more nested for-loops) - Implemented as regular Contexts with special variables
+    - [x] satisfies-loop contexts (for "every x in y satisfies z" and "some x in y satisfies z" loops, with short-circuit brancing logic) - Implemented as regular Contexts with special variables
     - [x] **List Filter Iteration Context** (each item in list assigned to 'item' key in the context)
 
 Note: **List Filter Iteration Context** was implemented as a standard `Context`, with OpCodes being used to initialize and access it.
@@ -74,8 +74,8 @@ The `Interpreter` class will execute the `OpCode`s and return a result.
  - [x] filter expressions using the special variable "item" in lists
  - [x] filter expressions using field names without "item" to access properties of the current item, if it is a context
  - [x] context selection (using dot name after a list of contexts yields a list of values of the name property taken from all the contexts)
- - [ ] quantified expressions: some (some name in expression satisfies expression),
- - [ ] quantified expressions: every (every name in expression satisfies expression),
+ - [x] quantified expressions: some (some name in expression satisfies expression),
+ - [x] quantified expressions: every (every name in expression satisfies expression),
  - [x] expression between expression and expression
  - [x] in operator (not involving positive unary tests)
  - [x] expression in positive unary test
@@ -93,6 +93,8 @@ Positive unary tests have been implemented as half-open ranges.
 Thus the existing implementation of the "in" operator is sufficient.
 
 ## Simple Expression Tree Walk
+
+This is the beginning of converting a parse tree (AST) into a series of OpCodes.
 
  - [ ] Additive
  - [ ] Multiplicative
@@ -121,10 +123,17 @@ These 29 properties are listed in Table 65 and Table 66 of §10.3.2.15 of the DM
  - [ ] Assembling Ranges
  - [ ] Sorting
  - [ ] Filtering
+     - [x] Macros to generate OpCodes for control logic of list filtering
+     - [ ] Conversion from AST to OpCodes of list filtering
+     - [ ] Special cases for Context filtering
+ - [ ] Iteration contexts (lists, for loops)
+     - [x] Macros to generate OpCodes for control logic of for-loops
+     - [x] Macros to generate OpCodes for control logic of "every" and "some" satisfies-loops
+     - [ ] Conversion from AST to OpCodes of for-loops
+     - [ ] Conversion from AST to OpCodes of satisfy-loops
  - [ ] Rule Chaining
  - [ ] Defining Functions
  - [ ] Calling Functions
- - [ ] Iteration contexts (lists, for loops)
 
 ## Caching and other Performance Enhancements
 

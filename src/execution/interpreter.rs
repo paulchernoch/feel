@@ -2075,8 +2075,7 @@ num(-2)
     if print_diagnostics() { println!("{}", message); }
     let message = format!("Failed case {}", case_description);
     assert_eq!(FeelValue::Boolean(expected), actual, "{}", message);        
-}
-
+  }
 
 }
 
