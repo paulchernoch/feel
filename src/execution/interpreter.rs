@@ -257,10 +257,29 @@ impl Interpreter {
                         self.push_data(result);
                     },
                     OpCode::Or => {
+                        // By Table 50, p 121, if either argument is true, "or" returns true, even if the other argument is not Boolean.
                         self.advance();
                         let (lower, higher) = self.pop_two();
                         let result: FeelValue = match (lower.get_type(), higher.get_type()) {
                             (FeelType::Boolean, FeelType::Boolean) => (lower.is_true() || higher.is_true()).into(),
+                            (FeelType::Boolean, _) => {
+                                if lower.is_true() { FeelValue::Boolean(true) }
+                                else { 
+                                    self.error(
+                                        format!("Cannot compare {} with {} using logical or", lower.get_type().to_string(), higher.get_type().to_string()),
+                                        false
+                                    )
+                                }
+                            },
+                            (_, FeelType::Boolean) => {
+                                if higher.is_true() { FeelValue::Boolean(true) }
+                                else { 
+                                    self.error(
+                                        format!("Cannot compare {} with {} using logical or", lower.get_type().to_string(), higher.get_type().to_string()),
+                                        false
+                                    )
+                                }
+                            },
                             _ => {
                                 self.error(
                                     format!("Cannot compare {} with {} using logical or", lower.get_type().to_string(), higher.get_type().to_string()),
@@ -271,10 +290,29 @@ impl Interpreter {
                         self.push_data(result);
                     },
                     OpCode::And => {
+                        // If either argument is false, return a false, even if the other argument is null. 
                         self.advance();
                         let (lower, higher) = self.pop_two();
                         let result: FeelValue = match (lower.get_type(), higher.get_type()) {
                             (FeelType::Boolean, FeelType::Boolean) => (lower.is_true() && higher.is_true()).into(),
+                            (FeelType::Boolean, _) => {
+                                if lower.is_false() { FeelValue::Boolean(false) }
+                                else { 
+                                    self.error(
+                                        format!("Cannot compare {} with {} using logical and", lower.get_type().to_string(), higher.get_type().to_string()),
+                                        false
+                                    )
+                                }
+                            },
+                            (_, FeelType::Boolean) => {
+                                if higher.is_false() { FeelValue::Boolean(false) }
+                                else { 
+                                    self.error(
+                                        format!("Cannot compare {} with {} using logical and", lower.get_type().to_string(), higher.get_type().to_string()),
+                                        false
+                                    )
+                                }
+                            },
                             _ => {
                                 self.error(
                                     format!("Cannot compare {} with {} using logical and", lower.get_type().to_string(), higher.get_type().to_string()),
@@ -297,14 +335,16 @@ impl Interpreter {
                         else { self.push_data((&lower <= &higher).into()); }
                     },
                     OpCode::NotEqual => {
+                        // Use Feel semantics, where nulls produce nulls.
                         self.advance();
                         let (lower, higher) = self.pop_two();
-                        self.push_data((&lower != &higher).into());
+                        self.push_data(!lower.equal(&higher));
                     },
                     OpCode::Equal => {
+                        // Use Feel semantics, where null does not equal null, etc.
                         self.advance();
                         let (lower, higher) = self.pop_two();
-                        self.push_data((&lower == &higher).into());
+                        self.push_data(lower.equal(&higher));
                     },
                     OpCode::GreaterThan => {
                         self.advance();
@@ -1102,8 +1142,11 @@ mod tests {
     assert_eq!(FALSE, parse_and_execute(vec!["true", "false", "and"], Vec::new()));
     assert_eq!(FALSE, parse_and_execute(vec!["false", "true", "and"], Vec::new()));
     assert_eq!(FALSE, parse_and_execute(vec!["false", "false", "and"], Vec::new()));
-    assert_eq!(FeelValue::Null, parse_and_execute(vec!["num(2)", "false", "and"], Vec::new()));
-  }
+
+    // Special cases: false and non-boolean is false (because we can decide), but true and non-boolean is null.
+    assert_eq!(FeelValue::Boolean(false), parse_and_execute(vec!["num(2)", "false", "and"], Vec::new()));
+    assert_eq!(FeelValue::Null, parse_and_execute(vec!["null", "true", "and"], Vec::new()));
+}
 
   #[test]
   fn test_logical_or() {
@@ -1114,6 +1157,10 @@ mod tests {
     assert_eq!(TRUE, parse_and_execute(vec!["false", "true", "or"], Vec::new()));
     assert_eq!(FALSE, parse_and_execute(vec!["false", "false", "or"], Vec::new()));
     assert_eq!(FeelValue::Null, parse_and_execute(vec!["num(2)", "false", "or"], Vec::new()));
+
+    // Special cases: true or non-boolean is true (because we can decide), but false or non-boolean is null.
+    assert_eq!(FeelValue::Boolean(true), parse_and_execute(vec!["null", "true", "or"], Vec::new()));
+    assert_eq!(FeelValue::Null, parse_and_execute(vec!["null", "false", "or"], Vec::new()));
   }
 
   #[test]

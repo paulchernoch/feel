@@ -443,7 +443,7 @@ impl CompiledExpression {
     ///    innermost .... This expression may reference any or all of the loop variables. 
     ///                   It will be executed once per iteration.
     ///                   The result of this expression will be pushed into the special variable "partial",
-    ///                   a list of results frmo all the iterations. 
+    ///                   a list of results from all the iterations. 
     ///                   "innermost" may lookup values from previous iterations of the loop in "partial"
     ///                   and use them in computations. 
     /// 
@@ -470,11 +470,16 @@ impl CompiledExpression {
     ///                                 or negative one (for descendent ranges). 
     /// The names of the first two context entries (partial and <variable name>) are dictated by the spec. 
     /// The remaining names are internal. 
+    /// 
+    /// NOTE: The FEEL spec does not define any of these variables that start with the word "loop".
+    ///       If an expression shadows them with its own definitions in an inner context,
+    ///       it will break things. It may be necessary to permit QNames that use a character not permitted
+    ///       in normal expressions via the language parser and include that character in the loop variable names.
     pub fn for_loops(loops: &mut Vec<(&FeelValue, &mut CompiledExpression)>, innermost: &mut CompiledExpression) -> CompiledExpression {
         // Because it is tedious to reference items on the stack other than the top three and we need to 
         // set the values of eight context entries, we will initialize all eight properties to Null
         // and store the context in contexts.
-        // Subsequent access will be mediated through contexts, instead of against a context near the top of the data stack.
+        // Subsequent access will be mediated through self.contexts, instead of against a context near the top of the data stack.
         //
         // Tricky: There will be two Context values in play that point to the same underlying dictionary. 
         //         One will be at or near the top of the data stack and the other inside "contexts". 
@@ -657,6 +662,259 @@ impl CompiledExpression {
         expr
     }
 
+    /// Similar to for_loops, but handles the "some" and "every" loop reduction functions. 
+    /// These are reduce operations that check if some or all items in a list or range,
+    /// when incorporated into an expression, yield a true value or not. 
+    /// These loops shortcut as soon as the answer is known, unlike the for loop.
+    /// Its result is to yield true, false (or possibly null). 
+    /// 
+    /// This creates a context to hold the temporary loop iteration variables, then 
+    /// pops it off at the end to clean up.
+    /// 
+    /// This does not create a variable named "partial" to hold results from previous iterations (which for loops do). 
+    /// It does create a variable called 'satisfies result' to hold the result. 
+    /// 
+    ///    loops ........... Each pair of values represents one loop. 
+    ///                      The FeelValue must be a FeelValue::Name to use as the loop variable. 
+    ///                      The CompiledExpression must either resolve to a list or a range over integers. 
+    ///                      If a Range, then the range may be a reversed Range, causing the iteration to be descendent.
+    ///    innermost ....... This expression may reference any or all of the loop variables. 
+    ///                      It will be executed once per iteration.
+    ///                      The result of this expression should be a FeelValue::Boolean.
+    ///                      If it does not return a boolean for at least one iteration, 
+    ///                      it will cause "every" to return false, but will not prevent 
+    ///                      "some" from returning true should another iteration yield a true. 
+    ///    is_every_loop ... If true, this is an "every x in expression satisfies y" expression. 
+    ///                      If false, this is a "some x in expression satisfies y" expression.
+    pub fn satisfies_loops(loops: &mut Vec<(&FeelValue, &mut CompiledExpression)>, innermost: &mut CompiledExpression, is_every_loop: bool) -> CompiledExpression {
+        // Because it is tedious to reference items on the stack other than the top three and we need to 
+        // set the values of seven context entries, we will initialize all seven properties to Null
+        // and store the context in contexts.
+        // Subsequent access will be mediated through self.contexts, instead of against a context near the top of the data stack.
+        //
+        // Tricky: There will be two Context values in play that point to the same underlying dictionary. 
+        //         One will be at or near the top of the data stack and the other inside "contexts". 
+        //         This is because you can call xset only against items on the data stack, 
+        //         since contexts is a NestedContext and we would not know which of its several contexts 
+        //         to store the key-value pair in. 
+        //         Once a variable is initialized to something via xset, it can be subsequently updated
+        //         with xup, which acts against contexts and can find where the variable is defined. 
+        let loop_count = loops.len();
+        let innermost_label = 1_usize;
+        let short_circuit_label = 2_usize;
+        let continue_label = 3_usize;
+        // We will initialize the result to be what we get if we proceed to the end of the loop without
+        // being able to shortcut. That means that inside the loop, we only set a return value 
+        // when we get to shortcut, meaning finding a false value in an "every" loop or a true value in a "some" loop. 
+        let initial_result = if is_every_loop { "true" } else { "false" };
+        // If 'satisfies result' got inverted from its original value, then we will short-circuit and exit loops.
+        // true means to exit.
+        let short_circuit_check = if is_every_loop { 
+            "'satisfies result' @ not" 
+        } 
+        else { 
+            "'satisfies result' @" 
+        };
+        let mut expr = CompiledExpression::new_from_string(&format!("
+                // Create a single context to hold variables for all loops.is_every_loop
+                // Define a variable called 'satisfies result' but not one named 'partial'.
+                xload 'satisfies result' {init} xset
+                // Make a duplicate context and push it to contexts.
+                // The duplicate will share the same storage of key-value pairs as the original.
+                dup xpush
+        ", init=initial_result), false);
+
+        for loop_number in 1..=loop_count {
+            // "iteration_context" below is normally an expression that yields a List or Range, not a context.
+            // This is terminology borrowed from the DMN spec.
+            let (param_name, &mut ref mut iteration_context) = loops[loop_number - 1];
+            let null_vars = format!("
+                // Initialize loop variables for {name} (loop #{num}) to null
+                '{name}' null xset
+                'loop context {num}' null xset
+                'loop position {num}' null xset
+                'loop start index {num}' null xset
+                'loop stop index {num}' null xset
+                'loop count {num}' null xset
+                'loop step {num}' null xset
+                ", 
+                name = param_name.to_string(),
+                num = loop_number
+            );
+
+            expr.append_str(&null_vars);
+
+            // Add in the iteration context expression, from which we will extract values
+            // about how many loop iterations to expect, start and stop positions, and iteration values. 
+            expr.append(iteration_context);
+
+            // Note that we need to store values returned by OpCode::LoopBounds (+loop) 
+            // in reverse order because of the stack semantics. 
+            let set_vars = format!("
+                // Set loop variables for {name} (loop #{num}) to initial values.
+                +loop
+                'loop step {num}' !
+                'loop count {num}' !
+                'loop stop index {num}' !
+                'loop start index {num}' !
+                'loop position {num}' !
+                'loop context {num}' !
+                ", 
+                name = param_name.to_string(),
+                num = loop_number
+            );
+            expr.append_str(&set_vars);
+        }
+        // Drop the context atop the data stack - no longer needed for initialization. 
+        // It is not lost as a clone was previously pushed onto contexts.
+        expr.append_str(" drop ");
+
+        // Now insert opcodes that perform the looping, 
+        // altering 'loop position' and the named loop variable at each level of looping.
+        let mut loop_start_ops = String::new();
+        let mut loop_end_ops = String::new();
+        for loop_number in 1..=loop_count {
+            let (param_name, _) = loops[loop_number - 1];
+            let a = loop_number * 20;
+            // The logic will distinguish between iteration contexts that are Ranges versus Lists. 
+            //   - For Ranges, all the information we need is already stored in the loop variables. 
+            //   - For Lists, we use the "index" op. 
+            // ops_before is all the operations at the top of the loop, before the start of the next loop
+            // or the main body that holds innermost.
+            let ops_before = format!("
+                    // Top of loop {num} over variable {name}
+                    // Skip over loop if list or range is empty. 
+                    'loop count {num}' @ 0 <= branch({exit_loop}/{loop_init}/{loop_init})
+
+                    // Grab iteration variables from context
+                    label({loop_init})
+                    'loop context {num}' @                  // _ -> ctx
+                    'loop stop index {num}' @               // ctx -> ctx stop
+                    'loop step {num}' @                     // ctx stop -> ctx stop step
+                    'loop position {num}' @                 // ctx stop step -> ctx stop step pos
+                    label({loop_top})
+                        // Increment the position in the correct direction, according to step.
+                        // Store in contexts but also keep on data stack. 
+                        over + dup 'loop position {num}' !  // ctx stop step pos -> ctx stop step newpos
+
+                        // If a previous iteration was able to short-circuit, break from the loop
+                        {sc_check} branch({sc_break}/{select_context}/{select_context})
+                            drop drop drop drop
+                            goto({exit_loop})
+                        label({select_context})
+                        // Treat range contexts separate from lists
+                        3 pick type?(range<Any>) branch({is_range}/{is_list}/{is_list})         // ctx stop step newpos -> ctx stop step newpos
+                            label({is_range})
+                                // Use loop step to assess if ascending
+                                over 0 > branch({is_ascending}/{is_descending}/{is_descending}) // ctx stop step newpos -> ctx stop step newpos
+                                    label({is_ascending})
+                                        // See if new position is higher than stop and copy newpos to be item.
+                                        2 pick over >= over swap // ctx stop step newpos -> ctx stop step newpos item in-range?
+                                        branch({set_variable}/{exceeds_range}/{exceeds_range}) // ctx stop step newpos item in-range? -> ctx stop step newpos item
+                                    label({is_descending})
+                                        // See if new position is lower than stop and copy newpos to be item.
+                                        2 pick over <= over swap // ctx stop step newpos -> ctx stop step newpos item in-range?
+                                        branch({set_variable}/{exceeds_range}/{exceeds_range}) // ctx stop step newpos item in-range? -> ctx stop step newpos item
+                                    label({exceeds_range})
+                                        drop drop drop drop drop // ctx stop step newpos item -> _
+                                        goto({exit_loop})
+                            label({is_list})  // ctx stop step newpos
+                                2 pick over >= branch({get_list}/{exceeds_list}/{exceeds_list}) // ctx stop step newpos => ctx stop step newpos
+                                    label({get_list})
+                                        // Get the item from the list at newpos.
+                                        3 pick over index // ctx stop step newpos -> ctx stop step newpos item
+                                        goto({set_variable})
+                                    label({exceeds_list})
+                                        drop drop drop drop // ctx stop step newpos -> _
+                                        goto({exit_loop})
+                            label({set_variable})
+                                // Sets the named loop variable. 
+                                '{name}' !  // ctx stop step newpos item -> ctx stop step newpos
+                            label({inside})
+                            // Next loop inserted here, or the innermost expression.
+                ",
+                name = param_name.to_string(),
+                num = loop_number,
+                sc_check = short_circuit_check,
+                loop_init = a,
+                loop_top = a + 1,
+                is_range = a + 2,
+                is_ascending = a + 3,
+                is_descending = a + 4,
+                is_list = a + 5,
+                exceeds_range = a + 6,
+                get_list = a + 7,
+                exceeds_list = a + 8,
+                set_variable = a + 9,
+                inside = a + 10,
+                exit_loop = a + 11,
+                select_context = a + 12,
+                sc_break = a + 13
+            );
+            loop_start_ops.push_str(&ops_before);
+
+            // ops_after is all the operations at the bottom of the loop, after the end of the next inner loop
+            // or the main body that holds innermost.
+            let mut ops_after = format!("
+                    goto({loop_top})
+                    label({exit_loop})
+                    // Reset loop position to start - step
+                    'loop start index {num}' @ 'loop step {num}' @ -
+                    'loop position {num}' !
+                ",
+                // Parameters below must equal values used above in ops_before format! statement.
+                num = loop_number,
+                loop_top = a + 1,  
+                exit_loop = a + 11
+            );
+            // Push the loop ending operations on in reverse order. 
+            ops_after.push_str(&loop_end_ops);
+            loop_end_ops = ops_after;
+        }
+
+        let short_circuit_test = if is_every_loop { 
+            // Check if false or not a boolean. True if a short-circuiting should occur.
+            "dup not swap type?(boolean) not or" 
+        } 
+        else {
+            // Check if true, evaluating to false even if a null or type other than boolean. 
+            "dup type?(boolean) and" 
+        };
+        let short_circuit_result = if is_every_loop { "false" } else { "true" };
+
+        let mut loop_ops = String::new();
+        loop_ops.push_str(&loop_start_ops);
+        // Down below we can't do a goto to get out of the loops,
+        // because for each loop we need to drop loop bookkeeping values.
+        // Instead we exit the loop at the top when we check the limits. 
+        loop_ops.push_str(&format!("
+                label({innermost})
+                // Assume that the innermost expression creates a boolean value and leaves it on the stack. 
+                // Decide whether to short circuit the loops.
+                {test} branch({short_circuit}/{continue_loop}/{continue_loop})
+                label({short_circuit})
+                {sc_result} 'satisfies result' !
+                label({continue_loop})
+            ",
+            test = short_circuit_test,
+            innermost = innermost_label,
+            sc_result = short_circuit_result,
+            short_circuit = short_circuit_label,
+            continue_loop = continue_label
+        ));
+        loop_ops.push_str(&loop_end_ops);
+        let mut loop_expr = CompiledExpression::new_from_string(&loop_ops, false);
+        loop_expr.insert(innermost, innermost_label);
+        expr.append(&mut loop_expr);
+
+        // The last thing to be done is pull out the result and ditch the context.
+        expr.append_str(" 
+            'satisfies result' @
+            xpop drop
+        ");
+
+        expr
+    }
 
     /// Replace any branching operations that refer to Labels by position
     /// with operations that refer to Labels by address (their zero-based position within the operations list). 
