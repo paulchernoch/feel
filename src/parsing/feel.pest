@@ -8,11 +8,14 @@
 // with the double underscore tokens removed. Only rules where whitespace is not permitted in at least one position
 // will retain the original practice of using explicit whitespace rules.
 //
-// The resulting parse tree would have many superfluous levels, so much use has been made of
+// The resulting parse tree has many superfluous levels. At first, much use was made of
 // the rule modifier @ to merge tokens below it and $, @, or ! at a lower level to turn
-// token retainment back on. This leaves many fewer superfluous tokens in the Pairs stream.
+// token retainment back on. That left too few tokens in the Pairs stream, so it had to be
+// pared back.
 
-// Feel
+// Pest will create a Rule enum where the variant names are the names 
+// of the lefthand sides of the rules below, such as Rule::start for the top-level rule
+// of a complete parse.
 
 // /////////////////////////////////////
 
@@ -30,7 +33,7 @@ expression = {
     | textual_expression
 }
 
-textual_expression = @{
+textual_expression = !{
       txt_expa // function definition | for expression | if expression | quantified expression |
     | txt_expb // disjunction |
     | txt_expc // conjunction |
@@ -42,7 +45,7 @@ textual_expression = @{
     | txt_expi // literal | simple positive unary test | name | "(" , textual expression , ")"
 }
 
-simple_expression = @{
+simple_expression = {
       arithmetic_expression
     | simple_value
 }
@@ -58,7 +61,6 @@ txt_expi = {
     | simple_positive_unary_test
 }
 
-// Added so we can suppress txt_expi in Pair stream
 parenthesized_expression = !{
     "(" ~ textual_expression ~ ")"
 }
@@ -155,7 +157,7 @@ literal = @{
     | null_literal
 }
 
-simple_literal = @{
+simple_literal = !{
       numeric_literal
     | string_literal
     | boolean_literal
@@ -288,7 +290,7 @@ closed_interval_end = !{ "]" }
 
 endpoint = @{ simple_value }
 
-simple_value = {
+simple_value = !{
       qualified_name
     | simple_literal
 }
@@ -415,7 +417,7 @@ arithmetic_negation = !{
     "-" ~ expression
 }
 
-unary_expression = @{
+unary_expression = {
       left_expe
     | arithmetic_negation
 }
@@ -433,9 +435,16 @@ multiplicative = !{
     exponentiation ~ (multiplicative_operator ~ exponentiation)*
 }
 
-additive = !{
-    multiplicative ~ ( ("+" | "-") ~ multiplicative)*
+additive_operator = @{
+    "+" 
+  | "-"
 }
+
+additive = !{
+    multiplicative ~ (additive_operator ~ multiplicative)*
+}
+
+
 
 txt_expd = { comparision }
 
