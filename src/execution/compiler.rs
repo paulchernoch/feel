@@ -62,7 +62,7 @@ impl<'a> Compiler<'a> {
     }
 
     /// Decide if the compiler should go down another level without generating any OpCodes at this level. 
-    /// Many intermediate rules are merely used to handle operator precedence and do not cause code to be generated. 
+    /// Many intermediate rules are merely used to handle operator precedence climbing and do not cause code to be generated. 
     fn should_descend(left_rule: Rule, right_rule: Rule) -> bool {
         match (left_rule, right_rule) {
             (Rule::textual_expression, _) => true, 
@@ -107,9 +107,21 @@ impl<'a> Compiler<'a> {
             [Rule::exponentiation, Rule::unary_expression, ..] => self.infix_to_postfix(children, expr),
             [Rule::multiplicative, Rule::exponentiation, ..] => self.infix_to_postfix(children, expr),
             [Rule::additive, Rule::multiplicative, ..] => self.infix_to_postfix(children, expr),
+            [Rule::comparision, _, Rule::comparision_operator, .. ] => self.infix_to_postfix(children, expr),
+            // TODO: comparisons using between_token, in_token
+            [Rule::conjunction, ..] => self.infix_to_postfix(children, expr),
+            [Rule::disjunction, ..] => self.infix_to_postfix(children, expr),
+            [Rule::arithmetic_negation, _] => {
+                self.walk_tree(&Compiler::first_child(pair), expr);
+                expr.append_str("neg");
+                Ok(())
+            },         
             [Rule::numeric_literal] => {
-                let literal_string = pair.as_str();
-                expr.append_str(&format!("num({})", literal_string));
+                expr.append_str(&format!("num({})", pair.as_str()));
+                Ok(())
+            },         
+            [Rule::boolean_literal, ..] => {
+                expr.append_str(&format!("{}", pair.as_str().to_lowercase()));
                 Ok(())
             },
             _ => Err(format!("Compilation not implemented for rule {:?}", rule))
@@ -171,6 +183,8 @@ impl<'a> Compiler<'a> {
                 let op_string = children[i - 1].as_str();
                 match op_string {
                     "+" | "-" | "*" | "/" | "**" => { expr.append_str(op_string) },
+                    "<" | "<=" | ">" | ">=" | "=" | "!=" => { expr.append_str(op_string) },
+                    "and" | "or" => { expr.append_str(op_string) },
                     _ => {
                         return Err(format!("Expected operator, received {}", op_string))
                     }
@@ -255,6 +269,28 @@ mod tests {
       */
       compiler_test("1 + 2 + 3", FeelValue::Number(6.0));
   }
+
+  #[test]
+  fn test_relational() {
+    compiler_test("10 < 20.5", FeelValue::Boolean(true));
+    compiler_test("10 <= 20.5", FeelValue::Boolean(true));
+    compiler_test("10 > 20.5", FeelValue::Boolean(false));
+    compiler_test("10 = 20.5", FeelValue::Boolean(false));
+    compiler_test("10 != 20.5", FeelValue::Boolean(true));
+  }  
+
+  #[test]
+  fn test_relational_logical() {
+    compiler_test("(1 + 2) < (3 * 4) and (5 + 6) != 12", FeelValue::Boolean(true));
+  }  
+
+  #[test]
+  fn test_logical() {
+    compiler_test("true and true", FeelValue::Boolean(true));
+    compiler_test("true and false", FeelValue::Boolean(false));
+    compiler_test("true or false", FeelValue::Boolean(true));
+    compiler_test("false or false", FeelValue::Boolean(false));
+  }   
 
   fn compiler_test(source_expression: &str, expected: FeelValue) {
     let mut compiler = Compiler::new();

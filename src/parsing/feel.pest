@@ -461,7 +461,7 @@ comparision_operator = @{
     | (">" ~ !"=")
     | ">="
 }
-
+// comparision is a strange word, but correct.
 comparision = !{
       left_expd ~ (comparision_operator ~ left_expd)+
     | left_expd ~ between_token ~ left_expd ~ and_token ~ left_expd
