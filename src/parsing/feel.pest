@@ -422,8 +422,10 @@ unary_expression = {
     | arithmetic_negation
 }
 
+exponentiation_operator = @{ "**" }
+
 exponentiation = !{
-    unary_expression ~ ("**" ~ unary_expression)*
+    unary_expression ~ (exponentiation_operator ~ unary_expression)*
 }
 
 multiplicative_operator = @{
@@ -443,8 +445,6 @@ additive_operator = @{
 additive = !{
     multiplicative ~ (additive_operator ~ multiplicative)*
 }
-
-
 
 txt_expd = { comparision }
 

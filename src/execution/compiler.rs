@@ -65,6 +65,7 @@ impl<'a> Compiler<'a> {
     /// Many intermediate rules are merely used to handle operator precedence climbing and do not cause code to be generated. 
     fn should_descend(left_rule: Rule, right_rule: Rule) -> bool {
         match (left_rule, right_rule) {
+            (Rule::expression, _) => true, 
             (Rule::textual_expression, _) => true, 
             (Rule::simple_expression, _) => true, 
             (Rule::parenthesized_expression, _) => true, 
@@ -112,9 +113,13 @@ impl<'a> Compiler<'a> {
             [Rule::conjunction, ..] => self.infix_to_postfix(children, expr),
             [Rule::disjunction, ..] => self.infix_to_postfix(children, expr),
             [Rule::arithmetic_negation, _] => {
-                self.walk_tree(&Compiler::first_child(pair), expr);
-                expr.append_str("neg");
-                Ok(())
+                match self.walk_tree(&Compiler::first_child(pair), expr) {
+                    Ok(()) => {
+                        expr.append_str("neg");
+                        Ok(())
+                    },
+                    Err(message) => Err(message)
+                }
             },         
             [Rule::numeric_literal] => {
                 expr.append_str(&format!("num({})", pair.as_str()));
@@ -269,6 +274,14 @@ mod tests {
       */
       compiler_test("1 + 2 + 3", FeelValue::Number(6.0));
   }
+
+  #[test]
+  fn test_math() {
+    compiler_test("10 + 2 * 30 / 15", FeelValue::Number(14.0));
+    compiler_test("1 + 2 - 3 * 6", FeelValue::Number(-15.0));
+    compiler_test("-(12 - 20)", FeelValue::Number(8.0)); // Unary negation
+    compiler_test("4 ** 3 ** 2", 4096.0.into());
+  }  
 
   #[test]
   fn test_relational() {

@@ -312,7 +312,8 @@ impl FromStr for OpCode {
             "neg" => OpCode::Negate,
             "*" => OpCode::Multiply,
             "/" => OpCode::Divide,
-            "^" => OpCode::Exponentiate,
+            "^" => OpCode::Exponentiate,  // Conventional
+            "**" => OpCode::Exponentiate, // FEEL version
             "not" => OpCode::Not,
             "or" => OpCode::Or,
             "and" => OpCode::And,
