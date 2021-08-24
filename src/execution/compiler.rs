@@ -152,8 +152,8 @@ impl<'a> Compiler<'a> {
                 match children.as_slice() {
                     [item, _, unary_tests] => {
                         let r1 = self.walk_tree(item, expr);
-                        // TODO: Replace with logic to create a list of the unary tests. 
-                        let r2 = self.walk_tree(unary_tests, expr);
+                        expr.append_str("list");
+                        let r2 = self.walk_list(unary_tests, expr, Some("push".to_owned()));
                         expr.append_str("in");
                         if r1.is_err() || r2.is_err() {
                             Err(format!("Error parsing IN expression {}.", pair.as_str()))
@@ -188,17 +188,8 @@ impl<'a> Compiler<'a> {
                 Ok(())
             },
             [Rule::list, Rule::list_entries] => {
-                let list_entries_children = self.children(&Compiler::first_child(pair));
                 expr.append_str("list");
-                for list_item in list_entries_children.iter() {
-                    match self.walk_tree(&Compiler::first_child(list_item), expr) {
-                        Ok(()) => {
-                            expr.append_str("push");
-                        },
-                        Err(message) => { return Err(message); }
-                    };
-                }
-                Ok(())
+                self.walk_list(pair, expr, Some("push".to_owned()))
             },
             // An empty list
             [Rule::list] => {
@@ -208,6 +199,23 @@ impl<'a> Compiler<'a> {
             _ => Err(format!("Compilation not implemented for rule {:?}", rule))
         }
     }
+
+    fn walk_list(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression, after_each: Option<String>) -> Result<(), String> {
+        let list_entries_children = self.children(&Compiler::first_child(pair));
+        for list_item in list_entries_children.iter() {
+            match self.walk_tree(&Compiler::first_child(list_item), expr) {
+                Ok(()) => {
+                    match after_each {
+                        Some(ref s) =>  { expr.append_str(s); },
+                        None => ()
+                    };
+                },
+                Err(message) => { return Err(message); }
+            };
+        }
+        Ok(())
+    }
+
 
     fn pair_list(&self, pairs: Pairs<'a, Rule>) -> Vec<Pair<'a, Rule>> {
         let mut list = vec![];

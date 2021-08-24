@@ -96,6 +96,16 @@ Thus the existing implementation of the "in" operator is sufficient.
 
 This is the beginning of converting a parse tree (AST) into a series of OpCodes.
 
+ - [x] Number literal
+ - [x] Boolean literal
+ - [ ] String literal
+ - [ ] Range literal
+ - [ ] Range literal as unary test
+ - [ ] Date literal
+ - [ ] Date and time literal
+ - [ ] Time literal
+ - [ ] Years and months duration literal
+ - [ ] Days and time duration literal
  - [x] Additive
  - [x] Multiplicative
  - [x] Unary minus
