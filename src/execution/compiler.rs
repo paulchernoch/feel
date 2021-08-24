@@ -117,14 +117,53 @@ impl<'a> Compiler<'a> {
                         let r3 = self.walk_tree(upper, expr);
                         expr.append_str("between");
                         if r1.is_err() || r2.is_err() || r3.is_err() {
-                            Err(format!("Error parsing between expression {}.", pair.as_str()))
+                            Err(format!("Error parsing BETWEEN expression {}.", pair.as_str()))
                         }
                         else {
                             Ok(())
                         }
                     },
                     _ => {
-                        Err(format!("Incorrect number of arguments to between expression {}.", pair.as_str()))
+                        Err(format!("Incorrect number of arguments to BETWEEN expression {}.", pair.as_str()))
+                    }
+                }
+            },
+            // Case of a single positive unary test
+            [Rule::comparision, _, Rule::in_token, Rule::positive_unary_test] => {
+                match children.as_slice() {
+                    [item, _, unary_test] => {
+                        let r1 = self.walk_tree(item, expr);
+                        let r2 = self.walk_tree(unary_test, expr);
+                        expr.append_str("in");
+                        if r1.is_err() || r2.is_err() {
+                            Err(format!("Error parsing IN expression {}.", pair.as_str()))
+                        }
+                        else {
+                            Ok(())
+                        }
+                    },
+                    _ => {
+                        Err(format!("Incorrect number of arguments to IN expression {}.", pair.as_str()))
+                    }
+                }
+            },
+            // Case of a list of positive unary tests
+            [Rule::comparision, _, Rule::in_token, Rule::positive_unary_tests] => {
+                match children.as_slice() {
+                    [item, _, unary_tests] => {
+                        let r1 = self.walk_tree(item, expr);
+                        // TODO: Replace with logic to create a list of the unary tests. 
+                        let r2 = self.walk_tree(unary_tests, expr);
+                        expr.append_str("in");
+                        if r1.is_err() || r2.is_err() {
+                            Err(format!("Error parsing IN expression {}.", pair.as_str()))
+                        }
+                        else {
+                            Ok(())
+                        }
+                    },
+                    _ => {
+                        Err(format!("Incorrect number of arguments to IN expression {}.", pair.as_str()))
                     }
                 }
             },
@@ -146,6 +185,24 @@ impl<'a> Compiler<'a> {
             },         
             [Rule::boolean_literal, ..] => {
                 expr.append_str(&format!("{}", pair.as_str().to_lowercase()));
+                Ok(())
+            },
+            [Rule::list, Rule::list_entries] => {
+                let list_entries_children = self.children(&Compiler::first_child(pair));
+                expr.append_str("list");
+                for list_item in list_entries_children.iter() {
+                    match self.walk_tree(&Compiler::first_child(list_item), expr) {
+                        Ok(()) => {
+                            expr.append_str("push");
+                        },
+                        Err(message) => { return Err(message); }
+                    };
+                }
+                Ok(())
+            },
+            // An empty list
+            [Rule::list] => {
+                expr.append_str("list");
                 Ok(())
             },
             _ => Err(format!("Compilation not implemented for rule {:?}", rule))
@@ -236,7 +293,7 @@ mod tests {
   use crate::parsing::{nested_context::NestedContext};
 
   fn print_diagnostics() -> bool {
-    false
+    true
   }
 
   #[test]
@@ -328,6 +385,12 @@ mod tests {
   fn test_between() {
     compiler_test("5 between 1 + 3 and 10", true.into());
   }  
+
+  #[test]
+  fn test_list() {
+    compiler_test("[]", FeelValue::new_list(vec![]));
+    compiler_test("[1,2,true]", FeelValue::new_list(vec![1.0.into(), 2.0.into(), true.into()]));
+  } 
 
   fn compiler_test(source_expression: &str, expected: FeelValue) {
     let mut compiler = Compiler::new();

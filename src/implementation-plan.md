@@ -121,7 +121,7 @@ These 29 properties are listed in Table 65 and Table 66 of §10.3.2.15 of the DM
 
 ## Complex Expressions
 
- - [ ] Assembling Lists
+ - [x] Assembling Lists
  - [ ] Assembling Contexts
  - [ ] Assembling Ranges
  - [ ] Sorting

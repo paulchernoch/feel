@@ -336,10 +336,12 @@ positive_unary_tests = !{
 
 // unary_tests Start
 
+dash_unary_test = @{ "-" }
+
 unary_tests = !{
       positive_unary_tests
     | not_token ~ "(" ~ positive_unary_tests ~ ")"
-    | "-"
+    | dash_unary_test
 }
 
 // unary_tests End
