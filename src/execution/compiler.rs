@@ -17,6 +17,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    /// Dump the parse tree to the console, for debugging.
     pub fn dump(&self) {
         match &self.parse_tree {
             Some(tree) => {
@@ -28,6 +29,8 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    /// Compile the source expression into a Pest parse tree, then 
+    /// walk the tree to generate OpCodes for the VM.
     pub fn compile(&mut self, source_expression: &'a str) -> Result<CompiledExpression, String> {
         match FeelParser::parse(Rule::start, source_expression) {
             Ok(pairs) => {
@@ -47,12 +50,8 @@ impl<'a> Compiler<'a> {
                             }
                         }
                     },
-                    [] => {
-                        Result::Err(format!("Parse tree empty. Failed to compile {}", source_expression))
-                    },
-                    _ => {
-                        Result::Err(format!("Parse tree has more than one root. Failed to correctly compile {}", source_expression))
-                    }
+                    [] => Result::Err(format!("Parse tree empty. Failed to compile {}", source_expression)),
+                    _ => Result::Err(format!("Parse tree has more than one root. Failed to correctly compile {}", source_expression))
                 }
             },
             Err(e) => {
@@ -109,7 +108,27 @@ impl<'a> Compiler<'a> {
             [Rule::multiplicative, Rule::exponentiation, ..] => self.infix_to_postfix(children, expr),
             [Rule::additive, Rule::multiplicative, ..] => self.infix_to_postfix(children, expr),
             [Rule::comparision, _, Rule::comparision_operator, .. ] => self.infix_to_postfix(children, expr),
-            // TODO: comparisons using between_token, in_token
+            // TODO: comparisons using in_token
+            [Rule::comparision, _, Rule::between_token, _, Rule::and_token, _] => {
+                match children.as_slice() {
+                    [item, _, lower, _, upper] => {
+                        let r1 = self.walk_tree(item, expr);
+                        let r2 = self.walk_tree(lower, expr);
+                        let r3 = self.walk_tree(upper, expr);
+                        expr.append_str("between");
+                        if r1.is_err() || r2.is_err() || r3.is_err() {
+                            Err(format!("Error parsing between expression {}.", pair.as_str()))
+                        }
+                        else {
+                            Ok(())
+                        }
+                    },
+                    _ => {
+                        Err(format!("Incorrect number of arguments to between expression {}.", pair.as_str()))
+                    }
+                }
+            },
+           
             [Rule::conjunction, ..] => self.infix_to_postfix(children, expr),
             [Rule::disjunction, ..] => self.infix_to_postfix(children, expr),
             [Rule::arithmetic_negation, _] => {
@@ -217,7 +236,7 @@ mod tests {
   use crate::parsing::{nested_context::NestedContext};
 
   fn print_diagnostics() -> bool {
-    true
+    false
   }
 
   #[test]
@@ -304,6 +323,11 @@ mod tests {
     compiler_test("true or false", FeelValue::Boolean(true));
     compiler_test("false or false", FeelValue::Boolean(false));
   }   
+
+  #[test]
+  fn test_between() {
+    compiler_test("5 between 1 + 3 and 10", true.into());
+  }  
 
   fn compiler_test(source_expression: &str, expected: FeelValue) {
     let mut compiler = Compiler::new();

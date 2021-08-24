@@ -96,10 +96,13 @@ Thus the existing implementation of the "in" operator is sufficient.
 
 This is the beginning of converting a parse tree (AST) into a series of OpCodes.
 
- - [ ] Additive
- - [ ] Multiplicative
- - [ ] Relational
- - [ ] Logical
+ - [x] Additive
+ - [x] Multiplicative
+ - [x] Unary minus
+ - [x] Relational
+ - [x] Logical
+ - [x] between
+ - [ ] in
  - [ ] Conditional
 
 ## Properties special to each type
