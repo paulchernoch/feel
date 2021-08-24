@@ -183,20 +183,21 @@ decimal_number = @{
     | digits
 }
 
-string_literal = @{
+string_literal = !{
     ("\"" ~ double_string_character* ~ "\"")
   | ("'" ~ single_string_character* ~ "'")
 }
 
-double_string_character = @{
+double_string_character = !{
     (!("\"" | "\\" | line_terminator) ~ source_character) 
-  | ("\\" ~ escape_sequence)
+  | code_point
+  | escape_sequence
   | line_continuation
 }
 
 single_string_character = @{
     (!("'" | "\\" | line_terminator) ~ source_character)
-  | ("\\" ~ escape_sequence)
+  | single_escape_character
   | line_continuation
 }
 
@@ -204,13 +205,17 @@ line_continuation = !{
   "\\" ~ line_terminator_sequence 
 }
 
-escape_sequence = @{ character_escape_sequence }
+escape_sequence = @{ "\\" ~ character_escape_sequence }
 
-character_escape_sequence = @{ single_escape_character }
+// Had to move single-quote to be by itself instead of in single_escape_character
+// because single quoted strings cannot contain it.
+character_escape_sequence = @{ 
+    single_escape_character 
+  | "'"
+}
 
 single_escape_character = @{
-    "'"
-  | "\""
+    "\""
   | "\\"
   | "b"
   | "f"
@@ -233,6 +238,15 @@ line_terminator_sequence = @{
   | "\r"
   | "\u{2028}"
   | "\u{2029}"
+}
+
+code_point = @{
+    ( "\\" ~ "u" ~ hexadecimal_digit{4} )
+  | ( "\\" ~ "U" ~ hexadecimal_digit{6} )
+}
+
+hexadecimal_digit = @{
+  '0'..'9' | 'a'..'f' | 'A'..'F'
 }
 
 date_time_literal = ${

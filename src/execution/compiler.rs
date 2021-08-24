@@ -187,6 +187,12 @@ impl<'a> Compiler<'a> {
                 expr.append_str(&format!("{}", pair.as_str().to_lowercase()));
                 Ok(())
             },
+            // TODO: Parse unicode and other escape sequences, 
+            // which will require going deeper into the parse tree
+            [Rule::string_literal, ..] => {
+                expr.append_load_string(&CompiledExpression::unquote(pair.as_str()));
+                Ok(())
+            },   
             [Rule::list, Rule::list_entries] => {
                 expr.append_str("list");
                 self.walk_list(pair, expr, Some("push".to_owned()))
@@ -358,6 +364,15 @@ mod tests {
       */
       compiler_test("1 + 2 + 3", FeelValue::Number(6.0));
   }
+
+  #[test]
+  fn test_string_literal_with_single_quotes() {
+    compiler_test("'Hello world!'", "Hello world!".into());
+    compiler_test(
+        "'No escaping \\n happens in single quoted strings'", 
+        "No escaping \\n happens in single quoted strings".into()
+    );
+  } 
 
   #[test]
   fn test_math() {

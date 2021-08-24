@@ -95,10 +95,12 @@ Thus the existing implementation of the "in" operator is sufficient.
 ## Simple Expression Tree Walk
 
 This is the beginning of converting a parse tree (AST) into a series of OpCodes.
+It addresses the creation of literals and simple mathematical formulas.
 
  - [x] Number literal
  - [x] Boolean literal
  - [ ] String literal
+ - [ ] Name literal
  - [ ] Range literal
  - [ ] Range literal as unary test
  - [ ] Date literal
@@ -113,7 +115,10 @@ This is the beginning of converting a parse tree (AST) into a series of OpCodes.
  - [x] Logical
  - [x] between
  - [ ] in
+ - [ ] instance of
  - [ ] Conditional
+ - [ ] Context property lookup (paths)
+ - [ ] Special property lookup
 
 ## Properties special to each type
 
@@ -131,6 +136,9 @@ These 29 properties are listed in Table 65 and Table 66 of §10.3.2.15 of the DM
 
 ## Complex Expressions
 
+These tasks are for creating OpCodes for complex statements, such as for-loops and user defined functions, or complex behaviors, such as filtering of lists and contexts. 
+
+ - [ ] Intervals
  - [x] Assembling Lists
  - [ ] Assembling Contexts
  - [ ] Assembling Ranges

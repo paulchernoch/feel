@@ -56,7 +56,7 @@ impl CompiledExpression {
     }
 
     /// Remove optional single or double quotes from start and end of string.
-    fn unquote(s: &str) -> String {
+    pub fn unquote(s: &str) -> String {
         if s.starts_with("'") && s.ends_with("'") {
             s[1..s.len()-1].to_string()
         }
@@ -83,6 +83,13 @@ impl CompiledExpression {
         }
         let index = self.find_or_add_to_heap(Self::unquote(op_string));
         OpCode::LoadString(index)
+    }
+
+    pub fn append_load_string(&mut self, literal_string: &str) -> OpCode {
+        let index = self.find_or_add_to_heap(literal_string);
+        let opcode = OpCode::LoadString(index);
+        self.operations.push(opcode);
+        opcode
     }
 
     /// Create a new CompiledExpression from a single string that will be split on spaces and parsed into OpCodes. 
