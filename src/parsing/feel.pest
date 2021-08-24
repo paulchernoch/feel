@@ -183,19 +183,20 @@ decimal_number = @{
     | digits
 }
 
-string_literal = !{
+string_literal = @{
     ("\"" ~ double_string_character* ~ "\"")
   | ("'" ~ single_string_character* ~ "'")
 }
 
 double_string_character = !{
-    (!("\"" | "\\" | line_terminator) ~ source_character) 
+   literal_space
+  | (!("\"" | "\\" | line_terminator) ~ source_character) 
   | code_point
   | escape_sequence
   | line_continuation
 }
 
-single_string_character = @{
+single_string_character = !{
     (!("'" | "\\" | line_terminator) ~ source_character)
   | single_escape_character
   | line_continuation
@@ -252,6 +253,8 @@ hexadecimal_digit = @{
 date_time_literal = ${
      date_time_keyword ~ "(" ~ __ ~ expression ~ (__ ~ "," ~ __ ~ expression)* ~ __ ~ ")"
 }
+
+literal_space = @{ " " }
 
 // Literal End
 

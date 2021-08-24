@@ -92,14 +92,14 @@ The `Interpreter` class will execute the `OpCode`s and return a result.
 Positive unary tests have been implemented as half-open ranges. 
 Thus the existing implementation of the "in" operator is sufficient.
 
-## Simple Expression Tree Walk
+## Literal from Tree Walk
 
 This is the beginning of converting a parse tree (AST) into a series of OpCodes.
-It addresses the creation of literals and simple mathematical formulas.
+It addresses the creation of literals.
 
  - [x] Number literal
  - [x] Boolean literal
- - [ ] String literal
+ - [x] String literal
  - [ ] Name literal
  - [ ] Range literal
  - [ ] Range literal as unary test
@@ -108,6 +108,12 @@ It addresses the creation of literals and simple mathematical formulas.
  - [ ] Time literal
  - [ ] Years and months duration literal
  - [ ] Days and time duration literal
+
+## Simple Expression Tree Walk
+
+This continues the converting of a parse tree (AST) into a series of OpCodes.
+It addresses simple mathematical formulas.
+
  - [x] Additive
  - [x] Multiplicative
  - [x] Unary minus

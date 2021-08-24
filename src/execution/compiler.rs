@@ -187,10 +187,13 @@ impl<'a> Compiler<'a> {
                 expr.append_str(&format!("{}", pair.as_str().to_lowercase()));
                 Ok(())
             },
-            // TODO: Parse unicode and other escape sequences, 
-            // which will require going deeper into the parse tree
+            // Parsing unicode and other escape sequences
+            // requires going deeper into the parse tree.
             [Rule::string_literal, ..] => {
-                expr.append_load_string(&CompiledExpression::unquote(pair.as_str()));
+                // To skip any escaped character processing, do this instead:
+                // expr.append_load_string(&CompiledExpression::unquote(pair.as_str()));
+                let string_literal = self.walk_string(pair);
+                expr.append_load_string(&string_literal);
                 Ok(())
             },   
             [Rule::list, Rule::list_entries] => {
@@ -220,6 +223,51 @@ impl<'a> Compiler<'a> {
             };
         }
         Ok(())
+    }
+
+    /// Convert a unicode string to a character.
+    /// The unicode_string may be either of these formats: 
+    ///    - \uXXXX
+    ///    - \UXXXXXX
+    /// where X is a hexadecimal digit. 
+    fn parse_unicode(unicode_string: &str) -> Option<char> {
+        let number = &unicode_string[2..];
+        u32::from_str_radix(number, 16)
+            .ok()
+            .and_then(std::char::from_u32)
+    }
+
+    /// Accepts a string_literal and processes its component characters to 
+    /// create a string. This does not create any OpCodes! Caller decides
+    /// what to do with the string.
+    fn walk_string(&mut self, pair: &Pair<'a, Rule>) -> String {
+        let double_string_characters = self.children(pair);
+        let mut s_literal = String::new();
+        for dsc in double_string_characters.iter() {
+            let char_string = dsc.as_str();
+            match char_string {
+                "\\\"" => s_literal.push('"'),
+                "\\\\" => s_literal.push('\\'),
+                "\\b" => s_literal.push('\x08'), // Backspace
+                "\\f" => s_literal.push('\x0C'), // Formfeed
+                "\\n" => s_literal.push('\n'),
+                "\\r" => s_literal.push('\r'),
+                "\\t" => s_literal.push('\t'),
+                "\\v" => s_literal.push('\x0B'), // Vertical formfeed
+                unicode if char_string.len() >= 6 => {
+                    // Assume first two characters are "\u" or "\U" followed by four or six hex digits.
+                    match Compiler::parse_unicode(unicode) {
+                        Some(uni_char) => s_literal.push(uni_char),
+                        None => {
+                            // TODO: Log error
+                            s_literal.push('�') // U+FFFD
+                        }
+                    }
+                },
+                _ => s_literal.push_str(char_string)
+            };
+        }
+        s_literal
     }
 
 
@@ -301,7 +349,6 @@ impl<'a> Compiler<'a> {
 #[cfg(test)]
 mod tests {
   use super::Compiler;
-  use super::super::compiled_expression::CompiledExpression;
   use super::super::interpreter::Interpreter;
   use crate::parsing::feel_value::{FeelValue};
   use crate::parsing::{nested_context::NestedContext};
@@ -371,6 +418,23 @@ mod tests {
     compiler_test(
         "'No escaping \\n happens in single quoted strings'", 
         "No escaping \\n happens in single quoted strings".into()
+    );
+  } 
+
+  #[test]
+  fn test_string_literal_with_double_quotes() {
+    compiler_test("\"Hello world!\"", "Hello world!".into());
+    compiler_test(
+        "\"Escaping \\n happens in double quoted strings\"", 
+        "Escaping \n happens in double quoted strings".into()
+    );
+  } 
+
+  #[test]
+  fn test_unicode_string_literal() {
+    compiler_test(
+        "\"\\u2661 \\u2661 me do, \\U01F411 know \\U01F441 \\u2661 \\U01F411\"", 
+        FeelValue::String("♡ ♡ me do, 🐑 know 👁 ♡ 🐑".to_owned())
     );
   } 
 
