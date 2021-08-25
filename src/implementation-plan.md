@@ -100,7 +100,7 @@ It addresses the creation of literals.
  - [x] Number literal
  - [x] Boolean literal
  - [x] String literal
- - [ ] Name literal
+ - [x] Name literal
  - [ ] Range literal
  - [ ] Range literal as unary test
  - [ ] Date literal
@@ -120,10 +120,11 @@ It addresses simple mathematical formulas.
  - [x] Relational
  - [x] Logical
  - [x] between
+ - [x] Qualified Name lookup
  - [ ] in
  - [ ] instance of
  - [ ] Conditional
- - [ ] Context property lookup (paths)
+ - [x] Context property lookup (paths)
  - [ ] Special property lookup
 
 ## Properties special to each type

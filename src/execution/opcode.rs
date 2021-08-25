@@ -110,6 +110,11 @@ pub enum OpCode {
 
   // Contexts
 
+  /// Get property value from a context on the data stack and push it onto the data stack.
+  /// The second and subsequent names in a Qualified name use this form of access. 
+  /// Unlike LoadFromContext, there is no traversal of many contexts inside the NestedContext. 
+  QualifiedGet,               //   c Q -> ?
+  
   /// Get property value from a context on the contexts stack and push it onto the data stack.
   LoadFromContext,            //     Q -> ? OR s -> ?
   /// Set property value in context on data stack
@@ -143,7 +148,7 @@ pub enum OpCode {
   CreateDayAndTimeDuration,      // s -> z
   /// Load a string from the heap given its zero-based index and push onto the data stack.
   LoadString(usize),             // _ -> _ s
-  CreateName,                    // s -> Q
+  CreateName,                    // s -> Q or Q -> Q
   LoadNumber(OrderedFloat<f64>), // _ -> n
   LoadBoolean(bool),             // _ -> b
   LoadNull,                      // _ -> _ 0
@@ -221,6 +226,7 @@ impl Display for OpCode {
         OpCode::CreateList => "list",
         OpCode::Index => "index",
         OpCode::PushList => "push",
+        OpCode::QualifiedGet => "qget",
         OpCode::LoadFromContext => "xget",
         OpCode::AddEntryToContext => "xset",
         OpCode::PushContext => "xpush",
@@ -329,6 +335,7 @@ impl FromStr for OpCode {
             "list" => OpCode::CreateList,
             "index" => OpCode::Index,
             "push" => OpCode::PushList,
+            "qget" => OpCode::QualifiedGet,
             "@" => OpCode::LoadFromContext, // Synonym for xget
             "xget" => OpCode::LoadFromContext,
             "xset" => OpCode::AddEntryToContext,

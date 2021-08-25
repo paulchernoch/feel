@@ -312,8 +312,11 @@ simple_value = !{
     | simple_literal
 }
 
+// Rule 15. The Javascript Grammar used "->" between names, 
+// but the DMN spec uses a period. Will this cause a grammar error?
 qualified_name = !{
-    name ~ ("->" ~ name)*
+    // name ~ ("->" ~ name)*
+    name ~ ("." ~ name)*
 }
 
 // simple_positive_unary_test End

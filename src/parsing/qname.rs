@@ -4,7 +4,11 @@ use std::cmp::Ordering;
 use std::str::FromStr;
 use std::convert::From;
 
-/// A qualified name, consisting of a list of strings.
+/// A name, consisting of a list of strings.
+/// Names may have spaces in them. 
+/// NOTE: Due to the developer's confusion, a QName is not a
+/// qualified name. A Qualified name is a series of names
+/// seprated by periods.
 #[derive(Eq, Clone, Debug, Hash)]
 pub struct QName {
   parts: Vec<String>

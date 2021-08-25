@@ -441,6 +441,47 @@ impl Interpreter {
                         }
                     },
 
+                    OpCode::QualifiedGet => {
+                        self.advance();
+                        let (ctx, key) = self.pop_two();
+                        match key.clone() {
+                            FeelValue::Name(qname) => {
+                                match ctx.try_get(&qname) {
+                                    Some(value) => {
+                                        self.push_data(value);
+                                    },
+                                    None => {
+                                        self.error(
+                                            format!("key '{}' not present in context", key.to_string()),
+                                            true
+                                        );   
+                                    }
+                                }
+                            },
+                            FeelValue::String(str_name) => {
+                                let qname = QName::new(&str_name);
+                                match ctx.try_get(&qname) {
+                                    Some(value) => {
+                                        self.push_data(value);
+                                    },
+                                    None => {
+                                        self.error(
+                                            format!("key '{}' not present in context", key.to_string()),
+                                            true
+                                        );   
+                                    }
+                                }
+                            },
+                            _ => {
+                                self.error(
+                                    format!("Cannot load key from context because its type is {}", key.get_type().to_string()),
+                                    true
+                                );   
+                            }
+                        }
+                    },
+
+
                     OpCode::LoadFromContext => {
                         self.advance();
                         let key = self.pop_data();
@@ -744,6 +785,7 @@ impl Interpreter {
                                 self.push_data(FeelValue::Name(QName::new(&s)));
                             },
                             FeelValue::Name(_) => {
+                                // It is already a name. Leave it alone and put it back.
                                 self.push_data(name_string);
                             },
                             _ => {

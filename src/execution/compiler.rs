@@ -98,9 +98,14 @@ impl<'a> Compiler<'a> {
          }
     }
 
+    /// Walk the parse tree recursively and insert OpCodes in the given expression
+    /// to perform the relevant computations.
     fn walk_tree(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
         let rule = pair.as_rule();
         let children = self.children(pair);
+        // The match arms correspond loosely to the grammar rules. 
+        // If a grammar rule does nothing but yield a lefthand token from a single righthand one,
+        // recurse without doing anything.
         match self.get_production_rule(pair).as_slice() {
             [Rule::start, _] => self.walk_tree(&Compiler::first_child(pair), expr),
             [left, right] if Compiler::should_descend(*left, *right) => self.walk_tree(&Compiler::first_child(pair), expr),
@@ -108,7 +113,6 @@ impl<'a> Compiler<'a> {
             [Rule::multiplicative, Rule::exponentiation, ..] => self.infix_to_postfix(children, expr),
             [Rule::additive, Rule::multiplicative, ..] => self.infix_to_postfix(children, expr),
             [Rule::comparision, _, Rule::comparision_operator, .. ] => self.infix_to_postfix(children, expr),
-            // TODO: comparisons using in_token
             [Rule::comparision, _, Rule::between_token, _, Rule::and_token, _] => {
                 match children.as_slice() {
                     [item, _, lower, _, upper] => {
@@ -123,11 +127,11 @@ impl<'a> Compiler<'a> {
                             Ok(())
                         }
                     },
-                    _ => {
-                        Err(format!("Incorrect number of arguments to BETWEEN expression {}.", pair.as_str()))
-                    }
+                    _ => Err(format!("Incorrect number of arguments to BETWEEN expression {}.", pair.as_str()))
                 }
             },
+            // TODO: Tests of the "in" operator with a single range or a list of ranges
+
             // Case of a single positive unary test
             [Rule::comparision, _, Rule::in_token, Rule::positive_unary_test] => {
                 match children.as_slice() {
@@ -178,7 +182,10 @@ impl<'a> Compiler<'a> {
                     },
                     Err(message) => Err(message)
                 }
-            },         
+            },      
+            
+            // Generate Literals or Lists or follow path expressions
+
             [Rule::numeric_literal] => {
                 expr.append_str(&format!("num({})", pair.as_str()));
                 Ok(())
@@ -195,7 +202,24 @@ impl<'a> Compiler<'a> {
                 let string_literal = self.walk_string(pair);
                 expr.append_load_string(&string_literal);
                 Ok(())
-            },   
+            },
+
+            // A path expression has several parts separated by periods. 
+            // Parts are normally names, but variations are supported.
+            [Rule::path_expression, ..] => self.walk_path(pair, expr),
+
+            // The grammar may be defective, as in an instance where I thought qualified_name
+            // would be generated, instead we get path_expression.
+            [Rule::qualified_name, ..] => self.walk_names(pair, expr),  
+
+            // Names will be processed differently if they are part of a qualified_name as above. 
+            // If encountered here, the self.contexts is the context that is searched. 
+            [Rule::name, ..] => {
+                let name_string = self.walk_name_parts(pair);
+                expr.append_load_string(&name_string);
+                expr.append_str("name @");
+                Ok(())
+            },
             [Rule::list, Rule::list_entries] => {
                 expr.append_str("list");
                 self.walk_list(pair, expr, Some("push".to_owned()))
@@ -270,6 +294,87 @@ impl<'a> Compiler<'a> {
         s_literal
     }
 
+    /// Accepts a "qualified_name" pair and processes its names as a
+    /// series of context lookups. 
+    /// The first name will be used to retrieve a value (possibly a context)
+    /// from contexts and push it onto the data stack. 
+    /// All subsequent names will be used to lookup values (in chained fashion)
+    /// from a series of intermediate contexts, until the final one likely produces a value. 
+    fn walk_names(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
+        let names = self.children(pair);
+        let mut is_first_name = true;
+        for name_pair in names.iter() {
+            let name_string = self.walk_name_parts(name_pair);
+            expr.append_load_string(&name_string);
+            if is_first_name {
+                expr.append_str("name @");
+            }
+            else {
+                expr.append_str("name qget");
+            }
+            is_first_name = false;
+        }
+        Ok(())
+    }
+
+    /// A path expression has several parts separated by periods. 
+    /// The parts are normally names, but variations are supported: 
+    ///   - If the first part is a name, perform an @ lookup from contexts. 
+    ///   - If the first part is not a name, assume it 
+    ///     is an expression that yields a context. Perform no @ lookup.
+    ///   - If a subsequent part is a name, perform a data stack qget lookup.
+    ///   - If a subsequent part is not a name, assume it yields a string which will 
+    ///     be used in place of a name for a data stack qget lookup. 
+    fn walk_path(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
+        let segments = self.children(pair);
+        let mut is_first_path_segment = true;
+        for segment in segments.iter() {
+            let name_found = self.find_without_branching(segment, Some(Rule::name));
+            if is_first_path_segment {
+                match name_found {
+                    Some(name_pair) => {
+                        let name_string = self.walk_name_parts(&name_pair);
+                        expr.append_load_string(&name_string);
+                        expr.append_str("name @");
+                    },
+                    None => {
+                        let result = self.walk_tree(segment, expr);
+                        if result.is_err() { return result; }
+                        // Do not append "name qget" - this should yield a context.
+                    }
+                };
+            }
+            else {
+                match name_found {
+                    Some(name_pair) => {
+                        let name_string = self.walk_name_parts(&name_pair);
+                        expr.append_load_string(&name_string);
+                        expr.append_str("name qget");
+                    },
+                    None => {
+                        let result = self.walk_tree(segment, expr);
+                        if result.is_err() { return result; }
+                        expr.append_str("name qget");
+                    }
+                };
+            }
+            is_first_path_segment = false;
+        }
+        Ok(())
+    }
+
+    /// Accepts a "name" pair and processes its component parts to 
+    /// create a String that can later be parsed into a QName. 
+    /// This does not create any OpCodes! Caller decides
+    /// what to do with the QName.
+    fn walk_name_parts(&mut self, pair: &Pair<'a, Rule>) -> String {
+        let name_parts = self.children(pair);
+        let mut name_list: Vec<String> = Vec::new();
+        for name_part_pair in name_parts.iter() {
+            name_list.push(name_part_pair.as_str().to_owned());
+        }
+        name_list.join(" ")
+    }
 
     fn pair_list(&self, pairs: Pairs<'a, Rule>) -> Vec<Pair<'a, Rule>> {
         let mut list = vec![];
@@ -305,6 +410,28 @@ impl<'a> Compiler<'a> {
     fn children(&self, pair: &Pair<'a, Rule>) -> Vec<Pair<'a, Rule>> {
         self.pair_list(pair.clone().into_inner())
     }
+
+    /// Traverse the AST downwards until we find the bottom node (having no children)
+    /// or find a node that has two or more children. This is used
+    /// to skip over many levels of parse tree that do nothing except enforce 
+    /// precedence climbing and the like. 
+    /// 
+    /// If match_rule is not None, stop at the first Pair that matches the given Rule. 
+    /// If no match is found, return None.
+    fn find_without_branching(&mut self, pair: &Pair<'a, Rule>, match_rule: Option<Rule>) -> Option<Pair<'a, Rule>> {
+        if let Some(rule) = match_rule {
+            if rule == pair.as_rule() {
+                return Some(pair.clone());
+            }
+        }
+        let children = self.pair_list(pair.clone().into_inner());
+        match children.len() {
+            0 => if match_rule.is_some() { None } else { Some(pair.clone()) },
+            1 => self.find_without_branching(&children[0], match_rule),
+            _ => if match_rule.is_some() { None } else { Some(pair.clone()) }
+        }
+    }
+
 
     /// Expected to have an odd number of children. 
     /// Every other child should be an operator. 
@@ -352,7 +479,9 @@ mod tests {
   use super::super::interpreter::Interpreter;
   use crate::parsing::feel_value::{FeelValue};
   use crate::parsing::{nested_context::NestedContext};
+  use crate::parsing::{context::Context};
 
+  /// Change to return true to see large diagnostics in several tests, false to not show it.
   fn print_diagnostics() -> bool {
     true
   }
@@ -439,6 +568,12 @@ mod tests {
   } 
 
   #[test]
+  fn test_qualified_name() {
+    compiler_test("hair color", "brown".into());
+    compiler_test("outer level.inner level", "Sanctum Sanctorum".into());
+  } 
+
+  #[test]
   fn test_math() {
     compiler_test("10 + 2 * 30 / 15", FeelValue::Number(14.0));
     compiler_test("1 + 2 - 3 * 6", FeelValue::Number(-15.0));
@@ -489,7 +624,15 @@ mod tests {
     match result.clone() {
         Ok(expr) => {
             if print_diagnostics() { println!("Expression\n{}", expr); }
-            let mut interpreter = Interpreter::new(expr, NestedContext::new());
+            let mut nctx = NestedContext::new();
+            let ctx = Context::new();
+            let inner_ctx = Context::new();
+            inner_ctx.insert("inner level", "Sanctum Sanctorum".into());
+            ctx.insert("outer level", inner_ctx.into());
+            ctx.insert("hair color", "brown".into());
+            ctx.insert("wind speed", 30.0.into());
+            nctx.push(ctx.into());
+            let mut interpreter = Interpreter::new(expr, nctx);
             let (actual, message) = interpreter.trace();
             if print_diagnostics() { println!("{}", message); }
 
