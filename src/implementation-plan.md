@@ -103,7 +103,8 @@ It addresses the creation of literals.
  - [x] String literal
  - [x] Name literal
  - [ ] Range literal
- - [ ] Range literal as unary test
+ - [x] Unary test (implemented as Range literal)
+ - [x] List of unary tests (implemented as list of Range literals)
  - [ ] Date literal
  - [ ] Date and time literal
  - [ ] Time literal

@@ -233,9 +233,7 @@ impl<'a> Compiler<'a> {
             [Rule::simple_positive_unary_test, Rule::unary_operator, _] => self.walk_open_range(pair, expr),
 
             // Ranges with brackets and "..", like [1..9] or [0..10)
-            [Rule::interval, ..] => {
-                Err(format!("Compilation not implemented for rule {:?}", rule))
-            },
+            [Rule::interval, ..] => self.walk_interval(pair, expr),
 
             _ => Err(format!("Compilation not implemented for rule {:?}", rule))
         }
@@ -424,6 +422,38 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
+    /// Assume that the pair is for an interval and add commands to
+    /// create a Range from its four children.
+    /// The Range's interval can be open or closed at either end. 
+    fn walk_interval(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
+        let children = self.children(pair);
+        match children.as_slice() {
+            [interval_start, low_endpoint, high_endpoint, interval_end] => {
+                // We create instructions for the endpoints first, then append the range op. 
+                let r1 = self.walk_tree(low_endpoint, expr);
+                let r2 = self.walk_tree(high_endpoint, expr);
+                
+                let is_open_interval_start = self.find_without_branching(interval_start, Some(Rule::open_interval_start)).is_some();
+                let is_open_interval_end = self.find_without_branching(interval_end, Some(Rule::open_interval_end)).is_some();
+                let range_op = match (is_open_interval_start, is_open_interval_end) {
+                    (true, true) => "(lo,hi)",
+                    (true, false) => "(lo,hi]",
+                    (false,true) => "[lo,hi)",
+                    (false,false) => "[lo,hi]"
+                };
+                expr.append_str(range_op);
+
+                match (r1, r2) {
+                    (Ok(_), Ok(_)) => Ok(()),
+                    (Err(low_error), Ok(_)) => Err(format!("Error parsing low endpoint for interval expression {}: {}", pair.as_str(), low_error)),
+                    (Ok(_), Err(high_error)) => Err(format!("Error parsing high endpoint for interval expression {}: {}", pair.as_str(), high_error)),
+                    (Err(low_error), Err(high_error)) => Err(format!("Error parsing endpoints for inteval expression {}:\n  Low -> {}\n  High -> {}", pair.as_str(), low_error, high_error))
+                }
+            },
+            _ => Err(format!("Incorrect number of arguments to interval expression {}.", pair.as_str()))
+        }
+    }
+
 
     fn pair_list(&self, pairs: Pairs<'a, Rule>) -> Vec<Pair<'a, Rule>> {
         let mut list = vec![];
@@ -533,7 +563,7 @@ mod tests {
 
   /// Change to return true to see large diagnostics in several tests, false to not show it.
   fn print_diagnostics() -> bool {
-    true
+    false
   }
 
   #[test]
@@ -665,12 +695,25 @@ mod tests {
     compiler_test("10 in < 10", false.into());
     compiler_test("1 in > 0", true.into());
     compiler_test("10 in >= 12", false.into());
-}  
+  }  
 
   /// in operator with a List of multiple unary tests
   #[test]
   fn test_in_list_of_unary_tests() {
     compiler_test("5 in (<= 10, >0)", true.into());
+  }  
+
+  /// in operator with a single unary test
+  #[test]
+  fn test_in_interval() {
+    compiler_test("5 in [0..10]", true.into());
+    compiler_test("5 in [0..10)", true.into());
+    compiler_test("5 in (0..10]", true.into());
+    compiler_test("5 in (0..10)", true.into());
+    compiler_test("10 in [0..10]", true.into());
+    compiler_test("10 in [0..10)", false.into());
+    compiler_test("0 in [0..10)", true.into());
+    compiler_test("0 in (0..10)", false.into());
   }  
 
   #[test]
