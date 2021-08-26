@@ -72,7 +72,8 @@ impl<'a> Compiler<'a> {
             (Rule::simple_literal, _) => true, 
             (Rule::simple_positive_unary_test, Rule::interval) => true, 
             (Rule::simple_value, _) => true, 
-            (Rule::positive_unary_test, _) => true, 
+            (Rule::endpoint, _) => true, 
+            (Rule::positive_unary_test, Rule::simple_positive_unary_test) => true, 
             (Rule::left_expa, _) => true, 
             (Rule::left_expb, _) => true, 
             (Rule::left_expc, _) => true, 
@@ -130,7 +131,6 @@ impl<'a> Compiler<'a> {
                     _ => Err(format!("Incorrect number of arguments to BETWEEN expression {}.", pair.as_str()))
                 }
             },
-            // TODO: Tests of the "in" operator with a single range or a list of ranges
 
             // Case of a single positive unary test
             [Rule::comparision, _, Rule::in_token, Rule::positive_unary_test] => {
@@ -139,16 +139,14 @@ impl<'a> Compiler<'a> {
                         let r1 = self.walk_tree(item, expr);
                         let r2 = self.walk_tree(unary_test, expr);
                         expr.append_str("in");
-                        if r1.is_err() || r2.is_err() {
-                            Err(format!("Error parsing IN expression {}.", pair.as_str()))
-                        }
-                        else {
-                            Ok(())
+                        match (r1, r2) {
+                            (Ok(_), Ok(_)) => Ok(()),
+                            (Err(item_error), Ok(_)) => Err(format!("Error parsing item for IN expression {}: {}", pair.as_str(), item_error)),
+                            (Ok(_), Err(unary_error)) => Err(format!("Error parsing unary test for IN expression {}: {}", pair.as_str(), unary_error)),
+                            (Err(item_error), Err(unary_error)) => Err(format!("Error parsing item and unary test IN expression {}:\n  Item -> {}\n  Test -> {}", pair.as_str(), item_error, unary_error))
                         }
                     },
-                    _ => {
-                        Err(format!("Incorrect number of arguments to IN expression {}.", pair.as_str()))
-                    }
+                    _ => Err(format!("Incorrect number of arguments to IN expression {}.", pair.as_str()))
                 }
             },
             // Case of a list of positive unary tests
@@ -156,15 +154,16 @@ impl<'a> Compiler<'a> {
                 match children.as_slice() {
                     [item, _, unary_tests] => {
                         let r1 = self.walk_tree(item, expr);
+                        if let Err(item_error) = r1 {
+                            return Err(format!("Error parsing item for IN expression {}: {}", pair.as_str(), item_error));
+                        }
                         expr.append_str("list");
                         let r2 = self.walk_list(unary_tests, expr, Some("push".to_owned()));
+                        if let Err(tests_error) = r2 {
+                            return Err(format!("Error parsing unary tests for IN expression {}: {}", pair.as_str(), tests_error));
+                        }
                         expr.append_str("in");
-                        if r1.is_err() || r2.is_err() {
-                            Err(format!("Error parsing IN expression {}.", pair.as_str()))
-                        }
-                        else {
-                            Ok(())
-                        }
+                        Ok(())
                     },
                     _ => {
                         Err(format!("Incorrect number of arguments to IN expression {}.", pair.as_str()))
@@ -174,14 +173,12 @@ impl<'a> Compiler<'a> {
            
             [Rule::conjunction, ..] => self.infix_to_postfix(children, expr),
             [Rule::disjunction, ..] => self.infix_to_postfix(children, expr),
-            [Rule::arithmetic_negation, _] => {
-                match self.walk_tree(&Compiler::first_child(pair), expr) {
-                    Ok(()) => {
-                        expr.append_str("neg");
-                        Ok(())
-                    },
-                    Err(message) => Err(message)
-                }
+            [Rule::arithmetic_negation, _] => match self.walk_tree(&Compiler::first_child(pair), expr) {
+                Ok(()) => {
+                    expr.append_str("neg");
+                    Ok(())
+                },
+                Err(message) => Err(message)
             },      
             
             // Generate Literals or Lists or follow path expressions
@@ -194,13 +191,9 @@ impl<'a> Compiler<'a> {
                 expr.append_str(&format!("{}", pair.as_str().to_lowercase()));
                 Ok(())
             },
-            // Parsing unicode and other escape sequences
-            // requires going deeper into the parse tree.
+            // Parses unicode and other escape sequences.
             [Rule::string_literal, ..] => {
-                // To skip any escaped character processing, do this instead:
-                // expr.append_load_string(&CompiledExpression::unquote(pair.as_str()));
-                let string_literal = self.walk_string(pair);
-                expr.append_load_string(&string_literal);
+                expr.append_load_string(&self.walk_string(pair));
                 Ok(())
             },
 
@@ -215,26 +208,41 @@ impl<'a> Compiler<'a> {
             // Names will be processed differently if they are part of a qualified_name as above. 
             // If encountered here, the self.contexts is the context that is searched. 
             [Rule::name, ..] => {
-                let name_string = self.walk_name_parts(pair);
-                expr.append_load_string(&name_string);
+                expr.append_load_string(&self.walk_name_parts(pair));
                 expr.append_str("name @");
                 Ok(())
             },
             [Rule::list, Rule::list_entries] => {
                 expr.append_str("list");
-                self.walk_list(pair, expr, Some("push".to_owned()))
+                self.walk_list(&Compiler::first_child(pair), expr, Some("push".to_owned()))
             },
             // An empty list
             [Rule::list] => {
                 expr.append_str("list");
                 Ok(())
             },
+
+            // Ranges (aka intervals)
+
+            [Rule::positive_unary_test, Rule::null_literal] => {
+                expr.append_str("null");
+                Ok(())
+            },
+
+            // Ranges made from unary operators, like "<=10" or ">5"
+            [Rule::simple_positive_unary_test, Rule::unary_operator, _] => self.walk_open_range(pair, expr),
+
+            // Ranges with brackets and "..", like [1..9] or [0..10)
+            [Rule::interval, ..] => {
+                Err(format!("Compilation not implemented for rule {:?}", rule))
+            },
+
             _ => Err(format!("Compilation not implemented for rule {:?}", rule))
         }
     }
 
     fn walk_list(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression, after_each: Option<String>) -> Result<(), String> {
-        let list_entries_children = self.children(&Compiler::first_child(pair));
+        let list_entries_children = self.children(pair);
         for list_item in list_entries_children.iter() {
             match self.walk_tree(&Compiler::first_child(list_item), expr) {
                 Ok(()) => {
@@ -376,6 +384,47 @@ impl<'a> Compiler<'a> {
         name_list.join(" ")
     }
 
+    /// Recognize a simple_positive_unary_test and create an open-ended range for it. 
+    ///   - < will become: [..limit)
+    ///   - <= will become: [..limit]
+    ///   - > will become: (limit..]
+    ///   - >= will become: [limit..] 
+    /// If the endpoint is a name, create a range that references a name instead of a value. 
+    /// If the endpoint is a simple_literal, create a range that references a value. 
+    /// If the endpoint is a qualified name, look up the value and then use it for the range.
+    /// NOTE: This final case should create a range based on a qualified name, but
+    /// that is not implemented. 
+    fn walk_open_range(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
+        let children = self.children(pair);
+        let endpoint = &children[1];
+        // See what kind of endpoint it is. If a name, make a Range that references a name,
+        // otherwise a Range that references a literal. 
+        match self.find_without_branching(endpoint, Some(Rule::name)) {
+            Some(name_pair) => {
+                let name_string = self.walk_name_parts(&name_pair);
+                expr.append_load_string(&name_string);
+                // Do not add "@" to fetch the value of the name. 
+                // That will be done by the range when it is evaluated.
+                expr.append_str("name");
+            },
+            None => {
+                // Process the normal way
+                let result = self.walk_tree(endpoint, expr);
+                if result.is_err() { return result; }
+            }
+        }
+        let range_op = match children[0].as_str() {
+            "<=" => "[..,hi]",
+            "<" => "[..,hi)",
+            ">=" => "[lo,..]",
+            ">" => "(lo,..]",
+            _ => unreachable!()
+        };
+        expr.append_str(range_op);
+        Ok(())
+    }
+
+
     fn pair_list(&self, pairs: Pairs<'a, Rule>) -> Vec<Pair<'a, Rule>> {
         let mut list = vec![];
         for pair in pairs {
@@ -476,6 +525,7 @@ impl<'a> Compiler<'a> {
 #[cfg(test)]
 mod tests {
   use super::Compiler;
+  use crate::parsing::execution_log::ExecutionLog;
   use super::super::interpreter::Interpreter;
   use crate::parsing::feel_value::{FeelValue};
   use crate::parsing::{nested_context::NestedContext};
@@ -608,6 +658,21 @@ mod tests {
     compiler_test("5 between 1 + 3 and 10", true.into());
   }  
 
+  /// in operator with a single unary test
+  #[test]
+  fn test_in_unary_test() {
+    compiler_test("5 in <= 10", true.into());
+    compiler_test("10 in < 10", false.into());
+    compiler_test("1 in > 0", true.into());
+    compiler_test("10 in >= 12", false.into());
+}  
+
+  /// in operator with a List of multiple unary tests
+  #[test]
+  fn test_in_list_of_unary_tests() {
+    compiler_test("5 in (<= 10, >0)", true.into());
+  }  
+
   #[test]
   fn test_list() {
     compiler_test("[]", FeelValue::new_list(vec![]));
@@ -615,6 +680,7 @@ mod tests {
   } 
 
   fn compiler_test(source_expression: &str, expected: FeelValue) {
+    ExecutionLog::clear();
     let mut compiler = Compiler::new();
     compiler.save_parse_tree = true;
     let result = compiler.compile(source_expression);
@@ -639,8 +705,10 @@ mod tests {
             assert_eq!(expected, actual);    
         },
         Err(s) => {
+            ExecutionLog::print("Error compiling expression:\n");
             assert!(false, "Error compiling expression: {}", s);
         }
     };
+    ExecutionLog::clear();
   }
 }

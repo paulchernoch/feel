@@ -31,6 +31,7 @@ Note: **List Filter Iteration Context** was implemented as a standard `Context`,
     - [x] Range includes
     - [x] Range added to FeelValue
     - [x] 14 HL7 CQL Range functions => implemented in Builtins instead.
+    - [ ] Range with a qualified name, not a simple name 
  - [x] FeelFunction
  - [x] FeelFunction added to FeelValue
  - [x] Execution Log

@@ -262,8 +262,10 @@ literal_space = @{ " " }
 
 // simple_positive_unary_test Start
 
+// Javascript PEG grammar had optional "?" after unary_operator,
+// but spec does not.
 simple_positive_unary_test = !{
-      unary_operator? ~ endpoint ~ !(arithmetic_operator | reserved_word | "..")
+      unary_operator ~ endpoint ~ !(arithmetic_operator | reserved_word | "..")
     | interval
 }
 
@@ -325,10 +327,14 @@ qualified_name = !{
 
 // simple_unary_tests Start
 
+// Rule 12. simple unary tests are commonly used in Decision Tables.
+// If an expression is one of these, you need to seed the 
+// data stack with the value to be compared, otherwise it has nothing 
+// to compute against. 
 simple_unary_tests = !{
       simple_positive_unary_tests
     | not_token ~ "(" ~ simple_positive_unary_tests ~ ")"
-    | "-"
+    | dash_unary_test
 }
 
 simple_positive_unary_tests = !{
@@ -358,6 +364,8 @@ positive_unary_tests = !{
 
 dash_unary_test = @{ "-" }
 
+// Rule 15. This rule is the terminal rule for some cells in DMN Decision Tables.
+// It will not be needed for typical expression processing.
 unary_tests = !{
       positive_unary_tests
     | not_token ~ "(" ~ positive_unary_tests ~ ")"
