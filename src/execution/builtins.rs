@@ -2335,7 +2335,7 @@ impl Builtins {
   //                                If the first argument is a DateAndTime, ignore the time portion
   //                                and get the time from the second argument. 
   pub fn date_and_time<C: ContextReader>(parameters: FeelValue, _contexts: &C) -> FeelValue {
-    let fname = "date";
+    let fname = "date and time";
     match Builtins::make_validator(fname, parameters)
       .arity(1..=2)
       .expect_type(1_usize, FeelType::Time, true)

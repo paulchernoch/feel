@@ -250,8 +250,14 @@ hexadecimal_digit = @{
   '0'..'9' | 'a'..'f' | 'A'..'F'
 }
 
-date_time_literal = ${
-     date_time_keyword ~ "(" ~ __ ~ expression ~ (__ ~ "," ~ __ ~ expression)* ~ __ ~ ")"
+date_time_literal = !{
+    ( date_time_keyword ~ "(" ~ expression ~ ("," ~ expression)* ~ ")" )
+  | at_literal
+}
+
+// Rule 65. New @string literals for times, dates, and durations
+at_literal = @{
+  "@" ~ string_literal
 }
 
 literal_space = @{ " " }

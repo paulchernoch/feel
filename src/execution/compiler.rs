@@ -102,6 +102,25 @@ impl<'a> Compiler<'a> {
     /// Walk the parse tree recursively and insert OpCodes in the given expression
     /// to perform the relevant computations.
     fn walk_tree(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
+        // TODO: The following Rules are not yet handled: 
+        //       - simple_unary_tests (needed for Decision Tables?)
+        //       - unary_tests (needed for Decision Tables?)
+        //       - named_parameters, named_parameter
+        //       - instance_of
+        //       - function_definition, function_body and related
+        //       - for_expression, in_expressions, in_expression and related
+        //       - quantified_expression (every and some loops)
+        //       - context, key, context_entry, context_entries
+        //       - date_time_literal, date_time_keyword
+        //  May need to add new builtins for date time keywords: 
+        //       - date and time - has builtin
+        //       - time - has builtin
+        //       - date - has builtin
+        //       - duration - has builtin
+        //       - years and months duration - has builtin
+        //       - days and time duration - Spec Sec 10.3.2.3.7 says use the duration function?
+    
+
         let rule = pair.as_rule();
         let children = self.children(pair);
         // The match arms correspond loosely to the grammar rules. 
@@ -197,6 +216,11 @@ impl<'a> Compiler<'a> {
                 Ok(())
             },
 
+            [Rule::null_literal, ..] => {
+                expr.append_str("null");
+                Ok(())
+            },
+
             // A path expression has several parts separated by periods. 
             // Parts are normally names, but variations are supported.
             [Rule::path_expression, ..] => self.walk_path(pair, expr),
@@ -238,6 +262,21 @@ impl<'a> Compiler<'a> {
             [Rule::function_invocation, _, Rule::positional_parameters] => self.walk_function(pair, expr),
 
             [Rule::function_invocation, _, Rule::named_parameters] => self.walk_function(pair, expr),
+
+            // Date, time, duration literals as @-strings
+            [Rule::date_time_literal, Rule::at_literal] => {
+                Err(format!("Compilation not implemented for date and time @-literals via rule {:?}", rule))
+            },
+
+            // Date, time, duration literals as funcion calls
+            [Rule::date_time_literal, Rule::date_time_keyword, ..] => self.walk_date_time_literal_function(pair, expr),
+
+
+            // A dash returns true for any value found at the top of the data stack. 
+            [Rule::dash_unary_test, ..] => {
+                expr.append_str("drop true");
+                Ok(())
+            },
 
             // Function with no parameters
             [Rule::function_invocation, _] => self.walk_function(pair, expr),
@@ -468,6 +507,31 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    /// Create a date, time, date and time, or duration literal by calling a builtin function. 
+    /// The name of the function usually matches the keyword used in the rule.
+    fn walk_date_time_literal_function(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
+        for child in self.children(pair).iter() {
+            if child.as_rule() == Rule::date_time_keyword {
+                let keyword = child.as_str();
+                // Spec curiously does not call for a function named "days and time duration",
+                // but duration can create either kind (I think).
+                let function_name = match keyword {
+                    "days and time duration" => "duration",
+                    _ => keyword
+                };
+                expr.append_str(&format!("'{}' name list", function_name));
+            }
+            else {
+                if let Err(message) = self.walk_tree(child, expr) {
+                    return Err(format!("Unable to compile argument to date and time function: {}. {}", pair.as_str(), message));
+                }
+                expr.append_str("push");
+            }
+        }
+        expr.append_str("call");
+        Ok(())
+    }
+
     /// Append a function call to the expression, using parts parsed from the children of the 
     /// given pair. 
     fn walk_function(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
@@ -625,6 +689,7 @@ impl<'a> Compiler<'a> {
 
 #[cfg(test)]
 mod tests {
+  use chrono::{NaiveDate};
   use super::Compiler;
   use crate::parsing::execution_log::ExecutionLog;
   use super::super::interpreter::Interpreter;
@@ -723,6 +788,11 @@ mod tests {
     compiler_test("hair color", "brown".into());
     compiler_test("outer level.inner level", "Sanctum Sanctorum".into());
   } 
+
+  #[test]
+  fn test_date_time_literal_function() {
+    compiler_test_with_builtins("date(2001,9,11)", FeelValue::Date(NaiveDate::from_ymd(2001, 9, 11)));
+  }
 
   #[test]
   fn test_math() {

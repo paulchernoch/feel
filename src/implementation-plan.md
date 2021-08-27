@@ -105,11 +105,12 @@ It addresses the creation of literals.
  - [x] Range literal
  - [x] Unary test (implemented as Range literal)
  - [x] List of unary tests (implemented as list of Range literals)
- - [ ] Date literal
- - [ ] Date and time literal
- - [ ] Time literal
- - [ ] Years and months duration literal
- - [ ] Days and time duration literal
+ - [x] Date literal (from builtin function)
+ - [x] Date and time literal (from builtin function)
+ - [x] Time literal (from builtin function)
+ - [x] Years and months duration literal (from builtin function)
+ - [x] Days and time duration literal (from builtin function)
+ - [ ] @-string literals for date, time, duration
 
 ## Simple Expression Tree Walk
 
