@@ -102,7 +102,7 @@ It addresses the creation of literals.
  - [x] Boolean literal
  - [x] String literal
  - [x] Name literal
- - [ ] Range literal
+ - [x] Range literal
  - [x] Unary test (implemented as Range literal)
  - [x] List of unary tests (implemented as list of Range literals)
  - [ ] Date literal
@@ -123,9 +123,9 @@ It addresses simple mathematical formulas.
  - [x] Logical
  - [x] between
  - [x] Qualified Name lookup
- - [ ] in
+ - [x] in
  - [ ] instance of
- - [ ] Conditional
+ - [x] Conditional (if-then-else)
  - [x] Context property lookup (paths)
  - [ ] Special property lookup
 
@@ -163,7 +163,8 @@ These tasks are for creating OpCodes for complex statements, such as for-loops a
      - [ ] Conversion from AST to OpCodes of satisfy-loops
  - [ ] Rule Chaining
  - [ ] Defining Functions
- - [ ] Calling Functions
+ - [x] Calling Functions with positional parameters
+ - [ ] Calling Functions with named parameters
 
 ## Caching and other Performance Enhancements
 

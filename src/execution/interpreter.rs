@@ -816,6 +816,7 @@ impl Interpreter {
                         let function_opt = match function_name.clone() {
                             FeelValue::Name(qname) => self.contexts.get(qname),
                             FeelValue::String(sname) => self.contexts.get(sname),
+                            FeelValue::Function(_) => Some(function_name.clone()),
                             _ => {
                                 self.error(
                                     format!("Cannot call function where name is a {}", function_name.get_type().to_string()),

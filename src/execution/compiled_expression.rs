@@ -436,6 +436,25 @@ impl CompiledExpression {
         filter_expression
     }
 
+    /// Generate the OpCodes for an if-else statement.
+    pub fn if_else(condition: &mut CompiledExpression, true_result: &mut CompiledExpression, false_result: &mut CompiledExpression) -> CompiledExpression {
+        let mut if_else_expr = CompiledExpression::new_from_string("
+            label(1)
+            // Condition inserted here
+            branch(2/3/3)
+            label(2)
+            // True expression inserted here
+            goto(4)
+            label(3)
+            // False (or otherwise) expression inserted here
+            label(4)
+        ", false);
+        if_else_expr.insert(condition, 1);
+        if_else_expr.insert(true_result, 2);
+        if_else_expr.insert(false_result, 3);
+        if_else_expr
+    }
+
     /// Generate the OpCodes for a series of nested for loops that build up a list of results,
     /// one per iteration of the innermost loop. 
     /// This function does not expect that a context is on the data stack to start, hence will create one.

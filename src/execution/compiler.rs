@@ -235,6 +235,18 @@ impl<'a> Compiler<'a> {
             // Ranges with brackets and "..", like [1..9] or [0..10)
             [Rule::interval, ..] => self.walk_interval(pair, expr),
 
+            [Rule::function_invocation, _, Rule::positional_parameters] => self.walk_function(pair, expr),
+
+            [Rule::function_invocation, _, Rule::named_parameters] => self.walk_function(pair, expr),
+
+            // Function with no parameters
+            [Rule::function_invocation, _] => self.walk_function(pair, expr),
+
+            // If-then-else expression
+            [Rule::if_expression, Rule::if_token, Rule::expression, Rule::then_token, Rule::expression, Rule::else_token, Rule::expression] => {
+                self.walk_if_then_else(pair, expr)
+            },
+
             _ => Err(format!("Compilation not implemented for rule {:?}", rule))
         }
     }
@@ -242,7 +254,9 @@ impl<'a> Compiler<'a> {
     fn walk_list(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression, after_each: Option<String>) -> Result<(), String> {
         let list_entries_children = self.children(pair);
         for list_item in list_entries_children.iter() {
-            match self.walk_tree(&Compiler::first_child(list_item), expr) {
+            // Why did I get the first child here???
+            // match self.walk_tree(&Compiler::first_child(list_item), expr) {
+            match self.walk_tree(list_item, expr) {
                 Ok(()) => {
                     match after_each {
                         Some(ref s) =>  { expr.append_str(s); },
@@ -454,19 +468,76 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    /// Append a function call to the expression, using parts parsed from the children of the 
+    /// given pair. 
+    fn walk_function(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
+        let children = self.children(pair);
+        match children.as_slice() {
+            [function_or_name, positional_parameters] if positional_parameters.as_rule() == Rule::positional_parameters => {
+                let r1 = self.walk_tree(function_or_name, expr);
+                expr.append_str("list");
+                let r2 = self.walk_list(positional_parameters, expr, Some("push".to_owned()));
+                expr.append_str("call");
+
+                match (r1, r2) {
+                    (Ok(_), Ok(_)) => Ok(()),
+                    (Err(name_error), Ok(_)) => Err(format!("Error parsing function name for function call {}: {}", pair.as_str(), name_error)),
+                    (Ok(_), Err(args_error)) => Err(format!("Error parsing arguments for for function call {}: {}", pair.as_str(), args_error)),
+                    (Err(name_error), Err(args_error)) => Err(format!("Error parsing function call {}:\n  Name -> {}\n  Args -> {}", pair.as_str(), name_error, args_error))
+                }
+            },
+            [_function_or_name, named_parameters] if named_parameters.as_rule() == Rule::named_parameters => {
+                Err(format!("Calling a function with named parameters is not yet implemented: {}.", pair.as_str()))
+            },
+            [function_or_name] => {
+                // Calling a function with no parameters. 
+                let r1 = self.walk_tree(function_or_name, expr);
+
+                // Prepare an empty argument list and call. 
+                expr.append_str("list call");
+                match r1 {
+                    Ok(_) => Ok(()),
+                    Err(name_error) => Err(format!("Error calling function with no parameters {}: {}", pair.as_str(), name_error))
+                }
+            },
+            _ => Err(format!("Incorrect number of arguments to function expression {}.", pair.as_str()))
+        }
+    }
+
+    fn walk_if_then_else(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
+        let children = self.children(pair);
+        match children.as_slice() {
+            [_, condition, _, true_result, _, false_result] => {
+                let mut condition_expr = CompiledExpression::new("condition");
+                let mut true_expr = CompiledExpression::new("if expression");
+                let mut false_expr = CompiledExpression::new("else expression");
+
+                let r1 = self.walk_tree(condition, &mut condition_expr);
+                let r2 = self.walk_tree(true_result, &mut true_expr);
+                let r3 = self.walk_tree(false_result, &mut false_expr);
+
+                let mut if_else_expr = CompiledExpression::if_else(
+                    &mut condition_expr, 
+                    &mut true_expr,
+                    &mut false_expr
+                );
+                expr.append(&mut if_else_expr);
+
+                match (r1, r2, r3) {
+                    (Ok(_), Ok(_), Ok(_)) => Ok(()),
+                    (Err(condition_error), _, _) => Err(format!("Unable to parse condition of if-then-else expression {}. {}", pair.as_str(), condition_error)),
+                    (_, Err(true_error), _) => Err(format!("Unable to parse true result expression of if-then-else expression {}. {}", pair.as_str(), true_error)),
+                    (_, _, Err(false_error)) => Err(format!("Unable to parse false result expression of if-then-else expression {}. {}", pair.as_str(), false_error)),
+                }
+            },
+            _ => Err(format!("Incorrect number of arguments to if-then-else expression {}.", pair.as_str()))
+        }
+    }
 
     fn pair_list(&self, pairs: Pairs<'a, Rule>) -> Vec<Pair<'a, Rule>> {
         let mut list = vec![];
         for pair in pairs {
             list.push(pair);
-        }
-        list
-    }
-
-    fn rule_list(&self, pairs: Pairs<'a, Rule>) -> Vec<Rule> {
-        let mut list = vec![];
-        for pair in pairs {
-            list.push(pair.as_rule());
         }
         list
     }
@@ -563,7 +634,7 @@ mod tests {
 
   /// Change to return true to see large diagnostics in several tests, false to not show it.
   fn print_diagnostics() -> bool {
-    false
+    true
   }
 
   #[test]
@@ -722,7 +793,26 @@ mod tests {
     compiler_test("[1,2,true]", FeelValue::new_list(vec![1.0.into(), 2.0.into(), true.into()]));
   } 
 
+  #[test]
+  fn test_function_positional_parameters() {
+    compiler_test_with_builtins("sum(1,2,3,4)", 10.0.into());
+  }
+
+  #[test]
+  fn test_if_then_else() {
+    compiler_test("if 2 + 2 = 4 then 1 else 0", 1.0.into());
+    compiler_test("if 2 + 2 > 4 then 1 else 0", 0.0.into());
+  } 
+
   fn compiler_test(source_expression: &str, expected: FeelValue) {
+    compiler_test_base(source_expression, expected, false);
+  }
+
+  fn compiler_test_with_builtins(source_expression: &str, expected: FeelValue) {
+    compiler_test_base(source_expression, expected, true);
+  }
+
+  fn compiler_test_base(source_expression: &str, expected: FeelValue, add_builtins: bool) {
     ExecutionLog::clear();
     let mut compiler = Compiler::new();
     compiler.save_parse_tree = true;
@@ -733,7 +823,11 @@ mod tests {
     match result.clone() {
         Ok(expr) => {
             if print_diagnostics() { println!("Expression\n{}", expr); }
-            let mut nctx = NestedContext::new();
+            let mut nctx = if add_builtins { 
+                NestedContext::new_with_builtins()
+            } else {
+                NestedContext::new()
+            };
             let ctx = Context::new();
             let inner_ctx = Context::new();
             inner_ctx.insert("inner level", "Sanctum Sanctorum".into());
