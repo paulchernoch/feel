@@ -147,10 +147,10 @@ These 29 properties are listed in Table 65 and Table 66 of §10.3.2.15 of the DM
 
 These tasks are for creating OpCodes for complex statements, such as for-loops and user defined functions, or complex behaviors, such as filtering of lists and contexts. 
 
- - [ ] Intervals
+ - [x] Intervals
  - [x] Assembling Lists
  - [ ] Assembling Contexts
- - [ ] Assembling Ranges
+ - [x] Assembling Ranges
  - [ ] Sorting
  - [ ] Filtering
      - [x] Macros to generate OpCodes for control logic of list filtering
