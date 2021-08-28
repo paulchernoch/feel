@@ -758,7 +758,7 @@ mod tests {
 
   /// Change to return true to see large diagnostics in several tests, false to not show it.
   fn print_diagnostics() -> bool {
-    false
+    true
   }
 
   #[test]
@@ -851,6 +851,18 @@ mod tests {
     compiler_test_with_builtins("@'2020-04-11' . year", 2020.0.into());
     compiler_test_with_builtins("@'2020-04-11' . month", 4.0.into());
     compiler_test_with_builtins("@'2020-04-11' . day", 11.0.into());
+  }
+
+  /// Test that you can select a property value from all elements in a list and
+  /// map them to a second list.
+  #[test]
+  fn test_list_projection() {
+    compiler_test_with_builtins(
+        "[@'P2Y7M', @'P4Y6M', @'P6Y9M'].years", 
+        FeelValue::new_list(
+           vec![2.0.into(), 4.0.into(), 6.0.into()] 
+        )
+    );
   }
 
   #[test]
