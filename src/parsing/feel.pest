@@ -431,8 +431,20 @@ left_expf = {
     | left_expg
 }
 
+// Rule 51. The DNS Spec refers to a rule for "type" which recursively
+//          constructs lattice types. We use "type_name" because "type"
+//          is a reserved word in Rust.
 instance_of = !{
-	left_expf ~ instance_of_token ~ qualified_name
+	// left_expf ~ instance_of_token ~ qualified_name
+	left_expf ~ "instance" ~ "of" ~ type_name
+}
+
+// Rule 52. Lattice types.
+type_name = @{
+    qualified_name
+  | ( "list" ~ "<" ~ type_name ~ ">" )
+  | ( "context" ~ "<" ~ name ~ ":" ~ type_name ~ ( "," ~ name ~ ":" ~ type_name )*  ~ ">" )
+  | ( "function" ~ "<" ~ ( type_name ~ ( "," ~ type_name )* )? ~ ">" ~ "->" ~ type_name )
 }
 
 txt_expe = { arithmetic_expression }
@@ -707,7 +719,7 @@ some_token        = ${ "some"                           ~  !name_part_char }
 every_token       = ${ "every"                          ~  !name_part_char }
 satisfies_token   = ${ "satisfies"                      ~  !name_part_char }
 between_token     = ${ "between"                        ~  !name_part_char }
-instance_of_token = ${ "instanceof"                     ~  !name_part_char }
+instance_of_token = ${ ("instanceof" | "instance of")   ~  !name_part_char }
 function_token    = ${ "function"                       ~  !name_part_char }
 external_token    = ${ "external"                       ~  !name_part_char }
 

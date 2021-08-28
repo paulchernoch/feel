@@ -172,13 +172,19 @@ These tasks are for creating OpCodes for complex statements, such as for-loops a
 
  - [ ] LRU Rule Cache
  - [ ] Redis Cache
- - [ ] Memoization
+ - [ ] Memoization of context/rule/rule-version
  - [ ] Regex Cache
  - [ ] `FeelValue::NumberList` - to reduce boxing/unboxing overhead make a new variant of FeelValue similar to FeelValue::List.
        Instead of holding Boxed FeelValue::Numbers in the Vec, just hold raw f64 values.
        Add branches for all the Builtins that can handle this new variant more efficiently.
  - [ ] Detect if the Sort `precedes` function is a simple < or > operator comparison of the two values. 
-       If it is, sort using the Ord implementation.  
+       If it is, sort using the Ord implementation. 
+ - [ ] Reduce use of cloning 
+
+## Refactor
+
+ - Split code into VM library and Compiler library.
+
 
 ## Service
 
@@ -206,6 +212,8 @@ These tasks are for creating OpCodes for complex statements, such as for-loops a
  - [ ] States
  - [ ] Push/Pop Stack
  - [ ] Error State
+ - [ ] Path memoization
+ - [ ] Tokenization
 
 ## List of all builtin functions:
 

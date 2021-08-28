@@ -130,7 +130,8 @@ impl Builtins {
     BuiltinAdders::date_and_time(&mut builtin_context);
     BuiltinAdders::time(&mut builtin_context);
     BuiltinAdders::number(&mut builtin_context);
-    // Exceptional: "type_name" Adds a function to the context named "type", not "type_name"
+    // Exceptional: "type_name" Adds a function to the context named "type", not "type_name". 
+    // "type" is a reserved word, so can't be used where expected.
     BuiltinAdders::type_name(&mut builtin_context); 
     BuiltinAdders::string(&mut builtin_context);
     BuiltinAdders::instance_of(&mut builtin_context);
