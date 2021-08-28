@@ -1,6 +1,8 @@
 use super::compiled_expression::CompiledExpression;
 use pest::iterators::{Pairs,Pair};
 use crate::pest::Parser;
+use crate::parsing::duration_parser::parse_duration;
+use crate::parsing::duration::{DurationVariety};
 use crate::parsing::feel_parser::{Rule,FeelParser,show_pair_tree};
 
 /// Compile a string into a CompiledExpression by walking the AST created by the Pest parser. 
@@ -264,9 +266,7 @@ impl<'a> Compiler<'a> {
             [Rule::function_invocation, _, Rule::named_parameters] => self.walk_function(pair, expr),
 
             // Date, time, duration literals as @-strings
-            [Rule::date_time_literal, Rule::at_literal] => {
-                Err(format!("Compilation not implemented for date and time @-literals via rule {:?}", rule))
-            },
+            [Rule::date_time_literal, Rule::at_literal] => self.walk_date_time_literal_string(pair, expr),
 
             // Date, time, duration literals as funcion calls
             [Rule::date_time_literal, Rule::date_time_keyword, ..] => self.walk_date_time_literal_function(pair, expr),
@@ -532,6 +532,24 @@ impl<'a> Compiler<'a> {
         Ok(())
     }
 
+    /// Parses an @-string into a date, time or duration
+    fn walk_date_time_literal_string(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
+        // Note the stripping of the the enclosing @ sign and quotes. 
+        let s = Compiler::first_child(pair).as_str();
+        let literal_string = s[2..s.len()-1].to_owned();
+        if literal_string.starts_with("-P") || literal_string.starts_with("P") {
+            // Duration Literal
+            if parse_duration(&literal_string, DurationVariety::Full).is_err() {
+                return Err(format!("Duration string improperly formatted: {}", literal_string))
+            }
+            expr.append_str(&format!("'duration' list '{}' push call", literal_string));
+            Ok(())
+        }
+        else {
+            // Date, time, or date and time literal
+            Err(format!("Compiling date or time strings not yet implemented: {}", pair.as_str()))
+        }
+    }
     /// Append a function call to the expression, using parts parsed from the children of the 
     /// given pair. 
     fn walk_function(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
@@ -689,6 +707,7 @@ impl<'a> Compiler<'a> {
 
 #[cfg(test)]
 mod tests {
+  use std::str::FromStr;
   use chrono::{NaiveDate};
   use super::Compiler;
   use crate::parsing::execution_log::ExecutionLog;
@@ -696,6 +715,7 @@ mod tests {
   use crate::parsing::feel_value::{FeelValue};
   use crate::parsing::{nested_context::NestedContext};
   use crate::parsing::{context::Context};
+  use crate::parsing::duration::Duration;
 
   /// Change to return true to see large diagnostics in several tests, false to not show it.
   fn print_diagnostics() -> bool {
@@ -792,6 +812,18 @@ mod tests {
   #[test]
   fn test_date_time_literal_function() {
     compiler_test_with_builtins("date(2001,9,11)", FeelValue::Date(NaiveDate::from_ymd(2001, 9, 11)));
+  }
+
+  #[test]
+  fn test_date_time_literal_string() {
+    compiler_test_with_builtins(
+        "@'-P2Y6M'", 
+        FeelValue::YearMonthDuration(Duration::from_str("-P2Y6M").unwrap())
+    );
+    compiler_test_with_builtins(
+        "@'P1DT30M'", 
+        FeelValue::DayTimeDuration(Duration::from_str("P1DT30M").unwrap())
+    );
   }
 
   #[test]

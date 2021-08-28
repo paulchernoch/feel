@@ -110,7 +110,8 @@ It addresses the creation of literals.
  - [x] Time literal (from builtin function)
  - [x] Years and months duration literal (from builtin function)
  - [x] Days and time duration literal (from builtin function)
- - [ ] @-string literals for date, time, duration
+ - [x] @-string literals for duration
+ - [ ] @-string literals for date, time, date time
 
 ## Simple Expression Tree Walk
 
