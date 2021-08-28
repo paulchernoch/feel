@@ -129,7 +129,7 @@ It addresses simple mathematical formulas.
  - [ ] instance of
  - [x] Conditional (if-then-else)
  - [x] Context property lookup (paths)
- - [ ] Special property lookup
+ - [x] Special property lookup
 
 ## Properties special to each type
 

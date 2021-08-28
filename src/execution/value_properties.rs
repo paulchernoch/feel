@@ -1,6 +1,7 @@
 use chrono::{Datelike, Timelike};
-use crate::parsing::feel_value::{FeelValue};
+use crate::parsing::feel_value::{FeelValue,FeelType};
 use crate::parsing::context::{ContextReader};
+use crate::parsing::qname::QName;
 use std::ops::{Bound};
 use crate::parsing::execution_log::ExecutionLog;
 
@@ -101,6 +102,16 @@ pub trait ValueProperties {
     // ......... 
 
     /// Access any of the preceding properties by string name. 
+    /// This intended to support the "." property acces operator of the Feel language,
+    /// as used in Path expressions.
+    /// If the value is a Context, retrieve a named property from the context, 
+    /// which may or may not be present. If it is not present, return FeelValue::Null.
+    ///   - If the FeelValue is a Context, any property name may be specified. 
+    ///     If it is missing, a FeelValue::Null will be returned. 
+    ///   - If the FeelValue is a Date, Time, DateAndTime, YearMonthDuration,
+    ///     DayTimeDuration, or Range, a list of special properties is recognized. 
+    ///     > If the property name is not in that list, a Null is returned. 
+    ///     > If that property name is not relevant for that FeelType, a Null is returned.
     fn get_property<C: ContextReader>(&self, property_name: &FeelValue, contexts: &C) -> FeelValue;
 } 
 
@@ -265,6 +276,8 @@ impl ValueProperties for FeelValue {
         }
     }
 
+    /// Get the value of the named property from the FeelValue, 
+    /// which may be invalid for the given FeelType or missing from the context.
     fn get_property<C: ContextReader>(&self, property_name: &FeelValue, contexts: &C) -> FeelValue {
         let prop_name = match property_name {
             FeelValue::String(s) => s.clone(),
@@ -274,26 +287,42 @@ impl ValueProperties for FeelValue {
                 return FeelValue::Null; 
             }
         };
-        match prop_name.as_str() {
-            "year" => self.year(),
-            "month" => self.month(),
-            "day" => self.day(),
-            "weekday" => self.weekday(),
-            "hour" => self.hour(),
-            "minute" => self.minute(),
-            "second" => self.second(),
-            "time offset" => self.time_offset(),
-            "timezone" => self.timezone(),
-            "years" => self.years(),
-            "months" => self.months(),
-            "days" => self.days(),
-            "hours" => self.hours(),
-            "minutes" => self.minutes(),
-            "seconds" => self.seconds(),
-            "start" => self.start(contexts),
-            "end" => self.end(contexts),
-            "start included" => self.start_included(contexts),
-            "end included" => self.end_included(contexts),
+        match self.get_type() {
+            // Since contexts may contain properties with any name,
+            // attempt a key lookup.
+            FeelType::Context => {
+                let key: QName = prop_name.into();
+                match self.try_get(&key) {
+                    Some(value) => value,
+                    None => no_such_property(&property_name.to_string(), self)
+                }
+            },
+            FeelType::Date | FeelType::Time | FeelType::DateAndTime 
+            | FeelType::YearMonthDuration | FeelType::DayTimeDuration
+            | FeelType::Range => {
+                match prop_name.as_str() {
+                    "year" => self.year(),
+                    "month" => self.month(),
+                    "day" => self.day(),
+                    "weekday" => self.weekday(),
+                    "hour" => self.hour(),
+                    "minute" => self.minute(),
+                    "second" => self.second(),
+                    "time offset" => self.time_offset(),
+                    "timezone" => self.timezone(),
+                    "years" => self.years(),
+                    "months" => self.months(),
+                    "days" => self.days(),
+                    "hours" => self.hours(),
+                    "minutes" => self.minutes(),
+                    "seconds" => self.seconds(),
+                    "start" => self.start(contexts),
+                    "end" => self.end(contexts),
+                    "start included" => self.start_included(contexts),
+                    "end included" => self.end_included(contexts),
+                    _ => no_such_property(&property_name.to_string(), self)
+                }
+            },
             _ => no_such_property(&property_name.to_string(), self)
         }
     }

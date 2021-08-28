@@ -355,7 +355,12 @@ impl<'a> Compiler<'a> {
     }
 
     /// Accepts a "qualified_name" pair and processes its names as a
-    /// series of context lookups. 
+    /// series of property lookups, which may be against
+    ///   - Contexts (to perform lookup of any property)
+    ///   - Dates, Times, or DateAndTimes (to perform lookup of special temporal properties)
+    ///   - YearMonthDurations or DayTimeDurations (to perform lookup of special duration properties)
+    ///   - Ranges (to perform lookup of special Range properties)
+    ///   - Lists (to project that property onto every member of the list and create a new list)
     /// The first name will be used to retrieve a value (possibly a context)
     /// from contexts and push it onto the data stack. 
     /// All subsequent names will be used to lookup values (in chained fashion)
@@ -370,7 +375,8 @@ impl<'a> Compiler<'a> {
                 expr.append_str("name @");
             }
             else {
-                expr.append_str("name qget");
+                // The "dot" operator wears many hats...
+                expr.append_str("name .");
             }
             is_first_name = false;
         }
@@ -409,12 +415,12 @@ impl<'a> Compiler<'a> {
                     Some(name_pair) => {
                         let name_string = self.walk_name_parts(&name_pair);
                         expr.append_load_string(&name_string);
-                        expr.append_str("name qget");
+                        expr.append_str("name .");
                     },
                     None => {
                         let result = self.walk_tree(segment, expr);
                         if result.is_err() { return result; }
-                        expr.append_str("name qget");
+                        expr.append_str("name .");
                     }
                 };
             }
@@ -752,7 +758,7 @@ mod tests {
 
   /// Change to return true to see large diagnostics in several tests, false to not show it.
   fn print_diagnostics() -> bool {
-    true
+    false
   }
 
   #[test]
@@ -763,50 +769,6 @@ mod tests {
 
   #[test]
   fn test_addition() {
-      /*
-      Parse tree for "1 + 2 + 3" looks like this: 
-
- start                           Text:    1 + 2 + 3
-   textual_expression              Text:    1 + 2 + 3
-     txt_expe                        Text:    1 + 2 + 3
-       arithmetic_expression           Text:    1 + 2 + 3
-         additive                        Text:    1 + 2 + 3
-           multiplicative                  Text:    1
-             exponentiation                  Text:    1
-               unary_expression                Text:    1
-                 left_expe                       Text:    1
-                   left_expf                       Text:    1
-                     left_expg                       Text:    1
-                       left_exph                       Text:    1
-                         txt_expi                        Text:    1
-                           literal                         Text:    1
-                             simple_literal                  Text:    1
-                               numeric_literal                 Text:    1
-           additive_operator               Text:    +
-           multiplicative                  Text:    2
-             exponentiation                  Text:    2
-               unary_expression                Text:    2
-                 left_expe                       Text:    2
-                   left_expf                       Text:    2
-                     left_expg                       Text:    2
-                       left_exph                       Text:    2
-                         txt_expi                        Text:    2
-                           literal                         Text:    2
-                             simple_literal                  Text:    2
-                               numeric_literal                 Text:    2
-           additive_operator               Text:    +
-           multiplicative                  Text:    3
-             exponentiation                  Text:    3
-               unary_expression                Text:    3
-                 left_expe                       Text:    3
-                   left_expf                       Text:    3
-                     left_expg                       Text:    3
-                       left_exph                       Text:    3
-                         txt_expi                        Text:    3
-                           literal                         Text:    3
-                             simple_literal                  Text:    3
-                               numeric_literal                 Text:    3
-      */
       compiler_test("1 + 2 + 3", FeelValue::Number(6.0));
   }
 
@@ -866,6 +828,29 @@ mod tests {
         "@'08:30:00'", 
         FeelValue::new_time("08:30:00").unwrap()
     );
+  }
+
+  #[test]
+  fn test_duration_special_properties() {
+    compiler_test_with_builtins("@'P3Y7M' . years", 3.0.into());
+    compiler_test_with_builtins("@'P3Y7M' . months", 7.0.into());
+    compiler_test_with_builtins("@'P1DT10H5M' . hours", 10.0.into());
+    compiler_test_with_builtins("@'P1DT10H5M' . minutes", 5.0.into());
+    compiler_test_with_builtins("@'P1DT10H5M' . seconds", 0.0.into());
+  }
+
+  #[test]
+  fn test_time_special_properties() {
+    compiler_test_with_builtins("@'05:15:00' . hour", 5.0.into());
+    compiler_test_with_builtins("@'05:15:00' . minute", 15.0.into());
+    compiler_test_with_builtins("@'05:15:00' . second", 0.0.into());
+  }
+
+  #[test]
+  fn test_date_special_properties() {
+    compiler_test_with_builtins("@'2020-04-11' . year", 2020.0.into());
+    compiler_test_with_builtins("@'2020-04-11' . month", 4.0.into());
+    compiler_test_with_builtins("@'2020-04-11' . day", 11.0.into());
   }
 
   #[test]
