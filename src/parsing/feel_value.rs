@@ -5,6 +5,7 @@ use std::str::FromStr;
 use std::convert::{From,TryFrom};
 use std::string::ToString;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::format::{ParseResult};
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use super::qname::{QName, Stringlike};
@@ -214,6 +215,13 @@ impl FeelValue {
         }
       },
       None => None
+    }
+  }
+
+  pub fn new_date(date_string: &str) -> Option<Self> {
+    match NaiveDate::parse_from_str(date_string, "%Y-%m-%d") {
+      ParseResult::Ok(date) => Some(FeelValue::Date(date)),
+      ParseResult::Err(_) =>  None
     }
   }
 

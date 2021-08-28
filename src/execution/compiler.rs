@@ -4,6 +4,7 @@ use crate::pest::Parser;
 use crate::parsing::duration_parser::parse_duration;
 use crate::parsing::duration::{DurationVariety};
 use crate::parsing::feel_parser::{Rule,FeelParser,show_pair_tree};
+use crate::parsing::feel_value::FeelValue;
 
 /// Compile a string into a CompiledExpression by walking the AST created by the Pest parser. 
 pub struct Compiler<'a> {
@@ -542,12 +543,44 @@ impl<'a> Compiler<'a> {
             if parse_duration(&literal_string, DurationVariety::Full).is_err() {
                 return Err(format!("Duration string improperly formatted: {}", literal_string))
             }
-            expr.append_str(&format!("'duration' list '{}' push call", literal_string));
+            expr.append_str(&format!("'duration' name list '{}' push call", literal_string));
             Ok(())
         }
         else {
             // Date, time, or date and time literal
-            Err(format!("Compiling date or time strings not yet implemented: {}", pair.as_str()))
+            // Use the presence of dash and colon to discriminate. 
+            let has_date = literal_string.contains("-");
+            let has_time = literal_string.contains(":");
+            match (has_date, has_time) {
+                (true, true) => {
+                    match FeelValue::new_date_and_time(&literal_string) {
+                        Some(_dt) => {
+                            expr.append_str(&format!("'date and time' name list '{}' push call", literal_string));
+                            Ok(())
+                        },
+                        None => Err(format!("Date and time string improperly formatted: {}", literal_string))
+                    }
+                },
+                (true, false) => {
+                    match FeelValue::new_date(&literal_string) {
+                        Some(_date) => {
+                            expr.append_str(&format!("'date' name list '{}' push call", literal_string));
+                            Ok(())
+                        },
+                        None => Err(format!("Date string improperly formatted: {}", literal_string))
+                    }
+                },
+                (false, true) => {
+                    match FeelValue::new_time(&literal_string) {
+                        Some(_time) => {
+                            expr.append_str(&format!("'time' name list '{}' push call", literal_string));
+                            Ok(())
+                        },
+                        None => Err(format!("Time string improperly formatted: {}", literal_string))
+                    }
+                },
+                (false, false) => Err(format!("Date or time string improperly formatted: {}", literal_string))
+            }
         }
     }
     /// Append a function call to the expression, using parts parsed from the children of the 
@@ -823,6 +856,15 @@ mod tests {
     compiler_test_with_builtins(
         "@'P1DT30M'", 
         FeelValue::DayTimeDuration(Duration::from_str("P1DT30M").unwrap())
+    );
+
+    compiler_test_with_builtins(
+        "@'2020-02-14'", 
+        FeelValue::new_date("2020-02-14").unwrap()
+    );
+    compiler_test_with_builtins(
+        "@'08:30:00'", 
+        FeelValue::new_time("08:30:00").unwrap()
     );
   }
 

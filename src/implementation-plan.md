@@ -6,10 +6,10 @@ Add grammar rules for new features not supported by the Javascript PEG Grammar
 that was the basis of this project. 
 That grammar was for FEEL version 1.1 or 1.2, hence is missing fatures found in 1.3.
 
- - [ ] Duration literals like @"PT5H"
- - [ ] Date literals
- - [ ] Time Literals
- - [ ] Datetime literals
+ - [x] Duration @-string literals like @"PT5H"
+ - [x] Date @-string literals
+ - [x] Time @-string Literals
+ - [x] Datetime @-string literals
  - [ ] Other things I missed
 
 ## FeelValue
@@ -86,7 +86,7 @@ The `Interpreter` class will execute the `OpCode`s and return a result.
  - [x] Function calls
  - [x] context key lookup
  - [ ] automatic conversions (§ 10.3.2.9.4) to and from singleton lists.
- - [ ] Serialization (Send/Receive)
+ - [ ] Serialization (Send/Receive, JSON format)
  - [x] Convert FeelOpcode to FeelValue
  - [x] Execute method
 
@@ -111,7 +111,7 @@ It addresses the creation of literals.
  - [x] Years and months duration literal (from builtin function)
  - [x] Days and time duration literal (from builtin function)
  - [x] @-string literals for duration
- - [ ] @-string literals for date, time, date time
+ - [x] @-string literals for date, time, date time
 
 ## Simple Expression Tree Walk
 
