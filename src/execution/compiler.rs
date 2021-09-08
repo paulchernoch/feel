@@ -49,12 +49,12 @@ impl<'a> Compiler<'a> {
                                 Ok(expr)
                             },
                             Err(message) => {
-                                Result::Err(format!("Failed to compile {}. Error: {}", source_expression, message))
+                                Result::Err(format!("Failed to compile '{}'. Error: {}", source_expression, message))
                             }
                         }
                     },
-                    [] => Result::Err(format!("Parse tree empty. Failed to compile {}", source_expression)),
-                    _ => Result::Err(format!("Parse tree has more than one root. Failed to correctly compile {}", source_expression))
+                    [] => Result::Err(format!("Parse tree empty. Failed to compile '{}'", source_expression)),
+                    _ => Result::Err(format!("Parse tree has more than one root. Failed to correctly compile '{}", source_expression))
                 }
             },
             Err(e) => {
@@ -113,16 +113,7 @@ impl<'a> Compiler<'a> {
         //       - function_definition, function_body and related
         //       - for_expression, in_expressions, in_expression and related
         //       - quantified_expression (every and some loops)
-        //       - context, key, context_entry, context_entries
-        //       - date_time_literal, date_time_keyword
-        //  May need to add new builtins for date time keywords: 
-        //       - date and time - has builtin
-        //       - time - has builtin
-        //       - date - has builtin
-        //       - duration - has builtin
-        //       - years and months duration - has builtin
-        //       - days and time duration - Spec Sec 10.3.2.3.7 says use the duration function?
-    
+        //       - context, key, context_entry, context_entries    
 
         let rule = pair.as_rule();
         let children = self.children(pair);
@@ -188,7 +179,7 @@ impl<'a> Compiler<'a> {
                         Ok(())
                     },
                     _ => {
-                        Err(format!("Incorrect number of arguments to IN expression {}.", pair.as_str()))
+                        Err(format!("Incorrect number of arguments to IN expression '{}'.", pair.as_str()))
                     }
                 }
             },
@@ -269,7 +260,7 @@ impl<'a> Compiler<'a> {
             // Date, time, duration literals as @-strings
             [Rule::date_time_literal, Rule::at_literal] => self.walk_date_time_literal_string(pair, expr),
 
-            // Date, time, duration literals as funcion calls
+            // Date, time, duration literals as function calls
             [Rule::date_time_literal, Rule::date_time_keyword, ..] => self.walk_date_time_literal_function(pair, expr),
 
 
@@ -281,6 +272,8 @@ impl<'a> Compiler<'a> {
 
             // Function with no parameters
             [Rule::function_invocation, _] => self.walk_function(pair, expr),
+
+            [Rule::instance_of, _, Rule::instance_token, Rule::of_token, Rule::type_spec] => self.walk_instance_of(pair, expr),
 
             // If-then-else expression
             [Rule::if_expression, Rule::if_token, Rule::expression, Rule::then_token, Rule::expression, Rule::else_token, Rule::expression] => {
@@ -592,8 +585,7 @@ impl<'a> Compiler<'a> {
     /// Append a function call to the expression, using parts parsed from the children of the 
     /// given pair. 
     fn walk_function(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
-        let children = self.children(pair);
-        match children.as_slice() {
+        match self.children(pair).as_slice() {
             [function_or_name, positional_parameters] if positional_parameters.as_rule() == Rule::positional_parameters => {
                 let r1 = self.walk_tree(function_or_name, expr);
                 expr.append_str("list");
@@ -625,9 +617,25 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    fn walk_instance_of(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
+        match self.children(pair).as_slice() {
+            [expression, _, _, type_spec] => {
+                match self.walk_tree(expression, expr) {
+                    Ok(_) => {
+                        expr.append_str(&format!("type?({})", type_spec.as_str()));
+                        Ok(())
+                    },
+                    Err(message) => {
+                        Err(format!("Error compiling operand for instance of operator: {}. {}", expression.as_str(), message))
+                    }
+                }
+            },
+            _ => Err(format!("Incorrect number of operands in instance of expression {}.", pair.as_str()))
+        }
+    }
+
     fn walk_if_then_else(&mut self, pair: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
-        let children = self.children(pair);
-        match children.as_slice() {
+        match self.children(pair).as_slice() {
             [_, condition, _, true_result, _, false_result] => {
                 let mut condition_expr = CompiledExpression::new("condition");
                 let mut true_expr = CompiledExpression::new("if expression");
@@ -940,10 +948,37 @@ mod tests {
   }
 
   #[test]
+  fn test_list_construction_and_equality() {
+    let expected = FeelValue::new_list(vec![1.into(), 2.into(), 3.into(), 4.into()]);
+    compiler_test_with_builtins("[1,2,3,4]", expected);
+    compiler_test_with_builtins("[1,2,3,4] = 1", FeelValue::Null);
+    compiler_test_with_builtins("[1,2,3,4] = [1,2,3,4]", true.into());
+    compiler_test_with_builtins("[1,2,3,4] = [1,2,3]", false.into());
+}
+
+  #[test]
+  fn test_instance_of() {
+    compiler_test_with_builtins("true instance of boolean", true.into());
+    compiler_test_with_builtins("(3 > 10) instance of boolean", true.into());
+    compiler_test_with_builtins("true instance of Any", true.into());
+    compiler_test_with_builtins("10 instance of number", true.into());
+    compiler_test_with_builtins("null instance of Null", true.into());
+    compiler_test_with_builtins("[1,2,3,4] instance of number", false.into());
+    compiler_test_with_builtins("[1,2,3,4] instance of list<number>", true.into());
+    compiler_test_with_builtins("[1,false,3,4] instance of list<number>", false.into());
+  }
+
+  #[test]
   fn test_if_then_else() {
     compiler_test("if 2 + 2 = 4 then 1 else 0", 1.0.into());
     compiler_test("if 2 + 2 > 4 then 1 else 0", 0.0.into());
   } 
+
+  // ////////////////////////////////// //
+  //                                    //
+  //          Helper functions          //
+  //                                    //
+  // ////////////////////////////////// //
 
   fn compiler_test(source_expression: &str, expected: FeelValue) {
     compiler_test_base(source_expression, expected, false);
@@ -978,12 +1013,14 @@ mod tests {
             nctx.push(ctx.into());
             let mut interpreter = Interpreter::new(expr, nctx);
             let (actual, message) = interpreter.trace();
-            if print_diagnostics() { println!("{}", message); }
-
+            if print_diagnostics() { 
+                println!("Trace:\n{}", message); 
+                ExecutionLog::print(&format!("Execution log for '{}':\n", source_expression));
+            }
             assert_eq!(expected, actual);    
         },
         Err(s) => {
-            ExecutionLog::print("Error compiling expression:\n");
+            ExecutionLog::print(&format!("Execution log for '{}':\n", source_expression));
             assert!(false, "Error compiling expression: {}", s);
         }
     };

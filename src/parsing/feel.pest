@@ -29,7 +29,7 @@ start_expression = {
 }
 
 expression = {
-      boxed_expression ~ !(__ ~ ("[" | "."))
+      boxed_expression ~ !(__ ~ ("[" | "." | comparision_operator | instance_token))
     | textual_expression
 }
 
@@ -278,7 +278,7 @@ simple_positive_unary_test = !{
 unary_operator = !{
       "<="
     | ">="
-    | "<"
+    | ( !(nested_type_spec_start | function_token) ~ "<" )
     | ">"
 }
 
@@ -432,19 +432,70 @@ left_expf = {
 }
 
 // Rule 51. The DNS Spec refers to a rule for "type" which recursively
-//          constructs lattice types. We use "type_name" because "type"
+//          constructs lattice types. We use "type_spec" because "type"
 //          is a reserved word in Rust.
 instance_of = !{
 	// left_expf ~ instance_of_token ~ qualified_name
-	left_expf ~ "instance" ~ "of" ~ type_name
+	  (left_expf ~ instance_token ~ of_token ~ type_spec)
+  | (boxed_expression ~ instance_token ~ of_token ~ type_spec)
 }
 
 // Rule 52. Lattice types.
-type_name = @{
-    qualified_name
-  | ( "list" ~ "<" ~ type_name ~ ">" )
-  | ( "context" ~ "<" ~ name ~ ":" ~ type_name ~ ( "," ~ name ~ ":" ~ type_name )*  ~ ">" )
-  | ( "function" ~ "<" ~ ( type_name ~ ( "," ~ type_name )* )? ~ ">" ~ "->" ~ type_name )
+// Ideal:
+// type_spec = @{
+//     qualified_name
+//   | ( "range" ~ "<" ~ type_spec ~ ">" )
+//   | ( "list" ~ "<" ~ type_spec ~ ">" )
+//   | ( "context" ~ "<" ~ name ~ ":" ~ type_spec ~ ( "," ~ name ~ ":" ~ type_spec )*  ~ ">" )
+//   | ( "function" ~ "<" ~ ( type_spec ~ ( "," ~ type_spec )* )? ~ ">" ~ "->" ~ type_spec )
+// }
+// Compromise, still won't work:
+// type_spec = !{
+//     simple_type_spec
+//   | ( "range" ~ "<" ~ type_spec ~ ">" )
+//   | ( "list" ~ "<" ~ type_spec ~ ">" )
+//   | ( "context" ~ "<" ~ name ~ ":" ~ type_spec ~ ( "," ~ name ~ ":" ~ type_spec )*  ~ ">" )
+//   | ( "function" ~ "<" ~ ( type_spec ~ ( "," ~ type_spec )* )? ~ ">" ~ "->" ~ type_spec )
+// }
+
+type_spec = !{
+    simple_type_spec
+  | (nested_type_spec_start ~ bracketed)
+  | (function_token ~ bracketed ~ "->" ~ type_spec)
+}
+
+type_spec_start = { 
+    simple_type_spec 
+  | nested_type_spec_start 
+  | function_token
+}
+
+simple_type_spec = !{
+    "Any"
+  | "Null" 
+  | "number"
+  | "string"
+  | "boolean"
+  | "date"
+  | "time"
+  | "date and time"
+  | "years and months duration"
+  | "days and time duration"
+}
+
+nested_type_spec_start = !{
+    range_token
+  | list_token
+  | context_token
+}
+
+bracketed = @{ 
+  "<" ~ (not_angle_bracket | bracketed)* ~ ">"
+}
+
+not_angle_bracket = {
+  !( "<" | ">" )
+  ~ ANY
 }
 
 txt_expe = { arithmetic_expression }
@@ -501,10 +552,14 @@ left_expd	= {
     | left_expe 
 }
 
-comparision_operator = @{ 
+equality_operator = @{
       "="
     | "!="
-    | ("<" ~ !"=")
+}
+
+comparision_operator = @{ 
+      equality_operator
+    | ( !(nested_type_spec_start | function_token) ~ "<" ~ !"=" )
     | "<="
     | (">" ~ !"=")
     | ">="
@@ -515,6 +570,9 @@ comparision = !{
     | left_expd ~ between_token ~ left_expd ~ and_token ~ left_expd
     | left_expd ~ in_token ~ positive_unary_test
     | left_expd ~ in_token ~ "(" ~ positive_unary_tests ~ ")"
+    // This case missing from Javascript version. Not sure best way to fix. 
+    // Permits lists and contexts to be compared.
+    | boxed_expression ~ comparision_operator ~ expression
 }
 
 txt_expc = { conjunction }
@@ -653,7 +711,8 @@ keyword = {
     | not_token
     | for_token
     | return_token
-    | instance_of_token
+    | instance_token
+    | of_token
     | in_token
     | if_token
     | then_token
@@ -664,6 +723,9 @@ keyword = {
     | between_token
     | function_token
     | external_token
+    | range_token
+    | list_token
+    | context_token
 }
 
 source_character = _{ 
@@ -719,9 +781,13 @@ some_token        = ${ "some"                           ~  !name_part_char }
 every_token       = ${ "every"                          ~  !name_part_char }
 satisfies_token   = ${ "satisfies"                      ~  !name_part_char }
 between_token     = ${ "between"                        ~  !name_part_char }
-instance_of_token = ${ ("instanceof" | "instance of")   ~  !name_part_char }
+instance_token    = ${ "instance" ~ &(WHITESPACE+ ~  &"of") }
+of_token          = ${ "of" ~  &(WHITESPACE+ ~ type_spec_start) }
 function_token    = ${ "function"                       ~  !name_part_char }
 external_token    = ${ "external"                       ~  !name_part_char }
+range_token       = ${ "range" ~ &(__ ~ "<") }
+list_token        = ${ "list" ~ &(__ ~ "<") }
+context_token     = ${ "context" ~ &(__ ~ "<") }
 
 //Tokens and Whitespace End
 

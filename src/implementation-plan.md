@@ -153,7 +153,7 @@ These tasks are for creating OpCodes for complex statements, such as for-loops a
  - [x] Assembling Lists
  - [ ] Assembling Contexts
  - [x] Assembling Ranges
- - [ ] Selection (mapping list of items to list of property values)
+ - [x] Selection (mapping list of items to list of property values)
  - [ ] Sorting
  - [ ] Filtering
      - [x] Macros to generate OpCodes for control logic of list filtering

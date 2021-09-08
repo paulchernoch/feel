@@ -2575,6 +2575,7 @@ impl Builtins {
       Ok(arguments) => {
         let a = &arguments[0];
         let b = &arguments[1];
+
         match b {
           FeelValue::Null => a.is_null().into(),
           FeelValue::String(type_string) => {
@@ -2582,6 +2583,7 @@ impl Builtins {
             match target_type_result {
               stdResult::Ok(target_type) => {
                 let argument_type = a.get_lattice_type(contexts);
+
                 let conforms = argument_type.conforms_to(&target_type);
                 conforms.into()
               },

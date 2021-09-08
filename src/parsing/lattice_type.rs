@@ -85,8 +85,14 @@ impl LatticeType {
                     let item_type = LatticeType::from_value(item, context);
                     if first_item_type.equivalent_to(&LatticeType::Null) {
                         first_item_type = item_type.clone();
+                        true
                     }
-                    first_item_type.equivalent_to(&item_type)
+                    else if item_type.equivalent_to(&LatticeType::Null) {
+                        true
+                    }
+                    else {
+                        first_item_type.equivalent_to(&item_type)
+                    }
                 });
                 if same_types {
                     first_item_type
@@ -114,10 +120,8 @@ impl LatticeType {
             FeelValue::List(rr_list) => LatticeType::List(Box::new(LatticeType::infer_list_item_type(&rr_list.borrow(), context))),
             FeelValue::Context(c) => c.infer_lattice_type(context),
 
-            // TODO: FeelFunction must be rewritten to use LatticeTypes. 
-            // FeelValue::Function(func) => LatticeType::Function { parameters: ?, return_type: ? },
-
-            FeelValue::Null => LatticeType::Number,
+            FeelValue::Function(f) => f.get_lattice_type().clone(),
+            FeelValue::Null => LatticeType::Null,
             _ => LatticeType::Any
           }
     }
