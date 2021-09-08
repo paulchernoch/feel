@@ -729,6 +729,7 @@ impl CompiledExpression {
         let innermost_label = 1_usize;
         let short_circuit_label = 2_usize;
         let continue_label = 3_usize;
+        let null_result_label = 4_usize;
         // We will initialize the result to be what we get if we proceed to the end of the loop without
         // being able to shortcut. That means that inside the loop, we only set a return value 
         // when we get to shortcut, meaning finding a false value in an "every" loop or a true value in a "some" loop. 
@@ -909,6 +910,9 @@ impl CompiledExpression {
         };
         let short_circuit_result = if is_every_loop { "false" } else { "true" };
 
+        // A null value immediately stops an "every" loop with a null result, but not a "some" loop.
+        let null_branch_label = if is_every_loop { null_result_label } else { continue_label };
+
         let mut loop_ops = String::new();
         loop_ops.push_str(&loop_start_ops);
         // Down below we can't do a goto to get out of the loops,
@@ -918,16 +922,25 @@ impl CompiledExpression {
                 label({innermost})
                 // Assume that the innermost expression creates a boolean value and leaves it on the stack. 
                 // Decide whether to short circuit the loops.
-                {test} branch({short_circuit}/{continue_loop}/{continue_loop})
+                {test} branch({short_circuit}/{continue_loop}/{null_branch})
+
+                // Found a true for a some loop or a false for an every loop, so can short-circuit
                 label({short_circuit})
                 {sc_result} 'satisfies result' !
+                goto({continue_loop})
+
+                // Found a null for an every loop, so can short-circuit with null result
+                label({null_result})
+                null 'satisfies result' !
                 label({continue_loop})
             ",
             test = short_circuit_test,
             innermost = innermost_label,
             sc_result = short_circuit_result,
             short_circuit = short_circuit_label,
-            continue_loop = continue_label
+            continue_loop = continue_label,
+            null_branch = null_branch_label,
+            null_result = null_result_label
         ));
         loop_ops.push_str(&loop_end_ops);
         let mut loop_expr = CompiledExpression::new_from_string(&loop_ops, false);

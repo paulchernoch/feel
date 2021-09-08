@@ -1994,7 +1994,7 @@ num(-2)
             "n", 
             " list 11 push 12 push 13 push 14 push ", 
             true, // an "every x satisfies y" loop
-            true, // Expected result
+            Some(true), // Expected result
             "every x in [11,12,13,14] satisfies x > 10 -> should be true"
         );
         satisfies_loop_over_single_list_test_case(
@@ -2002,16 +2002,16 @@ num(-2)
             "n", 
             " list 11 push 9 push 13 push 14 push ", 
             true, // an "every x satisfies y" loop
-            false, // Expected result
+            Some(false), // Expected result
             "every x in [11,9,13,14] satisfies x > 10 -> should be false"
         );
         satisfies_loop_over_single_list_test_case(
             " 'n' @ 10 > ", 
             "n", 
-            " list 11 push 12 push 13 push null push ", 
+            " list 11 push 12 push 13 push null push", 
             true, // an "every x satisfies y" loop
-            false, // Expected result
-            "every x in [11,12,13,null] satisfies x > 10 -> should be false"
+            None, // Expected result
+            "every x in [11,12,13,null] satisfies x > 10 -> should be null"
         );
     }
 
@@ -2022,7 +2022,7 @@ num(-2)
             "n", 
             " list 11 push 12 push 13 push 14 push ", 
             false, // a "some x satisfies y" loop
-            true, // Expected result
+            Some(true), // Expected result
             "some x in [11,12,13,14] satisfies x > 10 -> should be true"
         );
         satisfies_loop_over_single_list_test_case(
@@ -2030,7 +2030,7 @@ num(-2)
             "n", 
             " list 1 push 2 push 3 push 4 push ", 
             false, // a "some x satisfies y" loop
-            false, // Expected result
+            Some(false), // Expected result
             "some x in [1,2,3,4] satisfies x > 10 -> should be false"
         );
         satisfies_loop_over_single_list_test_case(
@@ -2038,7 +2038,7 @@ num(-2)
             "n", 
             " list null push 2 push 3 push 11 push ", 
             false, // a "some x satisfies y" loop
-            true, // Expected result
+            Some(true), // Expected result
             "some x in [null,2,3,11] satisfies x > 10 -> should be true"
         );
     }
@@ -2104,7 +2104,7 @@ num(-2)
     vec
   }
 
-  fn satisfies_loop_over_single_list_test_case(predicate: &str, variable: &str, loop_context: &str, is_every_loop: bool, expected: bool, case_description: &str) {
+  fn satisfies_loop_over_single_list_test_case(predicate: &str, variable: &str, loop_context: &str, is_every_loop: bool, expected: Option<bool>, case_description: &str) {
     let mut over_ten = CompiledExpression::new_from_string(predicate, false);
     let loop_variable = FeelValue::Name(QName::from_str(variable).unwrap());
     let mut loop_context = CompiledExpression::new_from_string(loop_context, false);
@@ -2117,7 +2117,12 @@ num(-2)
     let (actual, message) = interpreter.trace();
     if print_diagnostics() { println!("{}", message); }
     let message = format!("Failed case {}", case_description);
-    assert_eq!(FeelValue::Boolean(expected), actual, "{}", message);        
+    let expected_value = match expected {
+        Some(true) => FeelValue::Boolean(true),
+        Some(false) => FeelValue::Boolean(false),
+        None => FeelValue::Null
+    };
+    assert_eq!(expected_value, actual, "{}", message);        
   }
 
 }
