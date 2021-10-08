@@ -1878,8 +1878,8 @@ num(-2)
 
         let mut square = CompiledExpression::new_from_string(" 'n' @ 'n' @ * ", false);
         let loop_variable = FeelValue::Name(QName::from_str("n").unwrap());
-        let mut loop_context = CompiledExpression::new_from_string(" list 1 push 2 push 3 push 4 push ", false);
-        let mut loops: Vec<(&FeelValue, &mut CompiledExpression)> = vec![(&loop_variable, &mut loop_context)];
+        let loop_context = CompiledExpression::new_from_string(" list 1 push 2 push 3 push 4 push ", false);
+        let mut loops: Vec<(FeelValue, CompiledExpression)> = vec![(loop_variable, loop_context)];
         let mut for_expression = CompiledExpression::for_loops(&mut loops, &mut square);
         for_expression.resolve_jumps();
 
@@ -1905,10 +1905,10 @@ num(-2)
         let outer_loop_variable = FeelValue::Name(QName::from_str("n").unwrap());
         let inner_loop_variable = FeelValue::Name(QName::from_str("m").unwrap());
         let mut outer_loop_context = CompiledExpression::new_from_string(" list 1 push 2 push 3 push 4 push ", false);
-        let mut inner_loop_context = CompiledExpression::new_from_string(" list 1 push 2 push ", false);
-        let mut loops: Vec<(&FeelValue, &mut CompiledExpression)> = vec![
-            (&outer_loop_variable, &mut outer_loop_context),
-            (&inner_loop_variable, &mut inner_loop_context)
+        let inner_loop_context = CompiledExpression::new_from_string(" list 1 push 2 push ", false);
+        let mut loops: Vec<(FeelValue, CompiledExpression)> = vec![
+            (outer_loop_variable, outer_loop_context),
+            (inner_loop_variable, inner_loop_context)
         ];
         let mut for_expression = CompiledExpression::for_loops(&mut loops, &mut square_times);
         for_expression.resolve_jumps();
@@ -1938,9 +1938,9 @@ num(-2)
         let loop_variable = FeelValue::Name(QName::from_str("n").unwrap());
 
         // Create a range from 1 to 4 (inclusive)
-        let mut loop_context = CompiledExpression::new_from_string(" 1 4 [lo,hi] ", false);
+        let loop_context = CompiledExpression::new_from_string(" 1 4 [lo,hi] ", false);
 
-        let mut loops: Vec<(&FeelValue, &mut CompiledExpression)> = vec![(&loop_variable, &mut loop_context)];
+        let mut loops: Vec<(FeelValue, CompiledExpression)> = vec![(loop_variable, loop_context)];
         let mut for_expression = CompiledExpression::for_loops(&mut loops, &mut factorial);
         for_expression.resolve_jumps();
 
@@ -1970,12 +1970,12 @@ num(-2)
         let inner_loop_variable = FeelValue::Name(QName::from_str("m").unwrap());
 
         // Create ranges from 1 to 3 (inclusive), one ascending, one descending
-        let mut outer_loop_context = CompiledExpression::new_from_string(" 1 3 [lo,hi] ", false);
-        let mut inner_loop_context = CompiledExpression::new_from_string(" 3 1 [lo,hi] ", false);
+        let outer_loop_context = CompiledExpression::new_from_string(" 1 3 [lo,hi] ", false);
+        let inner_loop_context = CompiledExpression::new_from_string(" 3 1 [lo,hi] ", false);
         
-        let mut loops: Vec<(&FeelValue, &mut CompiledExpression)> = vec![
-            (&outer_loop_variable, &mut outer_loop_context),
-            (&inner_loop_variable, &mut inner_loop_context)
+        let mut loops: Vec<(FeelValue, CompiledExpression)> = vec![
+            (outer_loop_variable, outer_loop_context),
+            (inner_loop_variable, inner_loop_context)
         ];
         let mut for_expression = CompiledExpression::for_loops(&mut loops, &mut sum);
         for_expression.resolve_jumps();
@@ -2107,8 +2107,8 @@ num(-2)
   fn satisfies_loop_over_single_list_test_case(predicate: &str, variable: &str, loop_context: &str, is_every_loop: bool, expected: Option<bool>, case_description: &str) {
     let mut over_ten = CompiledExpression::new_from_string(predicate, false);
     let loop_variable = FeelValue::Name(QName::from_str(variable).unwrap());
-    let mut loop_context = CompiledExpression::new_from_string(loop_context, false);
-    let mut loops: Vec<(&FeelValue, &mut CompiledExpression)> = vec![(&loop_variable, &mut loop_context)];
+    let loop_context = CompiledExpression::new_from_string(loop_context, false);
+    let mut loops: Vec<(FeelValue, CompiledExpression)> = vec![(loop_variable, loop_context)];
     let mut expression = CompiledExpression::satisfies_loops(&mut loops, &mut over_ten, is_every_loop);
     expression.resolve_jumps();
 

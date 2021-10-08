@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use super::compiled_expression::CompiledExpression;
 use pest::iterators::{Pairs,Pair};
 use crate::pest::Parser;
@@ -5,6 +6,7 @@ use crate::parsing::duration_parser::parse_duration;
 use crate::parsing::duration::{DurationVariety};
 use crate::parsing::feel_parser::{Rule,FeelParser,show_pair_tree};
 use crate::parsing::feel_value::FeelValue;
+use crate::parsing::qname::QName;
 
 /// Compile a string into a CompiledExpression by walking the AST created by the Pest parser. 
 pub struct Compiler<'a> {
@@ -109,7 +111,6 @@ impl<'a> Compiler<'a> {
         //       - simple_unary_tests (needed for Decision Tables?)
         //       - unary_tests (needed for Decision Tables?)
         //       - named_parameters, named_parameter
-        //       - instance_of
         //       - function_definition, function_body and related
         //       - for_expression, in_expressions, in_expression and related
         //       - quantified_expression (every and some loops)
@@ -278,6 +279,22 @@ impl<'a> Compiler<'a> {
             // If-then-else expression
             [Rule::if_expression, Rule::if_token, Rule::expression, Rule::then_token, Rule::expression, Rule::else_token, Rule::expression] => {
                 self.walk_if_then_else(pair, expr)
+            },
+
+            // For loops
+            [Rule::for_expression, Rule::for_token, Rule::in_expressions, Rule::return_token, Rule::expression] => {
+                self.walk_for_expression(&children[1], &children[3], expr)
+            },
+
+            // Satisfies loops (Quantified expression)
+            [Rule::quantified_expression, Rule::some_token, Rule::in_expressions, Rule::satisfies_token, Rule::expression] => {
+                let is_every = false;
+                self.walk_satisfies_expression(is_every, &children[1], &children[3], expr)
+            },
+
+            [Rule::quantified_expression, Rule::every_token, Rule::in_expressions, Rule::satisfies_token, Rule::expression] => {
+                let is_every = true;
+                self.walk_satisfies_expression(is_every, &children[1], &children[3], expr)
             },
 
             _ => Err(format!("Compilation not implemented for rule {:?}", rule))
@@ -661,6 +678,80 @@ impl<'a> Compiler<'a> {
             },
             _ => Err(format!("Incorrect number of arguments to if-then-else expression {}.", pair.as_str()))
         }
+    }
+
+    fn walk_for_expression(&mut self, in_expressions: &Pair<'a, Rule>, inner_expression: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
+        let mut inner_expr = CompiledExpression::new("inner");
+        let r1 = self.walk_tree(inner_expression, &mut inner_expr);
+        if let Err(message) = r1 {
+            return Err(format!("Unable to parse body of for-expression {}. {}", inner_expression.as_str(), message));
+        }
+
+        let in_expr_children = self.children(in_expressions);
+
+        let mut loop_vars_with_expressions: Vec<(FeelValue, CompiledExpression)> = Vec::new();
+        for in_expr in &in_expr_children {
+            // Assume: in_expression = name ~ in_token ~ expression
+            let in_expr_parts = self.children(in_expr);
+            // let mut loop_variable = FeelValue::Name(QName::from_str(in_expr_parts[0].as_str()).unwrap());
+            let mut loop_expr = CompiledExpression::new("loop-expression");
+            let r2 = self.walk_tree(&in_expr_parts[2], &mut loop_expr);
+
+            if let Err(message) = r2 {
+                return Err(format!("Unable to parse for-expression's loop expression {}. {}", in_expr_parts[2].as_str(), message));
+            }
+            loop_vars_with_expressions.push((
+                // &loop_variable, 
+                FeelValue::Name(QName::from_str(in_expr_parts[0].as_str()).unwrap()),
+                loop_expr
+            ));
+        }
+        let mut for_expr = CompiledExpression::for_loops(&mut loop_vars_with_expressions, &mut inner_expr);
+        expr.append(&mut for_expr);
+        Ok(())
+    }
+
+    /// walk_satisfies_expression will assemble either a some-loop or an every-loop.
+    ///   If is_every is true, assume an every loop.
+    ///   If is_every is false, assume an some loop.
+    fn walk_satisfies_expression(&mut self, is_every: bool, in_expressions: &Pair<'a, Rule>, inner_expression: &Pair<'a, Rule>, expr: &mut CompiledExpression) -> Result<(), String> {
+        let mut inner_expr = CompiledExpression::new("inner");
+        let r1 = self.walk_tree(inner_expression, &mut inner_expr);
+        let loop_type = if is_every { "every" } else { "some" };
+        if let Err(message) = r1 {
+            return Err(format!("Unable to parse body of {}-expression {}. {}", 
+                loop_type, 
+                inner_expression.as_str(), 
+                message
+            ));
+        }
+
+        let in_expr_children = self.children(in_expressions);
+
+        let mut loop_vars_with_expressions: Vec<(FeelValue, CompiledExpression)> = Vec::new();
+        for in_expr in &in_expr_children {
+            // Assume: in_expression = name ~ in_token ~ expression
+            let in_expr_parts = self.children(in_expr);
+            // let mut loop_variable = FeelValue::Name(QName::from_str(in_expr_parts[0].as_str()).unwrap());
+            let mut loop_expr = CompiledExpression::new("loop-expression");
+            let r2 = self.walk_tree(&in_expr_parts[2], &mut loop_expr);
+
+            if let Err(message) = r2 {
+                return Err(format!("Unable to parse {}-expression's loop expression {}. {}", 
+                    loop_type, 
+                    in_expr_parts[2].as_str(), 
+                    message
+                ));
+            }
+            loop_vars_with_expressions.push((
+                // &loop_variable, 
+                FeelValue::Name(QName::from_str(in_expr_parts[0].as_str()).unwrap()),
+                loop_expr
+            ));
+        }
+        let mut for_expr = CompiledExpression::satisfies_loops(&mut loop_vars_with_expressions, &mut inner_expr, is_every);
+        expr.append(&mut for_expr);
+        Ok(())
     }
 
     fn pair_list(&self, pairs: Pairs<'a, Rule>) -> Vec<Pair<'a, Rule>> {

@@ -455,6 +455,7 @@ impl CompiledExpression {
         if_else_expr
     }
 
+
     /// Generate the OpCodes for a series of nested for loops that build up a list of results,
     /// one per iteration of the innermost loop. 
     /// This function does not expect that a context is on the data stack to start, hence will create one.
@@ -501,7 +502,7 @@ impl CompiledExpression {
     ///       If an expression shadows them with its own definitions in an inner context,
     ///       it will break things. It may be necessary to permit QNames that use a character not permitted
     ///       in normal expressions via the language parser and include that character in the loop variable names.
-    pub fn for_loops(loops: &mut Vec<(&FeelValue, &mut CompiledExpression)>, innermost: &mut CompiledExpression) -> CompiledExpression {
+    pub fn for_loops(loops: &mut Vec<(FeelValue, CompiledExpression)>, innermost: &mut CompiledExpression) -> CompiledExpression {
         // Because it is tedious to reference items on the stack other than the top three and we need to 
         // set the values of eight context entries, we will initialize all eight properties to Null
         // and store the context in contexts.
@@ -527,7 +528,7 @@ impl CompiledExpression {
         for loop_number in 1..=loop_count {
             // "iteration_context" below is normally an expression that yields a List or Range, not a context.
             // This is terminology borrowed from the DMN spec.
-            let (param_name, &mut ref mut iteration_context) = loops[loop_number - 1];
+            let (ref param_name, ref mut iteration_context) = loops[loop_number - 1];
             let null_vars = format!("
                 // Initialize loop variables for {name} (loop #{num}) to null
                 '{name}' null xset
@@ -574,7 +575,7 @@ impl CompiledExpression {
         let mut loop_start_ops = String::new();
         let mut loop_end_ops = String::new();
         for loop_number in 1..=loop_count {
-            let (param_name, _) = loops[loop_number - 1];
+            let (param_name, _) = &loops[loop_number - 1];
             let a = loop_number * 20;
             // The logic will distinguish between iteration contexts that are Ranges versus Lists. 
             //   - For Ranges, all the information we need is already stored in the loop variables. 
@@ -712,7 +713,7 @@ impl CompiledExpression {
     ///                      "some" from returning true should another iteration yield a true. 
     ///    is_every_loop ... If true, this is an "every x in expression satisfies y" expression. 
     ///                      If false, this is a "some x in expression satisfies y" expression.
-    pub fn satisfies_loops(loops: &mut Vec<(&FeelValue, &mut CompiledExpression)>, innermost: &mut CompiledExpression, is_every_loop: bool) -> CompiledExpression {
+    pub fn satisfies_loops(loops: &mut Vec<(FeelValue, CompiledExpression)>, innermost: &mut CompiledExpression, is_every_loop: bool) -> CompiledExpression {
         // Because it is tedious to reference items on the stack other than the top three and we need to 
         // set the values of seven context entries, we will initialize all seven properties to Null
         // and store the context in contexts.
@@ -754,7 +755,7 @@ impl CompiledExpression {
         for loop_number in 1..=loop_count {
             // "iteration_context" below is normally an expression that yields a List or Range, not a context.
             // This is terminology borrowed from the DMN spec.
-            let (param_name, &mut ref mut iteration_context) = loops[loop_number - 1];
+            let (ref param_name, ref mut iteration_context) = loops[loop_number - 1];
             let null_vars = format!("
                 // Initialize loop variables for {name} (loop #{num}) to null
                 '{name}' null xset
@@ -801,7 +802,7 @@ impl CompiledExpression {
         let mut loop_start_ops = String::new();
         let mut loop_end_ops = String::new();
         for loop_number in 1..=loop_count {
-            let (param_name, _) = loops[loop_number - 1];
+            let (param_name, _) = &loops[loop_number - 1];
             let a = loop_number * 20;
             // The logic will distinguish between iteration contexts that are Ranges versus Lists. 
             //   - For Ranges, all the information we need is already stored in the loop variables. 

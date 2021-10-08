@@ -126,7 +126,7 @@ It addresses simple mathematical formulas.
  - [x] between
  - [x] Qualified Name lookup
  - [x] in
- - [ ] instance of
+ - [x] instance of
  - [x] Conditional (if-then-else)
  - [x] Context property lookup (paths)
  - [x] Special property lookup
